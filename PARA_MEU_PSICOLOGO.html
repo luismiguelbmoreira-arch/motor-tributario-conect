@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Luis Miguel — Mente, Marca e Missão</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,700;0,900;1,700&display=swap');
+
+:root {
+  --preto: #0A0A0F;
+  --branco: #F5F3EE;
+  --ouro: #C9A84C;
+  --ouro2: #E8C97A;
+  --azul: #1A3A5C;
+  --azul2: #2B6CB0;
+  --verde: #1A4A3A;
+  --verde2: #2D8C6A;
+  --cinza: #8A8A9A;
+  --card-bg: #13131A;
+  --card-borda: rgba(201,168,76,0.2);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--preto);
+  color: var(--branco);
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+
+/* ── PARTÍCULAS DE FUNDO ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 10%, rgba(201,168,76,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(27,60,92,0.12) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── PROGRESS BAR ── */
+.progress-bar {
+  position: fixed;
+  top: 0; left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--ouro), var(--ouro2));
+  width: 0%;
+  z-index: 100;
+  transition: width 0.1s;
+}
+
+/* ── NAV ── */
+nav {
+  position: fixed;
+  top: 8px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 99;
+  display: flex;
+  gap: 4px;
+  background: rgba(10,10,15,0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(201,168,76,0.2);
+  border-radius: 100px;
+  padding: 8px 16px;
+}
+nav a {
+  color: var(--cinza);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .5px;
+  padding: 4px 12px;
+  border-radius: 100px;
+  transition: all .2s;
+}
+nav a:hover, nav a.active {
+  color: var(--ouro);
+  background: rgba(201,168,76,0.1);
+}
+
+/* ── HERO ── */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 80px 24px;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-eyebrow {
+  font-size: 11px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--ouro);
+  margin-bottom: 28px;
+  opacity: 0;
+  animation: fadeUp 1s .3s forwards;
+}
+
+.hero h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(48px, 8vw, 96px);
+  font-weight: 900;
+  line-height: 1.0;
+  margin-bottom: 8px;
+  opacity: 0;
+  animation: fadeUp 1s .5s forwards;
+}
+
+.hero h1 em {
+  font-style: italic;
+  color: var(--ouro);
+}
+
+.hero-sub {
+  font-size: clamp(16px, 2.5vw, 22px);
+  color: var(--cinza);
+  max-width: 560px;
+  margin: 24px auto 48px;
+  opacity: 0;
+  animation: fadeUp 1s .7s forwards;
+}
+
+.hero-badges {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  opacity: 0;
+  animation: fadeUp 1s .9s forwards;
+}
+.badge {
+  font-size: 12px;
+  padding: 7px 16px;
+  border-radius: 100px;
+  border: 1px solid rgba(201,168,76,0.3);
+  color: var(--ouro2);
+  background: rgba(201,168,76,0.07);
+  font-weight: 500;
+  letter-spacing: .3px;
+}
+
+.hero-scroll {
+  position: absolute;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  animation: fadeUp 1s 1.4s forwards;
+}
+.hero-scroll span { font-size: 11px; color: var(--cinza); letter-spacing: 2px; }
+.scroll-line {
+  width: 1px;
+  height: 40px;
+  background: linear-gradient(to bottom, var(--ouro), transparent);
+  animation: pulse-line 2s infinite;
+}
+
+/* ── SEÇÕES ── */
+section {
+  position: relative;
+  z-index: 1;
+  padding: 100px 24px;
+}
+.container { max-width: 900px; margin: 0 auto; }
+.container-wide { max-width: 1100px; margin: 0 auto; }
+
+.section-eyebrow {
+  font-size: 11px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--ouro);
+  margin-bottom: 16px;
+}
+.section-title {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 900;
+  line-height: 1.1;
+  margin-bottom: 20px;
+}
+.section-sub {
+  font-size: 17px;
+  color: var(--cinza);
+  max-width: 600px;
+  margin-bottom: 56px;
+  line-height: 1.8;
+}
+
+/* ── DIVISOR ── */
+.divider {
+  width: 48px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--ouro), transparent);
+  margin: 20px 0 40px;
+}
+
+/* ── CARDS BASE ── */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-borda);
+  border-radius: 20px;
+  padding: 32px;
+  transition: border-color .3s, transform .3s;
+}
+.card:hover {
+  border-color: rgba(201,168,76,0.5);
+  transform: translateY(-4px);
+}
+
+/* ── MENTE SECTION ── */
+.mente-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+@media(max-width:640px){ .mente-grid { grid-template-columns: 1fr; } }
+
+.mente-card { }
+.mente-icon {
+  font-size: 32px;
+  margin-bottom: 16px;
+  display: block;
+}
+.mente-card h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--branco);
+}
+.mente-card p { font-size: 14px; color: var(--cinza); line-height: 1.7; }
+
+.quote-block {
+  border-left: 3px solid var(--ouro);
+  padding: 20px 28px;
+  background: rgba(201,168,76,0.04);
+  border-radius: 0 16px 16px 0;
+  margin: 48px 0;
+}
+.quote-block p {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 20px;
+  color: var(--ouro2);
+  line-height: 1.5;
+}
+.quote-block cite {
+  display: block;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--cinza);
+  font-style: normal;
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── IA SECTION ── */
+.ia-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+  margin: 48px 0;
+}
+.ia-flow::before {
+  content: '';
+  position: absolute;
+  left: 23px; top: 0; bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--ouro), rgba(201,168,76,0.1));
+}
+.ia-step {
+  display: flex;
+  gap: 24px;
+  padding-bottom: 36px;
+  position: relative;
+}
+.ia-dot {
+  width: 48px; height: 48px; flex-shrink: 0;
+  background: var(--card-bg);
+  border: 2px solid var(--ouro);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  position: relative;
+  z-index: 2;
+}
+.ia-step-content { padding-top: 8px; }
+.ia-step-content h4 { font-size: 16px; font-weight: 700; margin-bottom: 6px; color: var(--ouro2); }
+.ia-step-content p  { font-size: 14px; color: var(--cinza); }
+
+/* ── PROJETOS ── */
+.projeto-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 28px;
+  align-items: start;
+  margin-bottom: 24px;
+}
+@media(max-width:640px){ .projeto-card { grid-template-columns: 1fr; } }
+
+.projeto-logo {
+  width: 72px; height: 72px;
+  border-radius: 18px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+  font-weight: 900;
+  color: white;
+  flex-shrink: 0;
+  font-family: 'Inter', sans-serif;
+}
+.logo-azul  { background: linear-gradient(135deg, #0F4C81, #2B6CB0); }
+.logo-verde { background: linear-gradient(135deg, #0D6A4F, #2D8C6A); }
+.logo-preto { background: linear-gradient(135deg, #1A1A2E, #16213E); border: 1px solid rgba(255,60,60,0.4); }
+
+.projeto-info h3 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+.projeto-info .tagline { font-size: 13px; color: var(--ouro); letter-spacing: .5px; margin-bottom: 12px; font-weight: 600; text-transform: uppercase; }
+.projeto-info p { font-size: 14px; color: var(--cinza); line-height: 1.7; margin-bottom: 16px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.chip {
+  font-size: 11px;
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-weight: 600;
+  letter-spacing: .3px;
+}
+.chip-ouro  { background: rgba(201,168,76,0.1); color: var(--ouro2); border: 1px solid rgba(201,168,76,0.25); }
+.chip-azul  { background: rgba(43,108,176,0.1); color: #90CDF4; border: 1px solid rgba(43,108,176,0.25); }
+.chip-verde { background: rgba(45,140,106,0.1); color: #9AE6B4; border: 1px solid rgba(45,140,106,0.25); }
+.chip-red   { background: rgba(220,38,38,0.1);  color: #FCA5A5; border: 1px solid rgba(220,38,38,0.25); }
+
+/* ── RELATORIO EXEMPLO ── */
+.relatorio-box {
+  background: #0D1117;
+  border: 1px solid rgba(201,168,76,0.2);
+  border-radius: 16px;
+  overflow: hidden;
+  margin: 32px 0;
+}
+.relatorio-header {
+  background: rgba(201,168,76,0.06);
+  border-bottom: 1px solid rgba(201,168,76,0.15);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ouro);
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+.relatorio-dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot-red   { background: #FF5F57; }
+.dot-yel   { background: #FFBD2E; }
+.dot-grn   { background: #28C840; }
+.relatorio-body {
+  padding: 24px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 2;
+  color: #cdd6f4;
+}
+.rl { display: block; }
+.rl .k  { color: #CBA6F7; }
+.rl .v  { color: #A6E3A1; }
+.rl .s  { color: #FAB387; }
+.rl .c  { color: #6C7086; }
+.rl .h  { color: var(--ouro2); font-weight: 700; }
+
+/* ── STATS ── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  margin: 48px 0;
+}
+.stat-item {
+  text-align: center;
+  padding: 28px 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-borda);
+  border-radius: 16px;
+}
+.stat-num {
+  font-family: 'Playfair Display', serif;
+  font-size: 42px;
+  font-weight: 900;
+  color: var(--ouro);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.stat-label { font-size: 12px; color: var(--cinza); letter-spacing: .5px; }
+
+/* ── LINHA DO TEMPO ── */
+.timeline-dark { padding: 16px 0; }
+.tld-item {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 24px;
+  opacity: 0;
+  transform: translateX(-20px);
+  transition: opacity .6s, transform .6s;
+}
+.tld-item.visible { opacity: 1; transform: translateX(0); }
+.tld-year {
+  min-width: 60px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ouro);
+  padding-top: 2px;
+  text-align: right;
+}
+.tld-line {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+.tld-circle {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--ouro);
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.tld-track {
+  width: 2px;
+  flex: 1;
+  background: linear-gradient(to bottom, rgba(201,168,76,0.4), transparent);
+  min-height: 32px;
+}
+.tld-content h4 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+.tld-content p  { font-size: 13px; color: var(--cinza); }
+
+/* ── CARTA FINAL ── */
+.carta {
+  background: linear-gradient(135deg, rgba(201,168,76,0.06), rgba(27,60,92,0.06));
+  border: 1px solid rgba(201,168,76,0.25);
+  border-radius: 24px;
+  padding: 56px 48px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.carta::before {
+  content: '"';
+  position: absolute;
+  top: -20px; left: 32px;
+  font-family: 'Playfair Display', serif;
+  font-size: 200px;
+  color: rgba(201,168,76,0.06);
+  line-height: 1;
+  pointer-events: none;
+}
+.carta h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 900;
+  margin-bottom: 24px;
+  line-height: 1.2;
+}
+.carta h2 em { color: var(--ouro); font-style: italic; }
+.carta p {
+  font-size: 16px;
+  color: var(--cinza);
+  max-width: 600px;
+  margin: 0 auto 32px;
+  line-height: 1.8;
+}
+.carta-sig {
+  font-size: 14px;
+  color: var(--ouro2);
+  font-weight: 600;
+}
+
+/* ── FOOTER ── */
+footer {
+  text-align: center;
+  padding: 40px 24px;
+  font-size: 12px;
+  color: rgba(138,138,154,0.5);
+  letter-spacing: 1px;
+}
+
+/* ── ANIMAÇÕES ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-line {
+  0%,100% { opacity: .3; }
+  50%      { opacity: 1; }
+}
+
+.fade-in {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity .8s, transform .8s;
+}
+.fade-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── PRINT ── */
+@media print {
+  nav, .progress-bar, .hero-scroll { display: none !important; }
+  body { background: white; color: #1a1a1a; }
+  .hero { min-height: auto; padding: 40px 24px; }
+  .card { background: #f8f8f8; border: 1px solid #ddd; break-inside: avoid; }
+  .card-bg { background: #f8f8f8; }
+  section { padding: 40px 24px; }
+}
+</style>
+</head>
+<body>
+
+<div class="progress-bar" id="progress"></div>
+
+<nav>
+  <a href="#mente" class="active">Mente</a>
+  <a href="#ia">IA</a>
+  <a href="#projetos">Projetos</a>
+  <a href="#jornada">Jornada</a>
+  <a href="#carta">Mensagem</a>
+</nav>
+
+<!-- ──────────────── HERO ──────────────── -->
+<div class="hero" id="top">
+  <div class="hero-eyebrow">Para meu psicólogo · Março 2026</div>
+  <h1>Uma mente que<br>não para.<br><em>Nunca parou.</em></h1>
+  <p class="hero-sub">
+    Me chamo Luis Miguel Moreira. Tenho TDAH e Superdotação (Altas Habilidades). Só descobri isso como adulto — e quando descobri, tudo fez sentido.
+  </p>
+  <div class="hero-badges">
+    <span class="badge">🧠 TDAH</span>
+    <span class="badge">⚡ Superdotado</span>
+    <span class="badge">🤖 Arquiteto de IA</span>
+    <span class="badge">🏗️ Construtor de sistemas</span>
+    <span class="badge">⚖️ Especialista Tributário</span>
+    <span class="badge">🛡️ Pentest Ético</span>
+  </div>
+  <div class="hero-scroll">
+    <span>ROLE PARA VER</span>
+    <div class="scroll-line"></div>
+  </div>
+</div>
+
+
+<!-- ──────────────── MENTE ──────────────── -->
+<section id="mente">
+<div class="container">
+  <div class="fade-in">
+    <div class="section-eyebrow">Como minha mente funciona</div>
+    <h2 class="section-title">Meu cérebro é um<br><em style="color:var(--ouro)">motor de alta performance</em><br>sem freio de fábrica.</h2>
+    <div class="divider"></div>
+    <p class="section-sub">
+      Enquanto a maioria processa uma ideia por vez, eu processo dezenas em paralelo.
+      Isso que parecia caos era, na verdade, a minha forma de operar — acima da média em amplitude,
+      abaixo da média em linearidade. TDAH + Superdotação juntos criam um perfil
+      raro: capacidade excepcional de conexões, hiperfoco devastador, e dificuldade real
+      com tarefas que não engajam a mente completamente.
+    </p>
+  </div>
+
+  <div class="mente-grid fade-in">
+    <div class="card mente-card">
+      <span class="mente-icon">⚡</span>
+      <h3>Hiperfoco</h3>
+      <p>Quando algo captura minha atenção, entro num estado de concentração total que pode durar horas. Foi assim que construí motores de cálculo fiscal, frameworks de pentest e sistemas completos em dias — não semanas.</p>
+    </div>
+    <div class="card mente-card">
+      <span class="mente-icon">🔗</span>
+      <h3>Conexões não-lineares</h3>
+      <p>Vejo padrões entre coisas que parecem não ter relação. É por isso que consigo conectar direito tributário, arquitetura de software, segurança e design de produto num único ecossistema coeso.</p>
+    </div>
+    <div class="card mente-card">
+      <span class="mente-icon">🌊</span>
+      <h3>Pensamento em ondas</h3>
+      <p>Minha mente não é linear — é cíclica. Uma ideia traz outra, que traz outra, que eventualmente retorna à primeira com mais profundidade. A IA me ajuda a capturar essas ondas antes que se percam.</p>
+    </div>
+    <div class="card mente-card">
+      <span class="mente-icon">🎯</span>
+      <h3>Exigência de sentido</h3>
+      <p>Não consigo me engajar com algo que não vejo significado. Quando o propósito é claro — proteger famílias de passivos fiscais, garantir segurança digital para empresas — a execução vem naturalmente.</p>
+    </div>
+  </div>
+
+  <div class="quote-block fade-in">
+    <p>"Eu não tinha problema de atenção. Eu tinha atenção demais — em tudo ao mesmo tempo. Só faltava o sistema certo para canalizar isso."</p>
+    <cite>— Luis Miguel Moreira, após o diagnóstico</cite>
+  </div>
+</div>
+</section>
+
+
+<!-- ──────────────── IA ──────────────── -->
+<section id="ia" style="background: rgba(255,255,255,0.01);">
+<div class="container">
+  <div class="fade-in">
+    <div class="section-eyebrow">A IA como extensão da mente</div>
+    <h2 class="section-title">Não uso IA para<br><em style="color:var(--ouro)">substituir</em> minha mente.<br>Uso para libertá-la.</h2>
+    <div class="divider"></div>
+    <p class="section-sub">
+      A IA resolveu o maior conflito do meu TDAH: a memória de trabalho. Enquanto minha mente voa entre ideias,
+      a IA ancora o contexto, organiza a execução e mantém o fio da meada. Eu trago o brilho — ela mantém a ordem.
+    </p>
+  </div>
+
+  <div class="ia-flow fade-in">
+    <div class="ia-step">
+      <div class="ia-dot">💡</div>
+      <div class="ia-step-content">
+        <h4>Captura de insight</h4>
+        <p>Uma ideia surge — complexa, multidimensional, urgente. Em vez de perder no ruído mental, falo para a IA em tempo real, do jeito que o pensamento chega.</p>
+      </div>
+    </div>
+    <div class="ia-step">
+      <div class="ia-dot">🗂️</div>
+      <div class="ia-step-content">
+        <h4>Estruturação</h4>
+        <p>A IA organiza, quebra em etapas, cria contexto persistente. O que seria dispersão vira arquitetura. Tenho agentes especializados — O Viciado (código), Luiz Moreira (tributário), Master Zen (design).</p>
+      </div>
+    </div>
+    <div class="ia-step">
+      <div class="ia-dot">⚙️</div>
+      <div class="ia-step-content">
+        <h4>Execução em hiperfoco</h4>
+        <p>Com o contexto estabilizado, entro em modo de execução. Construo sistemas completos, certificados, testados — porque a IA cuidou do que me travaria: a burocracia cognitiva.</p>
+      </div>
+    </div>
+    <div class="ia-step">
+      <div class="ia-dot">📐</div>
+      <div class="ia-step-content">
+        <h4>Validação e rastreabilidade</h4>
+        <p>Cada decisão fica registrada. Cada cálculo tem trilha de auditoria. A IA garante que nada se perde — mesmo quando minha mente já está na próxima ideia.</p>
+      </div>
+    </div>
+    <div class="ia-step">
+      <div class="ia-dot">🚀</div>
+      <div class="ia-step-content">
+        <h4>Entrega com qualidade</h4>
+        <p>O resultado final tem o rigor que sistemas sérios exigem. Motor tributário certificado. Framework de pentest com NDA e trilha legal. Não é improviso — é engenharia.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats-row fade-in">
+    <div class="stat-item">
+      <div class="stat-num">3</div>
+      <div class="stat-label">empresas construídas com IA como co-piloto</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">11</div>
+      <div class="stat-label">testes automatizados — 100% passando</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">2033</div>
+      <div class="stat-label">sistema mapeado até regime tributário pleno</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">∞</div>
+      <div class="stat-label">contexto preservado — trilha de auditoria viva</div>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ──────────────── PROJETOS ──────────────── -->
+<section id="projetos">
+<div class="container">
+  <div class="fade-in">
+    <div class="section-eyebrow">O que foi construído</div>
+    <h2 class="section-title">Três mundos.<br><em style="color:var(--ouro)">Uma mente.</em></h2>
+    <div class="divider"></div>
+    <p class="section-sub">Cada projeto nasceu de um hiperfoco genuíno — e virou um sistema real, funcional, com propósito claro no mundo.</p>
+  </div>
+
+  <!-- CONECTBR -->
+  <div class="card fade-in" style="margin-bottom:24px;">
+    <div class="projeto-card">
+      <div class="projeto-logo logo-azul">C</div>
+      <div class="projeto-info">
+        <p class="tagline">Gestão Contábil & Tributária</p>
+        <h3>ConectBR</h3>
+        <p>Plataforma digital que conecta empresários e escritórios contábeis num ambiente inteligente. O cliente chega, envia seus documentos, e recebe diagnóstico claro do impacto da Reforma Tributária no seu caixa — sem precisar entender a lei.</p>
+        <p style="font-size:13px; color:var(--cinza);">Site: <span style="color:var(--ouro2);">conectebr.com</span> · Mercado: B2B escritórios contábeis + B2C empresários</p>
+        <div class="chips">
+          <span class="chip chip-azul">SaaS</span>
+          <span class="chip chip-ouro">Reforma Tributária</span>
+          <span class="chip chip-verde">LC 214/2025</span>
+          <span class="chip chip-azul">Dashboard ao vivo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REFIN -->
+  <div class="card fade-in" style="margin-bottom:24px;">
+    <div class="projeto-card">
+      <div class="projeto-logo logo-verde">rF</div>
+      <div class="projeto-info">
+        <p class="tagline">Motor Fiscal de Precisão Cirúrgica</p>
+        <h3>reFIN — Motor Tributário</h3>
+        <p>O cérebro técnico do ecossistema. Um motor de cálculo fiscal em Python com tripla camada de segurança, trilha de auditoria imutável e cobertura de testes de 100%. Cada centavo calculado tem prova matemática e âncora legal. Certificado com empresas reais.</p>
+        <div class="relatorio-box">
+          <div class="relatorio-header">
+            <div class="relatorio-dot dot-red"></div>
+            <div class="relatorio-dot dot-yel"></div>
+            <div class="relatorio-dot dot-grn"></div>
+            <span style="margin-left:8px;">CERTIFICADO CANAVEZI — CERT-2026-IVA-DUAL-001</span>
+          </div>
+          <div class="relatorio-body">
+            <span class="rl"><span class="c">// Empresa: CANAVEZI · Simples Nacional Anexo I</span></span>
+            <span class="rl"><span class="k">base_calculo</span>  = <span class="v">R$ 10.000,00</span></span>
+            <span class="rl"><span class="k">cbs_2027</span>      = <span class="s">8,8%</span>  <span class="c">← Art. 344 LC 214/2025</span></span>
+            <span class="rl"><span class="k">ibs_2027</span>      = <span class="s">0,1%</span>  <span class="c">← Fase transição</span></span>
+            <span class="rl"><span class="k">split_payment</span> = <span class="v">R$ 890,00</span>  <span class="c">← retido na fonte via PIX</span></span>
+            <span class="rl"><span class="h">▶ DELTA vs. governo: R$ 23,71 (0,14%) ✅ APROVADO</span></span>
+          </div>
+        </div>
+        <div class="chips">
+          <span class="chip chip-verde">Python + Pydantic V2</span>
+          <span class="chip chip-ouro">Trilha de Auditoria</span>
+          <span class="chip chip-azul">Split Payment 2026–2033</span>
+          <span class="chip chip-verde">3 empresas certificadas</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHADOWCORE -->
+  <div class="card fade-in">
+    <div class="projeto-card">
+      <div class="projeto-logo logo-preto" style="font-size:20px;">SC</div>
+      <div class="projeto-info">
+        <p class="tagline" style="color:#FF6B6B;">Segurança Cibernética Ética</p>
+        <h3>ShadowCore V99</h3>
+        <p>Framework de pentest autorizado de alta performance. Opera com escudo jurídico completo (NDA, Termo de Autorização, Regras de Engajamento) e gera relatórios executivos de impacto — transformando vulnerabilidades técnicas em argumentos comerciais com risco monetário quantificado.</p>
+        <p style="font-size:13px; color:var(--cinza); margin-bottom:12px;">Modelo: Pentest + Relatório R$35k → Remediação R$18k → Retenção 12x R$6.500/mês</p>
+        <div class="chips">
+          <span class="chip chip-red">Pentest Autorizado</span>
+          <span class="chip chip-ouro">LGPD + PCI-DSS</span>
+          <span class="chip chip-red">LegalHack v5</span>
+          <span class="chip chip-azul">PHP/Laravel · SaaS BR</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ──────────────── JORNADA ──────────────── -->
+<section id="jornada" style="background: rgba(255,255,255,0.01);">
+<div class="container">
+  <div class="fade-in">
+    <div class="section-eyebrow">A jornada</div>
+    <h2 class="section-title">Não foi confusão.<br><em style="color:var(--ouro)">Foi preparação.</em></h2>
+    <div class="divider"></div>
+    <p class="section-sub">Cada fase que parecia caótica estava me treinando para o próximo nível. O diagnóstico de TDAH/SD não explicou quem eu sou — confirmou.</p>
+  </div>
+
+  <div class="timeline-dark fade-in">
+    <div class="tld-item">
+      <div class="tld-year">Antes</div>
+      <div class="tld-line"><div class="tld-circle"></div><div class="tld-track"></div></div>
+      <div class="tld-content">
+        <h4>A mente sem diagnóstico</h4>
+        <p>Hiperfoco intenso em projetos, dificuldade com linearidade, energia que o sistema convencional não sabia aproveitar. Produção excepcional em ondas, paralisia em tarefas sem sentido.</p>
+      </div>
+    </div>
+    <div class="tld-item">
+      <div class="tld-year">Diagnóstico</div>
+      <div class="tld-line"><div class="tld-circle"></div><div class="tld-track"></div></div>
+      <div class="tld-content">
+        <h4>TDAH + Superdotação: o perfil completo</h4>
+        <p>A descoberta não foi um limite — foi um manual. Entender meu wiring permitiu parar de lutar contra minha natureza e começar a projetar sistemas que funcionam com ela, não contra ela.</p>
+      </div>
+    </div>
+    <div class="tld-item">
+      <div class="tld-year">2024</div>
+      <div class="tld-line"><div class="tld-circle"></div><div class="tld-track"></div></div>
+      <div class="tld-content">
+        <h4>A IA como sistema de suporte cognitivo</h4>
+        <p>Descobri que a IA não era uma ferramenta de produtividade genérica — era a extensão que minha mente precisava. Contexto persistente, estrutura automática, nenhuma ideia perdida.</p>
+      </div>
+    </div>
+    <div class="tld-item">
+      <div class="tld-year">2025</div>
+      <div class="tld-line"><div class="tld-circle"></div><div class="tld-track"></div></div>
+      <div class="tld-content">
+        <h4>Construção do ecossistema</h4>
+        <p>ConectBR ganha forma. reFIN começa a tomar corpo como motor de cálculo. ShadowCore entra como terceira vertical. Três hiperfoco simultâneos — cada um num domínio real e necessário.</p>
+      </div>
+    </div>
+    <div class="tld-item">
+      <div class="tld-year">Mar 2026</div>
+      <div class="tld-line"><div class="tld-circle" style="background:var(--ouro2); box-shadow:0 0 12px rgba(201,168,76,0.5);"></div><div class="tld-track"></div></div>
+      <div class="tld-content">
+        <h4>Motor certificado. Marca estabelecida. Visão clara.</h4>
+        <p>reFIN com certificação real (3 empresas). ShadowCore operacional. ConectBR como face pública do ecossistema. E uma clareza sobre missão que só aparece quando a mente finalmente tem os sistemas certos ao redor dela.</p>
+      </div>
+    </div>
+    <div class="tld-item">
+      <div class="tld-year">2033+</div>
+      <div class="tld-line"><div class="tld-circle" style="background:rgba(201,168,76,0.3); border:2px dashed var(--ouro);"></div></div>
+      <div class="tld-content">
+        <h4>Legado</h4>
+        <p>O motor tributário que vai atravessar a maior reforma fiscal do Brasil. Uma marca de serviços que vai durar décadas. E a prova de que uma mente diferente, com os sistemas certos, constrói diferente.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ──────────────── CARTA FINAL ──────────────── -->
+<section id="carta">
+<div class="container">
+  <div class="carta fade-in">
+    <h2>Eu não aprendi<br>a me <em>conter</em>.<br>Aprendi a me <em>canalizar</em>.</h2>
+    <p>
+      Durante anos, tentaram me encaixar num molde que não era meu. O TDAH era falta de foco.
+      A superdotação era arrogância. A intensidade era problema.
+      Hoje entendo que era tudo parte do mesmo perfil raro — e que esse perfil,
+      quando encontra o sistema certo de suporte, não apenas funciona:
+      <strong style="color:var(--ouro2);">constrói coisas que outros não conseguem imaginar.</strong>
+    </p>
+    <p>
+      A IA não me salvou. Ela me deu o que eu sempre precisei:
+      um parceiro que nunca se cansa do meu ritmo, nunca perde contexto,
+      nunca julga a quantidade de ideias. Com ela,
+      minha mente não é um problema a resolver —
+      <strong style="color:var(--ouro2);">é um motor a explorar.</strong>
+    </p>
+    <div class="divider" style="margin: 32px auto; width:48px;"></div>
+    <p class="carta-sig">
+      Luis Miguel Moreira<br>
+      <span style="font-weight:400; color:var(--cinza); font-size:13px;">ConectBR · reFIN · ShadowCore · Março 2026</span>
+    </p>
+  </div>
+</div>
+</section>
+
+
+<footer>
+  LUIS MIGUEL MOREIRA &nbsp;·&nbsp; TDAH + SD &nbsp;·&nbsp; CONSTRUTOR DE SISTEMAS &nbsp;·&nbsp; 2026
+</footer>
+
+
+<script>
+// Progress bar
+window.addEventListener('scroll', () => {
+  const scrollTop = window.scrollY;
+  const docHeight = document.body.scrollHeight - window.innerHeight;
+  const progress = (scrollTop / docHeight) * 100;
+  document.getElementById('progress').style.width = progress + '%';
+});
+
+// Fade in on scroll
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if(e.isIntersecting) {
+      e.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.15 });
+
+document.querySelectorAll('.fade-in, .tld-item').forEach(el => observer.observe(el));
+
+// Active nav
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('nav a');
+window.addEventListener('scroll', () => {
+  let current = '';
+  sections.forEach(s => {
+    if(window.scrollY >= s.offsetTop - 200) current = s.id;
+  });
+  navLinks.forEach(a => {
+    a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+  });
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>re.FIN — Escritório Moreira</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* ── PALETA CONECTE.SE (confirmada do Pitch Deck) ──────────────────── */
+    :root {
+      --cafe-fundo:  #3B1F0E;
+      --cafe:        #6B3F1E;
+      --cafe-medio:  #5A3820;
+      --madeira:     #A0652A;
+      --ambar:       #C9943A;
+      --ambar-hover: #B8832A;
+      --linho:       #FAF0E0;
+      --creme:       #F2DFC0;
+      --creme-borda: #E0D0B8;
+      --verde-mata:  #3D6B45;
+      --verde-claro: #7AAF72;
+      --azul-noite:  #1B3D5C;
+      --azul-ceu:    #4A7FA5;
+      --grafite:     #3A3A3A;
+      --cinza:       #6B6B6B;
+      --branco:      #F7F7F5;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--linho);
+      color: var(--grafite);
+      font-size: 16px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ─────────────────────────────────────────────────────────── */
+    .header {
+      background: var(--cafe-fundo);
+      padding: 1.4rem 2.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .logo-wrap { display: flex; flex-direction: column; gap: 0.2rem; }
+    .logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.55rem;
+      color: var(--linho);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      letter-spacing: -0.01em;
+    }
+    .simbolo { display: inline-flex; align-items: center; gap: 0.1rem; font-size: 1.1rem; }
+    .simbolo .s-cafe  { color: #A0652A; }
+    .simbolo .s-ambar { color: #C9943A; }
+    .simbolo .s-verde { color: #7AAF72; }
+    .logo-sub {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: var(--creme);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      opacity: 0.75;
+    }
+    .header-right { text-align: right; }
+    .header-titulo {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.7rem;
+      color: var(--ambar);
+      font-weight: 500;
+    }
+    .header-sub {
+      font-size: 0.72rem;
+      color: var(--creme);
+      opacity: 0.6;
+      font-weight: 300;
+      letter-spacing: 0.03em;
+    }
+
+    /* ── STEPPER ─────────────────────────────────────────────────────────── */
+    .stepper {
+      background: var(--cafe-medio);
+      padding: 0.9rem 2rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0;
+    }
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 1.25rem;
+      font-size: 0.82rem;
+      color: var(--creme);
+      opacity: 0.45;
+      transition: opacity 0.3s;
+    }
+    .step.active { opacity: 1; }
+    .step.done   { opacity: 0.75; }
+    .step-num {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: 0.75rem;
+      flex-shrink: 0; transition: all 0.3s;
+    }
+    .step.active .step-num { background: var(--ambar); border-color: var(--ambar); color: var(--cafe-fundo); }
+    .step.done   .step-num { background: var(--verde-claro); border-color: var(--verde-claro); color: var(--cafe-fundo); }
+    .step-line { width: 36px; height: 1px; background: var(--creme); opacity: 0.25; }
+
+    /* ── MAIN ─────────────────────────────────────────────────────────────── */
+    .main { max-width: 700px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .sec-titulo {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.55rem;
+      color: var(--cafe);
+      margin-bottom: 0.35rem;
+    }
+    .sec-sub { font-size: 0.875rem; color: var(--cinza); margin-bottom: 2rem; }
+
+    /* ── FORM ─────────────────────────────────────────────────────────────── */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+    .col2 { grid-column: span 2; }
+    .fgroup { display: flex; flex-direction: column; gap: 0.3rem; }
+
+    label.flabel {
+      font-size: 0.73rem;
+      font-weight: 600;
+      color: var(--azul-noite);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .flabel .opt { font-weight: 400; text-transform: none; color: var(--cinza); letter-spacing: 0; font-size: 0.72rem; }
+
+    input[type="text"], input[type="number"], select {
+      border: 1.5px solid var(--creme-borda);
+      border-radius: 7px;
+      padding: 0.65rem 0.9rem;
+      font-size: 0.95rem;
+      font-family: 'Inter', sans-serif;
+      background: white;
+      color: var(--grafite);
+      width: 100%;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--ambar);
+      box-shadow: 0 0 0 3px rgba(201,148,58,0.18);
+    }
+    input.err  { border-color: var(--cafe); }
+    input.ok   { border-color: var(--verde-mata); }
+    .ferr { font-size: 0.74rem; color: var(--cafe); display: none; font-weight: 500; }
+    .ferr.show { display: block; }
+
+    .cnpj-row { display: flex; gap: 0.5rem; }
+    .cnpj-row input { flex: 1; }
+    .btn-rf {
+      padding: 0 1rem; height: 44px;
+      background: var(--cafe-fundo); color: var(--creme);
+      border: none; border-radius: 7px;
+      font-size: 0.78rem; font-family: 'Inter', sans-serif;
+      font-weight: 500; cursor: pointer; white-space: nowrap;
+      transition: background 0.2s; flex-shrink: 0;
+    }
+    .btn-rf:hover { background: var(--cafe); }
+    .btn-rf:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Radio options */
+    .radio-row { display: flex; gap: 0.75rem; }
+    .ropt {
+      flex: 1; display: flex; align-items: center; gap: 0.6rem;
+      padding: 0.75rem 1rem; border: 1.5px solid var(--creme-borda);
+      border-radius: 8px; cursor: pointer; background: white;
+      transition: all 0.2s;
+    }
+    .ropt:hover { border-color: var(--ambar); }
+    .ropt.sel { border-color: var(--ambar); background: #FEF7EB; }
+    .ropt input { display: none; }
+    .rdot {
+      width: 16px; height: 16px; border-radius: 50%;
+      border: 2px solid var(--cinza); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s;
+    }
+    .ropt.sel .rdot { border-color: var(--ambar); background: var(--ambar); }
+    .ropt.sel .rdot::after {
+      content: ''; width: 6px; height: 6px;
+      border-radius: 50%; background: white; display: block;
+    }
+    .rlabel { font-size: 0.88rem; font-weight: 500; }
+    .rsub   { font-size: 0.73rem; color: var(--cinza); }
+
+    /* Buttons */
+    .btn-pri {
+      background: var(--ambar); color: var(--cafe-fundo);
+      border: none; border-radius: 8px;
+      padding: 0.85rem 2rem;
+      font-size: 0.95rem; font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer; transition: background 0.2s, transform 0.1s;
+      display: inline-flex; align-items: center; gap: 0.5rem;
+    }
+    .btn-pri:hover  { background: var(--ambar-hover); }
+    .btn-pri:active { transform: scale(0.98); }
+    .btn-sec {
+      background: transparent; color: var(--grafite);
+      border: 1.5px solid var(--creme-borda); border-radius: 8px;
+      padding: 0.85rem 1.75rem;
+      font-size: 0.95rem; font-weight: 500;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer; transition: border-color 0.2s;
+    }
+    .btn-sec:hover { border-color: var(--grafite); }
+    .btn-row { display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 2rem; }
+
+    /* ── DIAGNÓSTICO ─────────────────────────────────────────────────────── */
+    .diag-header {
+      background: var(--cafe-fundo);
+      border-radius: 12px;
+      padding: 1.5rem 2rem;
+      margin-bottom: 1.5rem;
+      color: var(--linho);
+    }
+    .diag-nome {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.25rem;
+      color: var(--ambar);
+      margin-bottom: 0.35rem;
+    }
+    .diag-info { font-size: 0.82rem; color: var(--creme); opacity: 0.75; }
+    .chips { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.85rem; }
+    .chip {
+      padding: 0.22rem 0.7rem;
+      border-radius: 20px; font-size: 0.73rem; font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+    .chip-am  { background: var(--ambar);      color: var(--cafe-fundo); }
+    .chip-gr  { background: var(--verde-claro); color: var(--cafe-fundo); }
+    .chip-cr  { background: var(--creme);       color: var(--cafe); }
+    .chip-az  { background: #D6E8F5;            color: var(--azul-noite); }
+
+    /* Métricas rápidas */
+    .metricas { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+    .metrica-bloco {
+      flex: 1 1 0; min-width: 0;
+      background: white; border: 1px solid var(--creme-borda);
+      border-radius: 9px; padding: 1rem; text-align: center;
+      overflow: hidden;
+    }
+    .metrica-val {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(0.9rem, 2.5vw, 1.45rem);
+      color: var(--cafe); font-weight: 500;
+      word-break: break-word; overflow-wrap: anywhere;
+      line-height: 1.2;
+    }
+    .metrica-key {
+      font-size: 0.68rem; color: var(--cinza);
+      text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.2rem;
+    }
+
+    /* Cenários */
+    .sec-label {
+      font-size: 0.72rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--cinza); margin-bottom: 0.75rem;
+    }
+    .cenarios { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+    .ccard {
+      border-radius: 10px; padding: 1.25rem;
+      border: 2px solid transparent;
+    }
+    .ccard-atual    { background: var(--creme);  border-color: var(--madeira); }
+    .ccard-otimiz   { background: #EBF5EE;       border-color: var(--verde-mata); }
+    .ctitulo {
+      font-size: 0.72rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.07em;
+      margin-bottom: 0.7rem;
+    }
+    .ccard-atual  .ctitulo { color: var(--cafe); }
+    .ccard-otimiz .ctitulo { color: var(--verde-mata); }
+    .cvalor {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.75rem; font-weight: 500;
+      color: var(--grafite); line-height: 1.2;
+    }
+    .clabel { font-size: 0.78rem; color: var(--cinza); margin-top: 0.2rem; }
+    .clist  { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(0,0,0,0.07); }
+    .citem  {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.28rem 0; font-size: 0.83rem;
+    }
+    .citem-k { color: var(--cinza); }
+    .citem-v { font-weight: 600; color: var(--grafite); }
+    .badge {
+      display: inline-flex; align-items: center; gap: 0.3rem;
+      padding: 0.3rem 0.7rem; border-radius: 20px;
+      font-size: 0.72rem; font-weight: 700; margin-top: 0.75rem;
+    }
+    .badge-risk { background: #FDEAE0; color: var(--cafe); }
+    .badge-ok   { background: #E8F5EB; color: var(--verde-mata); }
+
+    /* Split Payment */
+    .split-card {
+      background: white; border: 1.5px solid var(--creme-borda);
+      border-radius: 10px; padding: 1.25rem; margin-bottom: 1.5rem;
+    }
+
+    /* Alertas */
+    .alertas { margin-bottom: 1.5rem; }
+    .alerta {
+      display: flex; gap: 0.75rem; padding: 0.9rem 1rem;
+      border-radius: 8px; margin-bottom: 0.5rem; align-items: flex-start;
+    }
+    .alerta-CRITICO { background: #FDEAE0; border-left: 3px solid var(--cafe); }
+    .alerta-ALTO    { background: #FDF5E6; border-left: 3px solid var(--ambar); }
+    .alerta-MEDIO   { background: var(--creme); border-left: 3px solid var(--madeira); }
+    .alerta-INFO    { background: #EEF4FA; border-left: 3px solid var(--azul-ceu); }
+    .alerta-icon { font-size: 1rem; flex-shrink: 0; margin-top: 0.1rem; }
+    .alerta-msg  { font-size: 0.85rem; color: var(--grafite); line-height: 1.55; }
+
+    /* Export bar */
+    .export-bar {
+      background: var(--cafe);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      display: flex; align-items: center;
+      justify-content: space-between; gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .export-info { color: var(--creme); }
+    .export-info strong { font-family: 'Playfair Display', serif; font-size: 1rem; }
+    .export-info small  { font-size: 0.75rem; opacity: 0.7; display: block; margin-top: 0.15rem; }
+    .export-btns { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+    .btn-nova {
+      background: transparent; color: var(--creme);
+      border: 1.5px solid rgba(250,240,224,0.4); border-radius: 8px;
+      padding: 0.65rem 1.2rem; font-size: 0.85rem;
+      font-family: 'Inter', sans-serif; cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .btn-nova:hover { border-color: var(--creme); }
+
+    /* Divider */
+    hr.div { border: none; border-top: 1px solid var(--creme-borda); margin: 1.5rem 0; }
+
+    /* Aviso legal */
+    .aviso-legal {
+      font-size: 0.76rem; color: var(--cinza);
+      line-height: 1.65; margin-bottom: 1.5rem;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem;
+      background: var(--cafe-fundo); color: var(--creme);
+      padding: 0.75rem 1.2rem; border-radius: 8px;
+      font-size: 0.83rem; max-width: 300px;
+      transform: translateY(80px); opacity: 0;
+      transition: all 0.3s; z-index: 999;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.ok  { border-left: 3px solid var(--verde-claro); }
+    .toast.err { border-left: 3px solid var(--ambar); }
+
+    /* Footer */
+    .footer {
+      background: var(--cafe-fundo);
+      text-align: center; padding: 1.5rem;
+      font-size: 0.72rem; color: var(--creme);
+      opacity: 0.85; line-height: 2;
+    }
+
+    /* Print footer */
+    .print-footer { display: none; }
+
+    /* ── RESPONSIVE ──────────────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .header   { flex-direction: column; gap: 0.75rem; text-align: center; padding: 1.2rem; }
+      .header-right { text-align: center; }
+      .grid     { grid-template-columns: 1fr; }
+      .col2     { grid-column: span 1; }
+      .cenarios { grid-template-columns: 1fr; }
+      .metricas { gap: 0.5rem; }
+      .step span { display: none; }
+    }
+
+    /* ── PRINT ───────────────────────────────────────────────────────────── */
+    @media print {
+      .stepper, .btn-row, .export-bar, .toast, #panel-1, #panel-2,
+      .btn-nova, #btn-exportar { display: none !important; }
+      body { background: white; font-size: 12px; }
+      .main { padding: 0.5rem; max-width: 100%; }
+      .header, .diag-header, .ccard-atual, .ccard-otimiz,
+      .alerta-CRITICO, .alerta-ALTO, .alerta-MEDIO, .alerta-INFO {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      #panel-3 { display: block !important; }
+      .print-footer {
+        display: block !important;
+        margin-top: 2rem; padding-top: 1rem;
+        border-top: 2px solid var(--ambar);
+        font-size: 0.7rem; color: var(--cinza);
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════ HEADER ═══════════════════ -->
+<header class="header">
+  <div class="logo-wrap">
+    <div class="logo">
+      <span class="simbolo">
+        <span class="s-cafe">—</span><span class="s-ambar">•</span><span class="s-verde">—</span>
+      </span>
+      re.FIN
+    </div>
+    <div class="logo-sub">Escritório Moreira</div>
+  </div>
+  <div class="header-right">
+    <div class="header-titulo">Análise Tributária</div>
+    <div class="header-sub">Reforma 2026–2033 · LC 123/2006 · LC 214/2025</div>
+  </div>
+</header>
+
+<!-- ═══════════════════ STEPPER ═══════════════════ -->
+<nav class="stepper" aria-label="Progresso">
+  <div class="step active" id="si1">
+    <div class="step-num">1</div><span>Empresa</span>
+  </div>
+  <div class="step-line"></div>
+  <div class="step" id="si2">
+    <div class="step-num">2</div><span>Operação</span>
+  </div>
+  <div class="step-line"></div>
+  <div class="step" id="si3">
+    <div class="step-num">3</div><span>Diagnóstico</span>
+  </div>
+</nav>
+
+<!-- ═══════════════════ MAIN ═══════════════════ -->
+<main class="main">
+
+  <!-- ─── ETAPA 1: EMPRESA ─── -->
+  <div class="panel active" id="panel-1">
+    <h1 class="sec-titulo">Sua Empresa</h1>
+    <p class="sec-sub">Preencha os dados principais. Nenhuma informação é armazenada — processado apenas em memória.</p>
+
+    <div class="grid">
+
+      <div class="fgroup col2">
+        <label class="flabel" for="cnpj">CNPJ</label>
+        <div class="cnpj-row">
+          <input type="text" id="cnpj" placeholder="00.000.000/0000-00"
+                 maxlength="18" autocomplete="off" aria-describedby="cnpj-err">
+          <button class="btn-rf" id="btn-rf" type="button" aria-label="Consultar Receita Federal">
+            Consultar RF
+          </button>
+        </div>
+        <div class="ferr" id="cnpj-err" role="alert"></div>
+      </div>
+
+      <div class="fgroup col2">
+        <label class="flabel" for="razao">Razão Social</label>
+        <input type="text" id="razao" placeholder="Nome da empresa" autocomplete="off">
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel" for="cnae">CNAE Principal <span class="opt">(7 dígitos)</span></label>
+        <input type="text" id="cnae" placeholder="0000000" maxlength="7" aria-describedby="cnae-err">
+        <div class="ferr" id="cnae-err" role="alert"></div>
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel" for="uf">UF de Origem</label>
+        <select id="uf">
+          <option value="">Selecione</option>
+          <option value="AC">AC</option><option value="AL">AL</option>
+          <option value="AP">AP</option><option value="AM">AM</option>
+          <option value="BA">BA</option><option value="CE">CE</option>
+          <option value="DF">DF</option><option value="ES">ES</option>
+          <option value="GO">GO</option><option value="MA">MA</option>
+          <option value="MT">MT</option><option value="MS">MS</option>
+          <option value="MG">MG</option><option value="PA">PA</option>
+          <option value="PB">PB</option><option value="PR">PR</option>
+          <option value="PE">PE</option><option value="PI">PI</option>
+          <option value="RJ">RJ</option><option value="RN">RN</option>
+          <option value="RS">RS</option><option value="RO">RO</option>
+          <option value="RR">RR</option><option value="SC">SC</option>
+          <option value="SP" selected>SP</option><option value="SE">SE</option>
+          <option value="TO">TO</option>
+        </select>
+      </div>
+
+      <div class="fgroup col2">
+        <label class="flabel" for="rbt12">Receita Bruta Acumulada 12 meses (RBT12)</label>
+        <input type="text" id="rbt12" placeholder="R$ 0,00" aria-describedby="rbt12-err">
+        <div class="ferr" id="rbt12-err" role="alert"></div>
+      </div>
+
+      <div class="fgroup col2">
+        <label class="flabel" for="folha">
+          Folha de Salários 12 meses <span class="opt">— opcional · necessário para Fator R</span>
+        </label>
+        <input type="text" id="folha" placeholder="R$ 0,00">
+      </div>
+
+      <div class="fgroup col2">
+        <label class="flabel">Seu principal cliente é</label>
+        <div class="radio-row" role="radiogroup">
+          <label class="ropt sel" id="ropt-b2b">
+            <input type="radio" name="tipo" value="B2B" checked>
+            <span class="rdot"></span>
+            <div>
+              <div class="rlabel">Empresa (B2B)</div>
+              <div class="rsub">Indústria, comércio, serviços</div>
+            </div>
+          </label>
+          <label class="ropt" id="ropt-b2c">
+            <input type="radio" name="tipo" value="B2C">
+            <span class="rdot"></span>
+            <div>
+              <div class="rlabel">Pessoa Física (B2C)</div>
+              <div class="rsub">Consumidor final</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="fgroup col2">
+        <label class="flabel" for="ano">Ano de Referência</label>
+        <select id="ano">
+          <option value="2026" selected>2026 — Período de Teste IVA (CBS 0,9% + IBS 0,1%)</option>
+          <option value="2027">2027 — CBS plena entra em vigor · Split Payment ativo</option>
+          <option value="2028">2028</option>
+          <option value="2029">2029 — Início phase-out ICMS</option>
+          <option value="2030">2030</option>
+          <option value="2031">2031</option>
+          <option value="2032">2032 — Extinção de benefícios fiscais estaduais</option>
+          <option value="2033">2033 — Regime IVA pleno</option>
+        </select>
+      </div>
+
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-pri" id="btn-prox1" type="button">Próximo →</button>
+    </div>
+  </div>
+
+  <!-- ─── ETAPA 2: OPERAÇÃO (B2B only) ─── -->
+  <div class="panel" id="panel-2">
+    <h1 class="sec-titulo">A Operação</h1>
+    <p class="sec-sub">Dados da nota fiscal ou contrato com o cliente B2B. Necessário para simular o Opt-Out e o crédito de IVA.</p>
+
+    <div class="grid">
+
+      <div class="fgroup col2">
+        <label class="flabel" for="valor">Valor da Nota Fiscal / Operação</label>
+        <input type="text" id="valor" placeholder="R$ 0,00" aria-describedby="valor-err">
+        <div class="ferr" id="valor-err" role="alert"></div>
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel" for="ncm">NCM / NBS <span class="opt">(8 dígitos)</span></label>
+        <input type="text" id="ncm" placeholder="00000000" maxlength="10" aria-describedby="ncm-err">
+        <div class="ferr" id="ncm-err" role="alert"></div>
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel" for="forma">Forma de Recebimento</label>
+        <select id="forma">
+          <option value="PIX_BOLETO" selected>PIX / Boleto</option>
+          <option value="CARTAO">Cartão</option>
+          <option value="DINHEIRO">Dinheiro / TED</option>
+        </select>
+      </div>
+
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-sec" id="btn-volt2" type="button">← Voltar</button>
+      <button class="btn-pri" id="btn-gerar" type="button">Gerar Diagnóstico →</button>
+    </div>
+  </div>
+
+  <!-- ─── ETAPA 3: DIAGNÓSTICO ─── -->
+  <div class="panel" id="panel-3">
+    <h1 class="sec-titulo">Diagnóstico Tributário</h1>
+    <p class="sec-sub" id="d-data"></p>
+
+    <div class="diag-header">
+      <div class="diag-nome" id="d-nome">—</div>
+      <div class="diag-info" id="d-info"></div>
+      <div class="chips" id="d-chips"></div>
+    </div>
+
+    <div class="metricas" id="d-metricas"></div>
+
+    <div id="sec-cenarios" style="display:none">
+      <div class="sec-label">Comparativo de Cenários</div>
+      <div class="cenarios" id="d-cenarios"></div>
+    </div>
+
+    <div id="sec-split" style="display:none">
+      <div class="split-card" id="d-split"></div>
+    </div>
+
+    <div class="alertas" id="d-alertas"></div>
+
+    <hr class="div">
+    <p class="aviso-legal">
+      Este diagnóstico é de natureza informativa e foi elaborado com base em LC 123/2006 e LC 214/2025.
+      Decisões tributárias devem ser validadas por contador responsável (CRC-SP).
+      <strong>Nenhum dado foi armazenado.</strong> Processado exclusivamente em memória — LGPD Art. 15.
+    </p>
+
+    <div class="export-bar">
+      <div class="export-info">
+        <strong>Exportar Relatório PDF</strong>
+        <small>Valera Aparecida Bornea Moreira · CRC-SP · Escritório Moreira</small>
+      </div>
+      <div class="export-btns">
+        <button class="btn-nova" id="btn-nova" type="button">Nova Análise</button>
+        <button class="btn-pri" id="btn-exportar" type="button">Exportar PDF</button>
+      </div>
+    </div>
+
+    <!-- Rodapé impresso (apenas no PDF) -->
+    <div class="print-footer">
+      Organização Contábil Moreira · CNPJ 50.803.019/0001-11 ·
+      Valera Aparecida Bornea Moreira · CRC-SP ·
+      Elaborado por re.FIN (Conecte.se) · LC 123/2006 &amp; LC 214/2025 ·
+      Documento confidencial — uso exclusivo do cliente.
+    </div>
+  </div>
+
+</main>
+
+<!-- ═══════════════════ FOOTER ═══════════════════ -->
+<footer class="footer">
+  re.FIN — Análise Tributária Reforma 2026–2033<br>
+  Organização Contábil Moreira · CNPJ 50.803.019/0001-11 · Valera Aparecida Bornea Moreira · CRC-SP<br>
+  <span style="opacity:.45">Desenvolvido por Conecte.se · Nenhum dado armazenado · LGPD Art. 15</span>
+</footer>
+
+<div class="toast" id="toast" role="alert" aria-live="polite"></div>
+
+<!-- ═══════════════════ SCRIPT ═══════════════════ -->
+<script>
+'use strict';
+// ════════════════════════════════════════════════════════════════════════════
+// re.FIN — Motor Tributário (JS)
+// Mirror do motor_tributario.py | Conecte.se × Escritório Moreira
+// LC 123/2006 + LC 214/2025
+// LGPD: zero persistência · purge automático após diagnóstico
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── UTILS ────────────────────────────────────────────────────────────────────
+const U = {
+  round(v, d = 2) {
+    const f = Math.pow(10, d);
+    return Math.round((v + Number.EPSILON) * f) / f;
+  },
+  brl(v) {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency', currency: 'BRL'
+    }).format(v);
+  },
+  pct(v, d = 2) {
+    return (v * 100).toFixed(d).replace('.', ',') + '%';
+  },
+  parseBRL(s) {
+    if (!s) return 0;
+    return parseFloat(s.replace(/[R$\s.]/g, '').replace(',', '.')) || 0;
+  },
+  maskCNPJ(v) {
+    const n = v.replace(/\D/g, '').slice(0, 14);
+    return n
+      .replace(/^(\d{2})(\d)/, '$1.$2')
+      .replace(/^(\d{2}\.\d{3})(\d)/, '$1.$2')
+      .replace(/^(\d{2}\.\d{3}\.\d{3})(\d)/, '$1/$2')
+      .replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+  },
+  maskBRL(v) {
+    const n = v.replace(/\D/g, '');
+    if (!n) return '';
+    return (parseInt(n) / 100).toLocaleString('pt-BR', {
+      style: 'currency', currency: 'BRL'
+    });
+  },
+  dataBR() {
+    return new Date().toLocaleDateString('pt-BR', {
+      day: '2-digit', month: 'long', year: 'numeric'
+    });
+  },
+};
+
+// ── VALIDADORES ───────────────────────────────────────────────────────────────
+const V = {
+  cnpj(raw) {
+    const n = raw.replace(/\D/g, '');
+    if (n.length !== 14) return { ok: false, msg: 'CNPJ deve ter 14 dígitos.' };
+    if (/^(\d)\1{13}$/.test(n)) return { ok: false, msg: 'CNPJ inválido — dígitos repetidos.' };
+    const d = n.split('').map(Number);
+    const calc = (digits, w) => {
+      const s = digits.reduce((a, x, i) => a + x * w[i], 0);
+      const r = s % 11; return r < 2 ? 0 : 11 - r;
+    };
+    const d1 = calc(d.slice(0, 12), [5,4,3,2,9,8,7,6,5,4,3,2]);
+    const d2 = calc(d.slice(0, 13), [6,5,4,3,2,9,8,7,6,5,4,3,2]);
+    if (d[12] !== d1 || d[13] !== d2)
+      return { ok: false, msg: 'CNPJ inválido — dígito verificador incorreto.' };
+    return { ok: true };
+  },
+  ncm(raw) {
+    const n = raw.replace(/\D/g, '');
+    if (n.length !== 8) return { ok: false, msg: 'NCM deve ter exatamente 8 dígitos.' };
+    return { ok: true };
+  },
+  rbt12(v) {
+    if (v <= 0)       return { ok: false, msg: 'RBT12 deve ser maior que zero.' };
+    if (v > 4800000)  return { ok: false, msg: 'RBT12 acima do teto Simples (R$ 4.800.000).' };
+    return { ok: true };
+  },
+};
+
+// ── TABELAS SIMPLES NACIONAL ──────────────────────────────────────────────────
+// Fonte: LC 123/2006, Anexos I–V | [limite_rbt12, aliq_nominal, parcela_deduzir]
+const TAB = {
+  I:   [[180000,0.04,0],[360000,0.073,5940],[720000,0.095,13860],
+        [1800000,0.107,22500],[3600000,0.143,87300],[4800000,0.19,378000]],
+  II:  [[180000,0.045,0],[360000,0.078,5940],[720000,0.10,13860],
+        [1800000,0.112,22500],[3600000,0.147,85500],[4800000,0.30,720000]],
+  III: [[180000,0.06,0],[360000,0.112,9360],[720000,0.135,17640],
+        [1800000,0.16,35640],[3600000,0.21,125640],[4800000,0.33,648000]],
+  IV:  [[180000,0.045,0],[360000,0.09,8100],[720000,0.102,12420],
+        [1800000,0.14,39780],[3600000,0.22,183780],[4800000,0.33,828000]],
+  V:   [[180000,0.155,0],[360000,0.18,4500],[720000,0.195,9900],
+        [1800000,0.205,17100],[3600000,0.23,62100],[4800000,0.305,540000]],
+};
+
+// CNAEs com Fator R elegível (LC 123/2006, Art. 18, § 24)
+const FATOR_R_CNAES = new Set([
+  '6201501','6202300','6209100','6911701','6920601',
+  '7111100','7112000','7210000','8599603',
+]);
+
+// Mapeamento CNAE → Anexo
+const CNAE_ANEXO = {
+  '4711301':'I','4711302':'I','4712100':'I','4721101':'I','4721104':'I',
+  '4741500':'I','4744001':'I','4781400':'I','4782201':'I','4789001':'I',
+  '1091100':'II','2211100':'II','2229301':'II','2311700':'II','2512800':'II',
+  '2543800':'II','2710401':'II','2911101':'II','2950600':'II',
+  '6201501':'V','6202300':'V','6209100':'V','6911701':'V','6920601':'V',
+  '7111100':'V','7112000':'V','7210000':'V','8599603':'V',
+  '5611201':'III','5611203':'III','5620101':'III','8011101':'III','8121400':'III',
+  '4120400':'IV','4211101':'IV','4399103':'IV','7711000':'IV',
+  '4930201':'IV','4930202':'IV','4921301':'IV',
+};
+
+// Cronograma IVA | LC 214/2025, Arts. 344, 348, 353-360
+// Auditado por Luiz Moreira — 26/03/2026
+// CBS: substitui PIS/COFINS em 2027 (~8,8%), estável até 2033
+// IBS: taxa-teste 0,1% em 2026-2028; fase-in ICMS/ISS de 2029 a 2033
+const IVA = {
+  2026:{CBS:0.009,IBS:0.001},  // CBS teste; sem pagamento efetivo (Art. 348)
+  2027:{CBS:0.088,IBS:0.001},  // CBS substitui PIS+COFINS; IBS ainda teste
+  2028:{CBS:0.088,IBS:0.001},  // IBS mantém taxa-teste
+  2029:{CBS:0.088,IBS:0.035},  // IBS fase-in 20%
+  2030:{CBS:0.088,IBS:0.071},  // IBS fase-in 40%
+  2031:{CBS:0.088,IBS:0.106},  // IBS fase-in 60%
+  2032:{CBS:0.088,IBS:0.142},  // IBS fase-in 80%
+  2033:{CBS:0.088,IBS:0.177},  // IBS fase-in 100% — ICMS/ISS extintos
+};
+
+// ── MOTOR TRIBUTÁRIO ──────────────────────────────────────────────────────────
+const Motor = {
+  fatorR(folha, rbt12) {
+    if (!folha || rbt12 === 0) return null;
+    return U.round(folha / rbt12, 4);
+  },
+  anexo(cnae, fr, explicito) {
+    if (explicito) return explicito;
+    if (fr !== null && FATOR_R_CNAES.has(cnae) && fr >= 0.28) return 'III';
+    return CNAE_ANEXO[cnae] || 'III';
+  },
+  aliqEfetiva(rbt12, anx) {
+    const t = TAB[anx];
+    if (!t) throw new Error('Anexo inválido: ' + anx);
+    for (const [lim, aliq, pd] of t) {
+      if (rbt12 <= lim)
+        return U.round(((rbt12 * aliq) - pd) / rbt12, 6);
+    }
+    throw new Error('RBT12 acima do teto Simples Nacional (R$ 4.800.000).');
+  },
+  faixa(rbt12, anx) {
+    const t = TAB[anx] || [];
+    for (let i = 0; i < t.length; i++) if (rbt12 <= t[i][0]) return i + 1;
+    return 6;
+  },
+  distFaixa(rbt12, anx) {
+    const t = TAB[anx] || [];
+    for (const [lim] of t) if (rbt12 <= lim) return U.round(lim - rbt12, 2);
+    return 0;
+  },
+  iva(ano) { return IVA[ano] || IVA[2033]; },
+  simplesPuro(rbt12, anx, valor, ano) {
+    const aliq = this.aliqEfetiva(rbt12, anx);
+    const iva  = this.iva(ano);
+    const custo   = U.round(valor * aliq, 2);
+    const credito = U.round(valor * (iva.CBS + iva.IBS), 2);
+    return { aliq, custo, credito, pct: U.round(credito/valor*100, 2) };
+  },
+  optOut(rbt12, anx, valor, ano) {
+    const aliq = this.aliqEfetiva(rbt12, anx);
+    const iva  = this.iva(ano);
+    const ivaVal  = U.round(valor * (iva.CBS + iva.IBS), 2);
+    const custo   = U.round(valor * aliq, 2);
+    return { aliq, ivaVal, custo, custoTotal: U.round(custo + ivaVal, 2), credito: ivaVal };
+  },
+  split(valor, ano, forma) {
+    // Split Payment dinâmico: taxa = CBS+IBS do ano da operação
+    // LC 214/2025, Art. 344 — NÃO usar taxa fixa
+    if (ano >= 2027 && forma !== 'DINHEIRO') {
+      const iva  = this.iva(ano);
+      const taxa = U.round(iva.CBS + iva.IBS, 4);
+      const ret  = U.round(valor * taxa, 2);
+      return { ativo: true, retencao: ret, taxa, anual: U.round(ret * 12, 2) };
+    }
+    return { ativo: false, retencao: 0, taxa: 0, anual: 0 };
+  },
+  alertas(rbt12, fr, tipo, ano, forma) {
+    const a = [];
+    if (rbt12 > 4320000)
+      a.push({ n:'CRITICO', i:'🔴', m:`RBT12 ${U.brl(rbt12)} = ${U.round(rbt12/4800000*100,1)}% do teto. Planejar migração para Lucro Presumido IMEDIATAMENTE.` });
+    if (fr !== null && fr >= 0.27 && fr < 0.29)
+      a.push({ n:'ALTO', i:'⚠️', m:`Fator R = ${(fr*100).toFixed(2)}% — Zona de risco (27%–29%). Pequena variação na folha pode mudar o Anexo. Monitorar mensalmente.` });
+    if (ano >= 2027 && forma !== 'DINHEIRO')
+      a.push({ n:'ALTO', i:'⚠️', m:`Split Payment ativo desde Jan/2027. IBS/CBS retido na fonte pelo banco antes de cair na conta. Impacto direto no fluxo de caixa.` });
+    if (tipo === 'B2B')
+      a.push({ n:'ALTO', i:'⚠️', m:`Simples Nacional gera crédito mínimo para comprador B2B. Avaliar Opt-Out para reter contrato com indústria e grandes clientes.` });
+    if (rbt12 > 3600000)
+      a.push({ n:'MEDIO', i:'🟡', m:`RBT12 ${U.brl(rbt12)} acima do sublimite R$ 3.600.000. ICMS e ISS devem ser apurados em guias separadas (fora do DAS).` });
+    return a;
+  },
+};
+
+// ── ESTADO ────────────────────────────────────────────────────────────────────
+let isB2B = true;
+let emp   = {};
+
+// ── MÁSCARAS ──────────────────────────────────────────────────────────────────
+document.getElementById('cnpj').addEventListener('input', e => {
+  e.target.value = U.maskCNPJ(e.target.value);
+});
+['rbt12','folha','valor'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', e => { e.target.value = U.maskBRL(e.target.value); });
+});
+document.getElementById('cnae').addEventListener('input', e => {
+  e.target.value = e.target.value.replace(/\D/g,'').slice(0,7);
+});
+document.getElementById('ncm').addEventListener('input', e => {
+  e.target.value = e.target.value.replace(/\D/g,'').slice(0,8);
+});
+
+// ── RADIO BUTTONS ────────────────────────────────────────────────────────────
+document.querySelectorAll('input[name="tipo"]').forEach(r => {
+  r.addEventListener('change', () => {
+    document.querySelectorAll('.ropt').forEach(o => o.classList.remove('sel'));
+    r.closest('.ropt').classList.add('sel');
+    isB2B = r.value === 'B2B';
+  });
+});
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+function toast(msg, tipo = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className   = `toast ${tipo} show`;
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+// ── STEPPER ───────────────────────────────────────────────────────────────────
+function setStep(n) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`panel-${n}`).classList.add('active');
+  for (let i = 1; i <= 3; i++) {
+    const el = document.getElementById(`si${i}`);
+    el.classList.remove('active','done');
+    if (i < n) el.classList.add('done');
+    else if (i === n) el.classList.add('active');
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── ERROS DE CAMPO ────────────────────────────────────────────────────────────
+function showErr(id, msg) {
+  const err = document.getElementById(`${id}-err`);
+  const inp = document.getElementById(id);
+  if (err) { err.textContent = msg; err.classList.add('show'); }
+  if (inp) { inp.classList.add('err'); inp.classList.remove('ok'); inp.focus(); }
+}
+function clrErr(id) {
+  const err = document.getElementById(`${id}-err`);
+  const inp = document.getElementById(id);
+  if (err) err.classList.remove('show');
+  if (inp) { inp.classList.remove('err'); inp.classList.add('ok'); }
+}
+
+// ── CONSULTA RECEITA FEDERAL (BrasilAPI) ───────────────────────────────────────
+document.getElementById('btn-rf').addEventListener('click', async () => {
+  const cnpj = document.getElementById('cnpj').value.replace(/\D/g,'');
+  const vld  = V.cnpj(cnpj);
+  if (!vld.ok) { showErr('cnpj', vld.msg); return; }
+
+  const btn = document.getElementById('btn-rf');
+  btn.textContent = '...'; btn.disabled = true;
+
+  try {
+    // BrasilAPI — SLA garantido pelo consórcio (Creditas, Neon, Stone + outros)
+    const res  = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+    if (!res.ok) throw new Error('CNPJ não encontrado na base da RF.');
+    const data = await res.json();
+
+    document.getElementById('razao').value = data.razao_social || '';
+    if (data.cnae_fiscal) {
+      document.getElementById('cnae').value = String(data.cnae_fiscal).padStart(7,'0');
+    }
+    if (data.uf) {
+      const sel = document.getElementById('uf');
+      for (const opt of sel.options) { if (opt.value === data.uf) { sel.value = data.uf; break; } }
+    }
+    clrErr('cnpj');
+    toast('Dados da Receita Federal carregados.', 'ok');
+  } catch (e) {
+    toast(`RF indisponível: ${e.message}. Preencha manualmente.`, 'err');
+  } finally {
+    btn.textContent = 'Consultar RF'; btn.disabled = false;
+  }
+});
+
+// ── STEP 1 → 2 ou 3 ──────────────────────────────────────────────────────────
+document.getElementById('btn-prox1').addEventListener('click', () => {
+  let ok = true;
+
+  const cnpjV = V.cnpj(document.getElementById('cnpj').value);
+  if (!cnpjV.ok) { showErr('cnpj', cnpjV.msg); ok = false; } else clrErr('cnpj');
+
+  const rbt12N = U.parseBRL(document.getElementById('rbt12').value);
+  const rbt12V = V.rbt12(rbt12N);
+  if (!rbt12V.ok) { showErr('rbt12', rbt12V.msg); ok = false; } else clrErr('rbt12');
+
+  if (!ok) return;
+
+  emp = {
+    cnpj:   document.getElementById('cnpj').value.replace(/\D/g,''),
+    razao:  document.getElementById('razao').value || 'Empresa Analisada',
+    cnae:   document.getElementById('cnae').value.replace(/\D/g,''),
+    uf:     document.getElementById('uf').value,
+    rbt12:  rbt12N,
+    folha:  U.parseBRL(document.getElementById('folha').value),
+    tipo:   isB2B ? 'B2B' : 'B2C',
+    ano:    parseInt(document.getElementById('ano').value),
+  };
+
+  if (isB2B) { setStep(2); }
+  else       { render(emp, null); setStep(3); }
+});
+
+// ── STEP 2 → 1 ───────────────────────────────────────────────────────────────
+document.getElementById('btn-volt2').addEventListener('click', () => setStep(1));
+
+// ── STEP 2 → 3 ───────────────────────────────────────────────────────────────
+document.getElementById('btn-gerar').addEventListener('click', () => {
+  let ok = true;
+
+  const valor = U.parseBRL(document.getElementById('valor').value);
+  if (valor <= 0) { showErr('valor', 'Informe o valor da operação.'); ok = false; } else clrErr('valor');
+
+  const ncm = document.getElementById('ncm').value.replace(/\D/g,'');
+  const ncmV = V.ncm(ncm);
+  if (!ncmV.ok) { showErr('ncm', ncmV.msg); ok = false; } else clrErr('ncm');
+
+  if (!ok) return;
+
+  const op = {
+    valor,
+    ncm,
+    forma: document.getElementById('forma').value,
+  };
+  render(emp, op);
+  setStep(3);
+});
+
+// ── RENDER DIAGNÓSTICO ────────────────────────────────────────────────────────
+function render(e, op) {
+  const { rbt12, folha, cnae, tipo, ano, razao, uf } = e;
+
+  const fr   = Motor.fatorR(folha, rbt12);
+  const anx  = Motor.anexo(cnae, fr, null);
+  let aliq;
+  try { aliq = Motor.aliqEfetiva(rbt12, anx); }
+  catch (err) { toast(err.message, 'err'); return; }
+
+  const faixa = Motor.faixa(rbt12, anx);
+  const dist  = Motor.distFaixa(rbt12, anx);
+  const iva   = Motor.iva(ano);
+
+  // Header
+  document.getElementById('d-data').textContent =
+    `Gerado em ${U.dataBR()} · Referência ${ano} · LC 123/2006 & LC 214/2025`;
+  document.getElementById('d-nome').textContent = razao;
+  document.getElementById('d-info').textContent =
+    `${uf || '—'} · CNAE ${cnae || '—'} · RBT12 ${U.brl(rbt12)}`;
+
+  document.getElementById('d-chips').innerHTML = [
+    `<span class="chip chip-am">Simples Nacional</span>`,
+    `<span class="chip chip-am">Anexo ${anx}</span>`,
+    `<span class="chip chip-cr">Faixa ${faixa}</span>`,
+    `<span class="chip chip-cr">Alíquota ${U.pct(aliq)}</span>`,
+    fr !== null ? `<span class="chip chip-az">Fator R ${(fr*100).toFixed(2)}%</span>` : '',
+    `<span class="chip chip-gr">${tipo}</span>`,
+  ].join('');
+
+  // Métricas rápidas
+  document.getElementById('d-metricas').innerHTML = [
+    bloco(U.pct(aliq), 'Alíquota Efetiva'),
+    bloco(`Anexo ${anx}`, `Faixa ${faixa}`),
+    bloco(U.brl(dist), 'Faltam para próxima faixa'),
+    fr !== null ? bloco((fr*100).toFixed(2)+'%', 'Fator R') : '',
+  ].join('');
+
+  // Cenários (B2B only)
+  const secC = document.getElementById('sec-cenarios');
+  const secS = document.getElementById('sec-split');
+
+  if (tipo === 'B2B' && op) {
+    secC.style.display = 'block';
+    secS.style.display = 'block';
+
+    const sp    = Motor.simplesPuro(rbt12, anx, op.valor, ano);
+    const oo    = Motor.optOut(rbt12, anx, op.valor, ano);
+    const split = Motor.split(op.valor, ano, op.forma);
+
+    document.getElementById('d-cenarios').innerHTML = `
+      <div class="ccard ccard-atual">
+        <div class="ctitulo">Situação Atual — Simples Puro</div>
+        <div class="cvalor">${U.brl(sp.custo)}</div>
+        <div class="clabel">custo DAS por operação</div>
+        <div class="clist">
+          <div class="citem">
+            <span class="citem-k">Alíquota efetiva</span>
+            <span class="citem-v">${U.pct(sp.aliq)}</span>
+          </div>
+          <div class="citem">
+            <span class="citem-k">Crédito p/ comprador</span>
+            <span class="citem-v">${U.brl(sp.credito)} (${sp.pct.toFixed(2)}%)</span>
+          </div>
+          <div class="citem">
+            <span class="citem-k">CBS vigente ${ano}</span>
+            <span class="citem-v">${(iva.CBS*100).toFixed(1)}% · IBS ${(iva.IBS*100).toFixed(1)}%</span>
+          </div>
+        </div>
+        <div class="badge badge-risk">⚠ Risco de perda de contrato B2B</div>
+      </div>
+      <div class="ccard ccard-otimiz">
+        <div class="ctitulo">✓ Com Opt-Out — Recomendado</div>
+        <div class="cvalor">${U.brl(oo.ivaVal)}</div>
+        <div class="clabel">IVA recolhido separadamente</div>
+        <div class="clist">
+          <div class="citem">
+            <span class="citem-k">Crédito p/ comprador</span>
+            <span class="citem-v">${U.brl(oo.credito)} (100%)</span>
+          </div>
+          <div class="citem">
+            <span class="citem-k">Custo DAS (mantido)</span>
+            <span class="citem-v">${U.brl(oo.custo)}</span>
+          </div>
+          <div class="citem">
+            <span class="citem-k">Impacto caixa</span>
+            <span class="citem-v">Neutro (IVA no preço)</span>
+          </div>
+        </div>
+        <div class="badge badge-ok">✓ Retém contrato com indústria</div>
+      </div>`;
+
+    // Split Payment
+    const sd = document.getElementById('d-split');
+    if (split.ativo) {
+      sd.innerHTML = `
+        <div class="sec-label">⚠ Split Payment — Ativo desde Jan/2027</div>
+        <div style="display:flex;gap:2rem;flex-wrap:wrap;margin-bottom:0.75rem">
+          <div>
+            <div style="font-family:'Playfair Display',serif;font-size:1.4rem;color:var(--cafe)">${U.brl(split.retencao)}</div>
+            <div style="font-size:0.75rem;color:var(--cinza)">Retenção por operação (0,9%)</div>
+          </div>
+          <div>
+            <div style="font-family:'Playfair Display',serif;font-size:1.4rem;color:var(--cafe)">${U.brl(split.anual)}</div>
+            <div style="font-size:0.75rem;color:var(--cinza)">Estimativa retida por ano</div>
+          </div>
+        </div>
+        <p style="font-size:0.82rem;color:var(--cinza)">
+          IBS/CBS retido pelo banco antes de cair na conta. Apenas TED/dinheiro escapa (até regulamentação posterior).
+        </p>`;
+    } else {
+      sd.innerHTML = `
+        <div class="sec-label">Split Payment</div>
+        <p style="font-size:0.85rem;color:var(--cinza)">
+          ${ano < 2027
+            ? `Não ativo em ${ano}. Entrará em vigor em Jan/2027 para pagamentos eletrônicos.`
+            : `Forma de pagamento selecionada (TED/Dinheiro) não está sujeita ao Split Payment.`}
+        </p>`;
+    }
+  } else {
+    secC.style.display = 'none';
+    secS.style.display = 'none';
+  }
+
+  // Alertas
+  const als = Motor.alertas(rbt12, fr, tipo, ano, op?.forma || 'PIX_BOLETO');
+  document.getElementById('d-alertas').innerHTML = als.length
+    ? `<div class="sec-label">Alertas (${als.length})</div>` +
+      als.map(a => `
+        <div class="alerta alerta-${a.n}" role="alert">
+          <span class="alerta-icon">${a.i}</span>
+          <span class="alerta-msg">${a.m}</span>
+        </div>`).join('')
+    : `<div class="alerta alerta-INFO" role="alert">
+         <span class="alerta-icon">✅</span>
+         <span class="alerta-msg">Nenhum alerta crítico identificado para este cenário.</span>
+       </div>`;
+
+  // LGPD purge
+  emp = {};
+}
+
+function bloco(val, key) {
+  return `<div class="metrica-bloco">
+    <div class="metrica-val">${val}</div>
+    <div class="metrica-key">${key}</div>
+  </div>`;
+}
+
+// ── EXPORT PDF ────────────────────────────────────────────────────────────────
+document.getElementById('btn-exportar').addEventListener('click', () => {
+  toast('Preparando PDF...', 'ok');
+  setTimeout(() => window.print(), 400);
+});
+
+// ── NOVA ANÁLISE ──────────────────────────────────────────────────────────────
+document.getElementById('btn-nova').addEventListener('click', () => {
+  ['cnpj','razao','cnae','rbt12','folha','valor','ncm'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('uf').value  = 'SP';
+  document.getElementById('ano').value = '2026';
+  document.getElementById('forma').value = 'PIX_BOLETO';
+  document.querySelectorAll('.ropt').forEach(o => o.classList.remove('sel'));
+  document.getElementById('ropt-b2b').classList.add('sel');
+  document.querySelector('input[value="B2B"]').checked = true;
+  isB2B = true; emp = {};
+  setStep(1);
+});
+</script>
+</body>
+</html>

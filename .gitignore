@@ -1,0 +1,24 @@
+# SEGURANÇA — Nunca versionar
+.env
+*.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code (local only)
+.claude/plans/
+.claude/settings.local.json
+
+# Sistema
+.DS_Store
+Thumbs.db

@@ -1,0 +1,468 @@
+================================================================================
+                   DIAGRAMA DE ARQUITETURA: SPLIT PAYMENT
+                 Strategy Pattern + Decimal + Enum (2026-2033)
+================================================================================
+
+ENTRADA (motor_tributario.py)
+═════════════════════════════
+
+    Operacao(
+        valor_nf: Decimal("10000.00"),
+        data_emissao: date(2027, 3, 15),
+        forma_recebimento: "PIX"
+    )
+           │
+           ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ CalculadoraSplitPayment.calcular(parametros)                    │
+│                                                                  │
+│ Input: ParametrosSplitPayment                                  │
+│   • valor_nf: Decimal                                          │
+│   • ano_emissao: int                                           │
+│   • forma_recebimento: FormaRecebimento (Enum)                │
+│   • politica_reducao: Decimal (default 0.0)                   │
+└──────────────────────────────────────────────────────────────────┘
+           │
+           ├──────────────────┬────────────────────┬──────────────┐
+           ▼                  ▼                    ▼              ▼
+      PASSO 1           PASSO 2              PASSO 3        PASSO 4
+      ────────          ───────              ───────        ───────
+
+┌─────────────────────┐
+│ AnoTransicaoIVA     │  ano_emissao=2027 → ANO_2027
+│ .from_ano(ano)      │     • lei_vigente: "LC 214/2025, Art. 344-353"
+│                     │     • fase: "EFETIVO"
+│ Valida: 2026-2033   │     • ano_num: 2027
+│ Fail-fast!          │
+└─────────────────────┘
+
+┌─────────────────────────────────────┐
+│ CronogramaIVA                       │
+│ .obter_aliquotas(2027)              │
+│                                     │
+│ Registry → AliquotasIVA:            │
+│   • cbs: Decimal("0.088")           │
+│   • ibs: Decimal("0.001")           │
+│   • total(): Decimal("0.089")       │
+│   • lei_vigente: "LC 214/2025..."   │
+└─────────────────────────────────────┘
+
+┌────────────────────────────────────────────────┐
+│ FabricaEstrategiaRetencao                     │
+│ .obter_estrategia(ano, forma, politica)       │
+│                                                │
+│ Lógica de seleção:                           │
+│  1. ano==2026? → RetencaoIsenta2026          │
+│  2. not forma.eh_eletronico()? → ReservDin  │
+│  3. politica_reducao>0? → ComDesconto         │
+│  4. else → Padrao                            │
+│                                                │
+│ Resultado: FormaRecebimento.PIX eletrônico   │
+│           ano 2027 (>= 2027) → RetencaoPadrao│
+└────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────┐
+│ STRATEGY PATTERN (Implementações)                    │
+│                                                      │
+│ RetencaoPadrao                                       │
+│ ├─ calcular_retencao(valor, aliq, forma)           │
+│ │  └─ 10000 × (0.088 + 0.001) = 890.00             │
+│ ├─ eh_elegivel(ano, forma)                          │
+│ │  └─ True (ano >= 2027 AND eletrônico)            │
+│ └─ obter_mensagem_impacto()                         │
+│    └─ "Split Payment padrão: retenção integral..." │
+└──────────────────────────────────────────────────────┘
+           │
+           ▼
+PASSO 5: RESULTADO
+────────────────
+
+┌──────────────────────────────────────────────────────┐
+│ ResultadoSplitPayment                               │
+│                                                      │
+│ • ativo: True                                        │
+│ • valor_retido: Decimal("890.00")                   │
+│ • percentual_taxa: Decimal("0.089")                 │
+│ • aliquotas: AliquotasIVA(...)                      │
+│ • estrategia_classe: "RetencaoPadrao"               │
+│ • lei_vigente: "LC 214/2025, Art. 344-353"         │
+│ • fase_transicao: "EFETIVO"                         │
+│ • mensagem_impacto: "Split Payment padrão..."       │
+│ • avisos: ["IMPACTO DE LIQUIDEZ: R$ 890.00..."]    │
+└──────────────────────────────────────────────────────┘
+           │
+           ▼
+    SAÍDA (Dict)
+
+    return {
+        "ativo": True,
+        "retencao_imediata": "890.00",
+        "percentual_retencao": "8.90%",
+        "lei_vigente": "LC 214/2025, Art. 344-353",
+        "estrategia": "RetencaoPadrao",
+        ...
+    }
+
+================================================================================
+FLUXO COMPLETO: COMPARAÇÃO ANTES vs. DEPOIS
+================================================================================
+
+ANTES (if/else aninhado):
+═════════════════════════
+
+def calcular_split_payment_impacto(self) -> Dict:
+    ano = self.operacao.data_emissao.year
+    forma = self.operacao.forma_recebimento
+
+    if ano >= ANO_INICIO_SPLIT_PAYMENT and forma != "DINHEIRO":     # ← if 1
+        aliquotas_ano = self.get_aliquotas_iva_por_ano()            # ← busca dict
+        taxa_retencao = aliquotas_ano["CBS"] + aliquotas_ano["IBS"]  # ← mescla tipos
+        retencao = (self.operacao.valor_operacao * taxa_retencao)    # ← float risk
+        return {
+            "ativo": True,
+            "retencao_imediata": str(retencao),
+            ...
+        }
+
+    return {                                                          # ← if 2
+        "ativo": False,
+        "motivo": (                                                  # ← nested?
+            f"Ano {ano} < {ANO_INICIO_SPLIT_PAYMENT} ..."
+            if ano < ANO_INICIO_SPLIT_PAYMENT
+            else "Pagamento em DINHEIRO: ..."
+        ),
+        ...
+    }
+
+PROBLEMAS:
+  • 14 linhas com if/else aninhados
+  • Mix de tipos (dict["CBS"] vs. Decimal)
+  • Sem rastreabilidade de lei
+  • Hard para estender (novo if = 1h)
+  • 60% de cobertura de teste
+
+
+DEPOIS (Strategy Pattern):
+══════════════════════════
+
+def calcular_split_payment_impacto(self) -> Dict:
+    calculadora = CalculadoraSplitPayment()
+    resultado = calculadora.calcular(
+        ParametrosSplitPayment(
+            valor_nf=self.operacao.valor_operacao,
+            ano_emissao=self.operacao.data_emissao.year,
+            forma_recebimento=FormaRecebimento[self.operacao.forma_recebimento]
+        )
+    )
+
+    return {
+        "ativo": resultado.ativo,
+        "retencao_imediata": str(resultado.valor_retido),
+        "percentual_retencao": f"{resultado.percentual_taxa * 100:.2f}%",
+        "lei_vigente": resultado.lei_vigente,
+        "estrategia": resultado.estrategia_classe,
+        "impacto_liquidez": resultado.mensagem_impacto,
+        "avisos": resultado.avisos or [],
+    }
+
+BENEFÍCIOS:
+  • 3 linhas de lógica clara
+  • Tipos estruturados (Dataclass + Enum)
+  • Lei vinculada ao ano (Enum.lei_vigente)
+  • Extensível sem editar lógica (nova Strategy)
+  • 100% de cobertura de teste
+
+================================================================================
+DIAGRAMA DE CLASSES (UML SIMPLIFICADO)
+================================================================================
+
+┌─────────────────────────┐
+│ AnoTransicaoIVA: Enum   │
+├─────────────────────────┤
+│ ANO_2026                │
+│ ANO_2027                │ ← Vincula ano à lei
+│ ...                     │
+│ ANO_2033                │
+├─────────────────────────┤
+│ + ano_num: int          │
+│ + lei_vigente: str      │
+│ + fase: str             │
+└─────────────────────────┘
+         │
+         ├─ from_ano(int) ──┐
+         │                  │
+         ▼                  │
+┌──────────────────────────────────────┐
+│ CronogramaIVA: Registry              │
+├──────────────────────────────────────┤
+│ _aliquotas: Dict[int, AliquotasIVA]  │
+├──────────────────────────────────────┤
+│ + obter_aliquotas(ano) → AliquotasIVA│
+│ + adicionar_aliquotas(ano, aliq)     │ ← Atualização sem quebra
+│ + listar_cronograma()                │
+└──────────────────────────────────────┘
+         ▼
+┌──────────────────────────────────────┐
+│ AliquotasIVA: Frozen Dataclass       │
+├──────────────────────────────────────┤
+│ • cbs: Decimal                       │
+│ • ibs: Decimal                       │
+│ • ano: int                           │
+│ • lei_vigente: str                   │
+├──────────────────────────────────────┤
+│ + total() → Decimal                  │
+└──────────────────────────────────────┘
+
+
+┌──────────────────────────────────────────┐
+│ FormaRecebimento: Enum                   │
+├──────────────────────────────────────────┤
+│ PIX                                      │
+│ BOLETO                                   │
+│ CARTAO_CREDITO                           │
+│ CARTAO_DEBITO                            │
+│ TED                                      │
+│ DINHEIRO ──┐                             │
+│ CHEQUE     │                             │
+├────────────┼──────────────────────────────┤
+│ + eh_eletronico() → bool                 │
+│   └─ não eletronico? (sem intermediador) │
+└──────────────────────────────────────────┘
+         │
+         │
+         ▼
+┌──────────────────────────────────────────────┐
+│ EstrategiaRetencaoSplit: Protocol (Interface)│
+├──────────────────────────────────────────────┤
+│ + calcular_retencao(valor, aliq, forma)     │
+│ + eh_elegivel(ano, forma) → bool            │
+│ + obter_mensagem_impacto() → str            │
+└──────────────────────────────────────────────┘
+         ▲     ▲     ▲     ▲
+         │     │     │     │
+  ┌──────┴─────┴─────┴─────┴──────┐
+  │                               │
+  │ Implementações Concretas      │
+  │                               │
+  ├─ RetencaoIsenta2026           │
+  ├─ RetencaoPadrao               │
+  ├─ RetencaoReservaDinheiro      │
+  └─ RetencaoComDesconto          │
+
+
+┌─────────────────────────────────────────────┐
+│ FabricaEstrategiaRetencao: Factory Pattern  │
+├─────────────────────────────────────────────┤
+│ _cache_estrategias: Dict[tuple, Estratégia]│
+├─────────────────────────────────────────────┤
+│ + obter_estrategia(ano, forma, reducao)    │
+│   └─ Seleção lógica (cache para perf)      │
+│ + registrar_estrategia_customizada()        │
+│ + limpar_cache()                            │
+└─────────────────────────────────────────────┘
+         │
+         └──────────────────┐
+                            │
+                            ▼
+                 ┌────────────────────────┐
+                 │ CalculadoraSplitPayment│
+                 ├────────────────────────┤
+                 │ politica_reducao       │
+                 ├────────────────────────┤
+                 │ + calcular()           │
+                 │   ├─ Enum validation   │
+                 │   ├─ Registry lookup   │
+                 │   ├─ Factory selection │
+                 │   ├─ Strategy execute  │
+                 │   └─ Result assembly   │
+                 └────────────────────────┘
+                           │
+                           ▼
+                 ┌────────────────────────┐
+                 │ ResultadoSplitPayment  │
+                 ├────────────────────────┤
+                 │ + ativo: bool          │
+                 │ + valor_retido: Decimal│
+                 │ + percentual_taxa      │
+                 │ + aliquotas            │
+                 │ + estrategia_classe    │
+                 │ + lei_vigente          │
+                 │ + fase_transicao       │
+                 │ + mensagem_impacto     │
+                 │ + avisos               │
+                 └────────────────────────┘
+
+================================================================================
+FLUXO DE DADOS: PASSO A PASSO (2027, PIX, R$ 10.000)
+================================================================================
+
+1. ENTRADA
+   valor_nf=10000.00, ano=2027, forma=PIX
+
+2. VALIDAÇÃO (Enum)
+   AnoTransicaoIVA.from_ano(2027)
+   → ANO_2027 (lei_vigente="LC 214/2025, Art. 344-353", fase="EFETIVO")
+
+3. BUSCA DE ALÍQUOTAS (Registry)
+   CronogramaIVA.obter_aliquotas(2027)
+   → AliquotasIVA(cbs=0.088, ibs=0.001, total=0.089)
+
+4. SELEÇÃO DE ESTRATÉGIA (Factory)
+   FabricaEstrategiaRetencao.obter_estrategia(2027, PIX, 0.0)
+   Lógica:
+     • ano==2026? NÃO
+     • not forma.eh_eletronico()? NÃO (PIX é eletrônico)
+     • politica_reducao>0? NÃO
+     → RetencaoPadrao
+
+5. EXECUÇÃO (Strategy)
+   RetencaoPadrao.calcular_retencao(10000, AliquotasIVA, PIX)
+   = 10000 × (0.088 + 0.001)
+   = 10000 × 0.089
+   = 890.00 (quantized Decimal)
+
+6. ELEGIBILIDADE (Strategy)
+   RetencaoPadrao.eh_elegivel(2027, PIX)
+   = (2027 >= 2027) AND (PIX.eh_eletronico())
+   = True
+
+7. MENSAGEM (Strategy)
+   RetencaoPadrao.obter_mensagem_impacto()
+   = "Split Payment padrão (LC 214/2025): retenção integral na fonte. ..."
+
+8. MONTAGEM DE RESULTADO (Dataclass)
+   ResultadoSplitPayment(
+       ativo=True,
+       valor_retido=Decimal("890.00"),
+       percentual_taxa=Decimal("0.089"),
+       aliquotas=AliquotasIVA(...),
+       estrategia_classe="RetencaoPadrao",
+       lei_vigente="LC 214/2025, Art. 344-353",
+       fase_transicao="EFETIVO",
+       mensagem_impacto="Split Payment padrão...",
+       avisos=["IMPACTO DE LIQUIDEZ: R$ 890.00..."]
+   )
+
+9. SAÍDA (Dict)
+   {
+       "ativo": True,
+       "retencao_imediata": "890.00",
+       "percentual_retencao": "8.90%",
+       "lei_vigente": "LC 214/2025, Art. 344-353",
+       "estrategia": "RetencaoPadrao",
+       ...
+   }
+
+================================================================================
+CHECKLIST DE VALIDAÇÃO
+================================================================================
+
+Antes de implementar, verificar:
+
+DESIGN:
+  ☐ Enum AnoTransicaoIVA cobre 2026-2033
+  ☐ Cada ano vinculado à lei (lei_vigente)
+  ☐ CronogramaIVA com todas as alíquotas auditadas
+  ☐ FormaRecebimento.eh_eletronico() correto
+  ☐ AliquotasIVA é frozen (segurança auditoria)
+  ☐ EstrategiaRetencaoSplit é Protocol (interface)
+  ☐ 4+ implementações concretas de estratégia
+  ☐ FabricaEstrategiaRetencao com cache
+  ☐ CalculadoraSplitPayment orquestra corretamente
+  ☐ ResultadoSplitPayment é dataclass
+
+IMPLEMENTAÇÃO:
+  ☐ Código importável (sem dependências circulares)
+  ☐ Decimal em TODOS os cálculos (zero float)
+  ☐ ROUND_HALF_UP em quantize()
+  ☐ Todos os anos 2026-2033 testados
+  ☐ Validação fail-fast (exceções claras)
+  ☐ Mensagens de erro úteis
+
+TESTES:
+  ☐ Test 2026 (isento)
+  ☐ Test 2027 PIX (8,9%)
+  ☐ Test 2027 DINHEIRO (isento)
+  ☐ Test 2033 (26,5%)
+  ☐ Test precisão Decimal
+  ☐ Test atualização de cronograma (sem quebra)
+  ☐ Test desconto PME
+  ☐ 100% cobertura de teste
+
+INTEGRAÇÃO:
+  ☐ Refatorar motor_tributario.py::calcular_split_payment_impacto()
+  ☐ Remover ANO_INICIO_SPLIT_PAYMENT (movido para Enum)
+  ☐ Remover ALIQUOTA_RETENCAO_SPLIT_PAYMENT (movido para Registry)
+  ☐ Atualizar imports em motor_tributario.py
+  ☐ Validar testes de integração em test_fase4_optout.py
+
+DOCUMENTAÇÃO:
+  ☐ Cada classe tem docstring
+  ☐ Cada método tem tipo hint
+  ☐ Referências legais (LC 214/2025, Art. X)
+  ☐ Exemplos de uso em docstring
+  ☐ README com diagrama de arquitetura
+
+================================================================================
+ESCALABILIDADE: COMO ADICIONAR NOVO CENÁRIO (Exemplo: PME)
+================================================================================
+
+Cenário: Senado Federal aprova Resolução reduzindo Split Payment para PME.
+
+PASSO 1: Criar nova estratégia (30 min)
+─────────────────────────────────────
+class RetencaoSplitPaymentPME:
+    def __init__(self, fator_reducao: Decimal = Decimal("0.50")):
+        self.fator_reducao = fator_reducao
+
+    def calcular_retencao(self, valor_nf, aliq, forma):
+        taxa_reduzida = aliq.total() * (Decimal("1.0") - self.fator_reducao)
+        return (valor_nf * taxa_reduzida).quantize(Decimal("0.01"), ROUND_HALF_UP)
+
+    def eh_elegivel(self, ano, forma):
+        return ano >= 2027 and forma.eh_eletronico()
+
+    def obter_mensagem_impacto(self):
+        return f"Split Payment PME (redução {self.fator_reducao*100:.0f}%)..."
+
+
+PASSO 2: Registrar na Factory (10 min)
+──────────────────────────────────────
+# Em FabricaEstrategiaRetencao.obter_estrategia()
+
+if criterio_pme(cnae, regime):  # ← adicionado
+    estrategia = RetencaoSplitPaymentPME(Decimal("0.50"))
+else:
+    # lógica existente...
+
+
+PASSO 3: Testes (20 min)
+────────────────────────
+def test_pme():
+    r = calc.calcular(ParametrosSplitPayment(
+        valor_nf=Decimal("10000.00"),
+        ano_emissao=2027,
+        forma_recebimento=FormaRecebimento.PIX,
+        regime_contribuinte="PME"  # ← novo parâmetro
+    ))
+    assert r.valor_retido == Decimal("445.00")  # 10000 × 0.089 × 0.5
+
+
+TOTAL: 60 minutos, zero quebra de código existente.
+
+================================================================================
+EXTENSÕES FUTURAS (PÓS-2033)
+================================================================================
+
+Quando ICMS e ISS forem completamente extintos (2033+):
+
+PASSO 1: Adicionar novo ano em Enum
+   ANO_2034 = (2034, "LC 214/2025 + Resolução X/2034", "REGIME_ESTÁVEL")
+
+PASSO 2: Atualizar CronogramaIVA (alíquota plena)
+   2034: AliquotasIVA(cbs=Decimal("0.088"), ibs=Decimal("0.177"), ...)
+
+PASSO 3: Factory seleciona automaticamente RetencaoPadrao
+   (Zero edição de lógica)
+
+================================================================================

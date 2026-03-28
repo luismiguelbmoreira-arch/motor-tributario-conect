@@ -1,0 +1,323 @@
+"""
+test_fase4_optout.py — TDD Fase 4 (Simulação Opt-Out)
+Testa: cenario_simples_puro, cenario_opt_out, calcular_split_payment_impacto, gerar_diagnostico
+
+3 cenários de Sorocaba:
+  - Comércio (Anexo I, B2B, fornecedor polo industrial)
+  - Serviço TI (Anexo V/III com Fator R, B2B, cliente indústria)
+  - Indústria (Anexo II, B2B, grande cliente)
+
+Executar: python -m pytest PY/tests/test_fase4_optout.py -v
+"""
+
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+import pytest
+import gc
+from decimal import Decimal
+from datetime import date
+
+from motor_tributario import (
+    EmpresaFornecedora,
+    EmpresaCompradora,
+    OperacaoFiscal,
+    MotorReformaTributaria,
+)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def motor_comercio_b2b(ano: int = 2026) -> MotorReformaTributaria:
+    """Comércio varejista Sorocaba — fornecedor do polo industrial."""
+    return MotorReformaTributaria(
+        EmpresaFornecedora(
+            cnpj="11.222.333/0001-81",
+            razao_social="Distribuidora Industrial SP Ltda",
+            regime="SIMPLES",
+            cnae_principal="4711302",
+            uf_origem="SP",
+            faturamento_12m=Decimal("1800000.00"),
+        ),
+        EmpresaCompradora(tipo="B2B_CONTRIBUINTE", uf_destino="SP"),
+        OperacaoFiscal(
+            data_emissao=date(ano, 3, 15),
+            valor_operacao=Decimal("50000.00"),
+            ncm_nbs="84099190",
+            forma_recebimento="PIX_BOLETO",
+        ),
+    )
+
+
+def motor_servico_ti(ano: int = 2026, folha: str = "140000.00") -> MotorReformaTributaria:
+    """Empresa TI Sorocaba — cliente é montadora (Lucro Real)."""
+    return MotorReformaTributaria(
+        EmpresaFornecedora(
+            cnpj="11.222.333/0001-81",
+            razao_social="TechSorocaba Sistemas Ltda",
+            regime="SIMPLES",
+            cnae_principal="6201501",
+            uf_origem="SP",
+            faturamento_12m=Decimal("500000.00"),
+            folha_salarios_12m=Decimal(folha),
+        ),
+        EmpresaCompradora(tipo="B2B_CONTRIBUINTE", uf_destino="SP", regime="REAL"),
+        OperacaoFiscal(
+            data_emissao=date(ano, 6, 1),
+            valor_operacao=Decimal("20000.00"),
+            ncm_nbs="85176290",
+            forma_recebimento="PIX_BOLETO",
+        ),
+    )
+
+
+def motor_industria_b2b(ano: int = 2026) -> MotorReformaTributaria:
+    """Fabricante Sorocaba — cliente é grande indústria (Lucro Real)."""
+    return MotorReformaTributaria(
+        EmpresaFornecedora(
+            cnpj="11.222.333/0001-81",
+            razao_social="Metalúrgica Sorocaba Ltda",
+            regime="SIMPLES",
+            cnae_principal="2950600",
+            uf_origem="SP",
+            faturamento_12m=Decimal("3000000.00"),
+        ),
+        EmpresaCompradora(tipo="B2B_CONTRIBUINTE", uf_destino="SP", regime="REAL"),
+        OperacaoFiscal(
+            data_emissao=date(ano, 9, 1),
+            valor_operacao=Decimal("100000.00"),
+            ncm_nbs="73269090",
+            forma_recebimento="PIX_BOLETO",
+        ),
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Cenário Simples Puro
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestCenarioSimplesPuro:
+
+    def test_retorna_dict_com_campos_obrigatorios(self):
+        motor = motor_comercio_b2b()
+        resultado = motor.cenario_simples_puro()
+        campos = ["cenario", "custo_das_por_operacao", "aliquota_efetiva",
+                  "credito_gerado_para_comprador", "risco_b2b"]
+        for campo in campos:
+            assert campo in resultado, f"Campo '{campo}' ausente no cenário"
+
+    def test_cenario_identificado_corretamente(self):
+        motor = motor_comercio_b2b()
+        assert motor.cenario_simples_puro()["cenario"] == "SIMPLES_PURO"
+
+    def test_risco_b2b_verdadeiro_para_b2b(self):
+        motor = motor_comercio_b2b()
+        assert motor.cenario_simples_puro()["risco_b2b"] is True
+
+    def test_risco_b2b_falso_para_b2c(self):
+        motor = MotorReformaTributaria(
+            EmpresaFornecedora(
+                cnpj="11.222.333/0001-81", razao_social="Loja X", regime="SIMPLES",
+                cnae_principal="4711302", uf_origem="SP",
+                faturamento_12m=Decimal("300000.00"),
+            ),
+            EmpresaCompradora(tipo="B2C_CONSUMIDOR_FINAL", uf_destino="SP"),
+            OperacaoFiscal(
+                data_emissao=date(2026, 1, 1), valor_operacao=Decimal("1000.00"),
+                ncm_nbs="84099190",
+            ),
+        )
+        assert motor.cenario_simples_puro()["risco_b2b"] is False
+
+    def test_custo_das_e_decimal_string(self):
+        """custo_das_por_operacao deve ser string de Decimal (não float)."""
+        motor = motor_comercio_b2b()
+        custo = motor.cenario_simples_puro()["custo_das_por_operacao"]
+        # Deve ser conversível para Decimal sem perda
+        assert Decimal(custo) > Decimal("0")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Cenário Opt-Out
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestCenarioOptOut:
+
+    def test_retorna_dict_com_campos_obrigatorios(self):
+        motor = motor_comercio_b2b()
+        resultado = motor.cenario_opt_out()
+        campos = ["cenario", "custo_das_por_operacao", "iva_recolhido_por_fora",
+                  "custo_total", "credito_gerado_para_comprador"]
+        for campo in campos:
+            assert campo in resultado, f"Campo '{campo}' ausente no opt-out"
+
+    def test_cenario_identificado_corretamente(self):
+        motor = motor_comercio_b2b()
+        assert motor.cenario_opt_out()["cenario"] == "OPT_OUT"
+
+    def test_opt_out_gera_100_porcento_credito(self):
+        """Opt-Out: crédito para comprador = 100% do IVA recolhido."""
+        motor = motor_comercio_b2b()
+        resultado = motor.cenario_opt_out()
+        assert resultado["percentual_credito_nf"] == "100%"
+
+    def test_iva_por_fora_positivo(self):
+        motor = motor_comercio_b2b()
+        iva = Decimal(motor.cenario_opt_out()["iva_recolhido_por_fora"])
+        assert iva > Decimal("0")
+
+    def test_risco_b2b_falso_no_opt_out(self):
+        """Opt-Out resolve o problema de crédito B2B."""
+        motor = motor_comercio_b2b()
+        assert motor.cenario_opt_out()["risco_b2b"] is False
+
+    def test_servico_ti_fator_r_alto_opt_out(self):
+        """TI com Fator R alto (Anexo III) — Opt-Out ainda funciona."""
+        motor = motor_servico_ti(folha="150000.00")
+        resultado = motor.cenario_opt_out()
+        assert resultado["cenario"] == "OPT_OUT"
+        assert resultado["risco_b2b"] is False
+
+    def test_industria_b2b_opt_out(self):
+        """Indústria (Anexo II) — Opt-Out correto."""
+        motor = motor_industria_b2b()
+        resultado = motor.cenario_opt_out()
+        assert resultado["cenario"] == "OPT_OUT"
+        assert Decimal(resultado["iva_recolhido_por_fora"]) > Decimal("0")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Split Payment
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestSplitPayment:
+
+    def test_split_inativo_em_2026(self):
+        """Split Payment ainda não existe em 2026."""
+        motor = motor_comercio_b2b(ano=2026)
+        resultado = motor.calcular_split_payment_impacto()
+        assert resultado["ativo"] is False
+
+    def test_split_ativo_em_2027_com_pix(self):
+        """Split Payment ativo a partir de Jan/2027 para PIX/Boleto."""
+        motor = motor_comercio_b2b(ano=2027)
+        resultado = motor.calcular_split_payment_impacto()
+        assert resultado["ativo"] is True
+        assert Decimal(resultado["retencao_imediata"]) > Decimal("0")
+
+    def test_split_inativo_em_2027_com_dinheiro(self):
+        """Pagamento em DINHEIRO escapa do Split Payment (2027)."""
+        motor = MotorReformaTributaria(
+            EmpresaFornecedora(
+                cnpj="11.222.333/0001-81", razao_social="Comercio X", regime="SIMPLES",
+                cnae_principal="4711302", uf_origem="SP",
+                faturamento_12m=Decimal("500000.00"),
+            ),
+            EmpresaCompradora(tipo="B2B_CONTRIBUINTE", uf_destino="SP"),
+            OperacaoFiscal(
+                data_emissao=date(2027, 3, 1), valor_operacao=Decimal("10000.00"),
+                ncm_nbs="84099190", forma_recebimento="DINHEIRO",
+            ),
+        )
+        resultado = motor.calcular_split_payment_impacto()
+        assert resultado["ativo"] is False
+
+    def test_retencao_calculada_corretamente(self):
+        """
+        2027: CBS 8,8% + IBS 0,1% = 8,9% (Split Payment dinâmico)
+        R$ 50.000 × 8,9% = R$ 4.450,00
+        LC 214/2025, Art. 344 + Art. 353 (CBS substitui PIS/COFINS em 2027)
+        """
+        motor = motor_comercio_b2b(ano=2027)
+        resultado = motor.calcular_split_payment_impacto()
+        retencao = Decimal(resultado["retencao_imediata"])
+        esperado = Decimal("50000.00") * (Decimal("0.088") + Decimal("0.001"))
+        assert abs(retencao - esperado) <= Decimal("0.01")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Diagnóstico Completo
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestGerarDiagnostico:
+
+    def test_diagnostico_retorna_dict(self):
+        motor = motor_comercio_b2b()
+        diagnostico = motor.gerar_diagnostico()
+        assert isinstance(diagnostico, dict)
+
+    def test_diagnostico_tem_campos_obrigatorios(self):
+        motor = motor_comercio_b2b()
+        diag = motor.gerar_diagnostico()
+        for campo in ["versao_schema", "versao_lei", "empresa", "aliquotas",
+                      "cenarios", "alertas", "split_payment", "meta"]:
+            assert campo in diag, f"Campo '{campo}' ausente no diagnóstico"
+
+    def test_diagnostico_versao_lei_correta(self):
+        motor = motor_comercio_b2b()
+        diag = motor.gerar_diagnostico()
+        assert diag["versao_lei"] == "LC123_2006_LC214_2025"
+
+    def test_diagnostico_nao_contem_cnpj_claro(self):
+        """LGPD: CNPJ não deve aparecer no diagnóstico."""
+        motor = motor_comercio_b2b()
+        diag = motor.gerar_diagnostico()
+        diag_str = str(diag)
+        assert "11222333000181" not in diag_str
+        assert "11.222.333/0001-81" not in diag_str
+
+    def test_diagnostico_nao_contem_razao_social(self):
+        """LGPD: Razão social não deve aparecer no diagnóstico."""
+        motor = motor_comercio_b2b()
+        diag = motor.gerar_diagnostico()
+        assert "Distribuidora Industrial SP" not in str(diag)
+
+    def test_purge_chamado_apos_diagnostico(self):
+        """Após gerar_diagnostico(), dados da empresa devem ser None."""
+        motor = motor_comercio_b2b()
+        motor.gerar_diagnostico()
+        assert motor.fornecedora is None
+        assert motor.compradora is None
+        assert motor.operacao is None
+
+    def test_alertas_para_b2b_simples(self):
+        """Empresa Simples + B2B deve ter alerta ALTO de crédito insuficiente."""
+        motor = motor_comercio_b2b()
+        diag = motor.gerar_diagnostico()
+        alertas = diag["alertas"]
+        codigos = [a["codigo"] for a in alertas]
+        assert "RISCO_B2B_CREDITO_INSUFICIENTE" in codigos
+
+    def test_recomendacao_opt_out_para_b2b(self):
+        """Diagnóstico B2B deve recomendar Opt-Out."""
+        motor = motor_comercio_b2b()
+        diag = motor.gerar_diagnostico()
+        assert "OPT_OUT" in diag["cenarios"]["recomendacao"]
+
+    def test_diagnostico_industria_b2b(self):
+        """Cenário indústria Sorocaba — diagnóstico completo sem erros."""
+        motor = motor_industria_b2b()
+        diag = motor.gerar_diagnostico()
+        assert diag["empresa"]["anexo_simples"] == "II"
+        assert diag["cenarios"]["opt_out"]["cenario"] == "OPT_OUT"
+
+    def test_diagnostico_servico_ti_fator_r_alto(self):
+        """TI com Fator R alto → Anexo III no diagnóstico."""
+        motor = motor_servico_ti(folha="150000.00")
+        diag = motor.gerar_diagnostico()
+        assert diag["empresa"]["anexo_simples"] == "III"
+
+    def test_diagnostico_servico_ti_fator_r_baixo(self):
+        """TI com Fator R baixo → Anexo V no diagnóstico."""
+        motor = motor_servico_ti(folha="100000.00")
+        diag = motor.gerar_diagnostico()
+        assert diag["empresa"]["anexo_simples"] == "V"
+
+    def test_diagnostico_aviso_validar_profissional(self):
+        """Todo diagnóstico deve ter aviso de validação profissional."""
+        motor = motor_comercio_b2b()
+        diag = motor.gerar_diagnostico()
+        assert diag["meta"]["validar_com_profissional"] is True
