@@ -24,10 +24,11 @@ LGPD:
 """
 
 import base64
+import gc
 import json
 import logging
 import os
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any, Literal, Optional
 
@@ -48,6 +49,17 @@ logger = logging.getLogger("motor_conect.extrator")
 # ─────────────────────────────────────────────────────────────────────────────
 # SCHEMA DE SAÍDA — O que a IA extrai dos PDFs
 # ─────────────────────────────────────────────────────────────────────────────
+
+class AtividadeExtraida(BaseModel):
+    """
+    Atividade individual extraída do PGDAS-D para empresa multi-atividade.
+    LC 123/2006, Art. 18, §3º — cada atividade tem Anexo próprio.
+    """
+    receita: str = Field(..., description="Receita da atividade no mês em R$ (apenas números e ponto decimal)")
+    anexo: Literal["I", "II", "III", "IV", "V"] = Field(..., description="Anexo Simples desta atividade")
+    icms_st: bool = Field(default=False, description="True quando ICMS foi retido por ST — zerado no DAS")
+    iss_retido: bool = Field(default=False, description="True quando ISS foi retido pelo tomador — zerado no DAS")
+
 
 class DadosExtraidosPDF(BaseModel):
     """
@@ -73,6 +85,14 @@ class DadosExtraidosPDF(BaseModel):
             "Receita mensal com ICMS-ST (substituicao tributaria) em R$. "
             "Presente quando empresa tem atividade com ST — ICMS nao compoe DAS. "
             "LC 123/2006, Art. 13, par. 1, VII."
+        )
+    )
+    atividades_detalhadas: Optional[list] = Field(
+        default=None,
+        description=(
+            "Lista de atividades individuais quando empresa tem mais de um segmento de receita "
+            "com Anexos diferentes. Cada item: {receita, anexo, icms_st, iss_retido}. "
+            "LC 123/2006, Art. 18, §3º."
         )
     )
 
@@ -125,19 +145,33 @@ class DadosExtraidosPDF(BaseModel):
         return v.strip().upper()[:2]
 
     def to_decimal(self, campo: str) -> Optional[Decimal]:
-        """Converte campo string para Decimal seguro."""
+        """
+        Converte campo string para Decimal seguro.
+
+        Detecta automaticamente o formato:
+          - Decimal US/API   "2014303.11"  → ponto é decimal, sem vírgula
+          - Brasileiro       "2.014.303,11" → pontos são milhares, vírgula é decimal
+          - Só vírgula       "2014303,11"  → vírgula é decimal
+        """
         valor = getattr(self, campo, None)
         if valor is None:
             return None
-        # Remove R$, espaços, separadores de milhar, normaliza vírgula
-        limpo = (
-            str(valor)
-            .replace("R$", "").replace(" ", "")
-            .replace(".", "").replace(",", ".")
-        )
+
+        limpo = str(valor).replace("R$", "").replace(" ", "").strip()
+        tem_ponto  = "." in limpo
+        tem_virgula = "," in limpo
+
+        if tem_ponto and tem_virgula:
+            # Formato brasileiro: 2.014.303,11 — pontos = milhares, vírgula = decimal
+            limpo = limpo.replace(".", "").replace(",", ".")
+        elif tem_virgula and not tem_ponto:
+            # Só vírgula: 2014303,11 — vírgula é decimal
+            limpo = limpo.replace(",", ".")
+        # else: formato decimal US/API "2014303.11" ou inteiro — mantém como está
+
         try:
             return Decimal(limpo).quantize(Decimal("0.01"), ROUND_HALF_UP)
-        except Exception:
+        except (InvalidOperation, ValueError):
             logger.warning("Nao foi possivel converter '%s' para Decimal: campo=%s", valor, campo)
             return None
 
@@ -145,7 +179,7 @@ class DadosExtraidosPDF(BaseModel):
         """LGPD: limpa dados sensíveis da instância após uso."""
         self.cnpj = "REDACTED"
         self.razao_social = "REDACTED"
-        import gc; gc.collect()
+        gc.collect()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -161,15 +195,23 @@ CAMPOS OBRIGATORIOS:
 - razao_social: Razao social completa
 - cnae_principal: CNAE principal sem pontuacao (7 digitos, ex: "4711302")
 - uf_origem: UF de 2 letras (ex: "SP")
-- faturamento_12m: RBT12 - Receita Bruta Total dos ultimos 12 meses em R$ (ex: "1158950.86")
-- rpa_referencia: Receita do Periodo de Apuracao do mes em questao em R$
-- das_ecac_referencia: Valor total do DAS pago em R$
+- faturamento_12m: RBT12 — campo especifico chamado "Receita Bruta Acumulada nos 12 meses anteriores ao periodo de apuracao" ou "RBT12" no Extrato PGDAS-D. ATENÇÃO: este valor e tipicamente entre R$ 50.000 e R$ 4.800.000 para empresas Simples Nacional. Informe apenas o numero sem formatacao (ex: "856430.21"). NAO confunda com receita acumulada de varios anos, CNPJ ou outros numeros do documento.
+- rpa_referencia: Receita do Periodo de Apuracao (RPA) do mes em questao — campo "Receita Bruta do Periodo de Apuracao" no Extrato PGDAS-D, em R$
+- das_ecac_referencia: Valor total do DAS pago, encontrado no Recibo de Pagamento ou no campo "Total" da Declaracao, em R$
 - competencia: Competencia no formato "MM/AAAA" (ex: "01/2026")
 
 CAMPOS OPCIONAIS (null se nao encontrado):
 - folha_salarios_12m: Folha de salarios 12 meses em R$ (para calculo do Fator R)
-- anexo_simples: Anexo Simples Nacional ("I", "II", "III", "IV" ou "V")
+- anexo_simples: Anexo Simples Nacional ("I", "II", "III", "IV" ou "V") — apenas quando a empresa tem UMA atividade
 - receita_com_st_icms: Valor MENSAL da receita sujeita a Substituicao Tributaria ICMS em R$ (quando o ICMS e zerado no DAS porque ja foi retido pelo substituto)
+- atividades_detalhadas: Lista de atividades quando a empresa tem MAIS DE UM segmento de receita com Anexos DIFERENTES. OBRIGATORIO quando houver mix de comercio (Anexo I/II) + servicos (Anexo III/IV). Formato:
+  [
+    {"receita": "95594.08", "anexo": "III", "icms_st": false, "iss_retido": false},
+    {"receita": "4929.43",  "anexo": "I",   "icms_st": false, "iss_retido": false},
+    {"receita": "32970.57", "anexo": "I",   "icms_st": true,  "iss_retido": false},
+    {"receita": "5650.00",  "anexo": "III", "icms_st": false, "iss_retido": true}
+  ]
+  Regras: (1) Receita em formato numerico sem R$ (ex: "32970.57"). (2) icms_st=true quando ICMS zerado por ST. (3) iss_retido=true quando ISS retido pelo tomador. (4) Se empresa so tem um Anexo, deixe null.
 
 BREAKDOWN DO DAS (valores em R$, 0.00 se nao encontrado):
 - das_breakdown: {
@@ -306,13 +348,64 @@ def extrair_dados_pdfs(caminhos_pdf: list[str | Path]) -> DadosExtraidosPDF:
 # INTEGRAÇÃO COM O MOTOR — Converte extração para parâmetros do motor
 # ─────────────────────────────────────────────────────────────────────────────
 
+_TETO_SIMPLES = Decimal("4800000.00")  # LC 123/2006, Art. 3º, II
+
+
 def dados_para_motor(dados: DadosExtraidosPDF) -> dict:
     """
     Converte DadosExtraidosPDF para um dict pronto para instanciar EmpresaFornecedora.
 
     Returns:
         dict com campos para EmpresaFornecedora e campos de auditoria separados
+
+    Raises:
+        ValueError: Se RBT12 excede o teto do Simples Nacional — indica erro de extração.
     """
+    rbt12 = dados.to_decimal("faturamento_12m")
+    if rbt12 is None:
+        raise ValueError(
+            "RBT12 nao pôde ser extraído dos PDFs (campo 'faturamento_12m' retornou None). "
+            "Verifique se o Extrato PGDAS-D está legível e contém o campo "
+            "'Receita Bruta Acumulada nos 12 meses anteriores ao período de apuração'. "
+            "Valor bruto retornado pela IA: '%s'" % dados.faturamento_12m
+        )
+    if rbt12 > _TETO_SIMPLES:
+        raise ValueError(
+            f"RBT12 extraido R$ {rbt12:,.2f} excede o teto do Simples Nacional "
+            f"(R$ {_TETO_SIMPLES:,.2f}). "
+            f"Provavel erro de extracao: verifique o campo 'Receita Bruta Acumulada nos "
+            f"12 meses anteriores ao periodo de apuracao' no Extrato PGDAS-D. "
+            f"Valor bruto retornado pela IA: '{dados.faturamento_12m}'"
+        )
+
+    # Converte atividades_detalhadas em lista de Atividade (multi-atividade)
+    atividades = None
+    if dados.atividades_detalhadas:
+        from motor_tributario import Atividade
+        atividades = []
+        for item in dados.atividades_detalhadas:
+            receita_str = str(item.get("receita", "0"))
+            receita_limpa = receita_str.replace("R$", "").replace(" ", "")
+            tem_ponto  = "." in receita_limpa
+            tem_virgula = "," in receita_limpa
+            if tem_ponto and tem_virgula:
+                receita_limpa = receita_limpa.replace(".", "").replace(",", ".")
+            elif tem_virgula:
+                receita_limpa = receita_limpa.replace(",", ".")
+            try:
+                receita_dec = Decimal(receita_limpa).quantize(Decimal("0.01"), ROUND_HALF_UP)
+            except (InvalidOperation, ValueError):
+                logger.warning("Receita invalida em atividade, ignorando: %s", item)
+                continue
+            atividades.append(Atividade(
+                receita=receita_dec,
+                anexo=item.get("anexo", "I"),
+                icms_st=bool(item.get("icms_st", False)),
+                iss_retido=bool(item.get("iss_retido", False)),
+            ))
+        if not atividades:
+            atividades = None
+
     return {
         # Campos para EmpresaFornecedora
         "empresa": {
@@ -323,8 +416,9 @@ def dados_para_motor(dados: DadosExtraidosPDF) -> dict:
             "uf_origem": dados.uf_origem,
             "faturamento_12m": dados.to_decimal("faturamento_12m"),
             "folha_salarios_12m": dados.to_decimal("folha_salarios_12m"),
-            "anexo_simples": dados.anexo_simples,
-            "receita_com_st_icms": dados.to_decimal("receita_com_st_icms"),
+            "anexo_simples": dados.anexo_simples if not atividades else None,
+            "receita_com_st_icms": dados.to_decimal("receita_com_st_icms") if not atividades else None,
+            "atividades": atividades,
         },
         # Referências para auditoria (comparar com e-CAC)
         "auditoria": {

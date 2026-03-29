@@ -1,0 +1,16 @@
+# Motor Tributário Conect 2026-2033
+# Instalar: python -m pip install -r requirements.txt
+
+# ── Core ──────────────────────────────────────────────────────────────────────
+anthropic>=0.25.0           # Claude Vision API — extração de PDFs
+pydantic>=2.6.0             # V2 — validação de modelos de dados
+sqlmodel>=0.0.16            # ORM SQLite — persistência (database.py)
+python-dotenv>=1.0.0        # Carrega .env automaticamente
+
+# ── API FastAPI (api_motor.py) ─────────────────────────────────────────────
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0   # Servidor ASGI com websockets + httptools
+python-multipart>=0.0.9     # Dependência runtime do FastAPI
+
+# ── Testes ────────────────────────────────────────────────────────────────────
+pytest>=8.0.0

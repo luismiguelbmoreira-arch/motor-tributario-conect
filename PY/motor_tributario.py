@@ -43,6 +43,9 @@ from tabelas_simples import (
 )
 from regimes.base import BaseRegimeEngine, registrar_violacao, RegimeMismatchError
 from regimes.lucro_presumido import LucroPresumidoEngine
+from regimes.lucro_real import LucroRealEngine
+from regimes.mei import MEIEngine
+from regimes.simples_multi import SimplesMultiAtividadeEngine
 
 logger = logging.getLogger("motor_conect.motor")
 
@@ -97,7 +100,7 @@ class EmpresaFornecedora(BaseModel):
     """
     cnpj: str = Field(..., description="CNPJ com ou sem pontuação")
     razao_social: str = Field(..., min_length=2, description="Razão social completa")
-    regime: Literal["SIMPLES", "PRESUMIDO", "REAL"] = Field(..., description="Regime tributário")
+    regime: Literal["SIMPLES", "PRESUMIDO", "REAL", "MEI"] = Field(..., description="Regime tributário")
     cnae_principal: str = Field(..., description="CNAE principal (7 dígitos)")
     uf_origem: str = Field(..., description="UF de origem (2 letras)")
     faturamento_12m: Decimal = Field(..., ge=Decimal("0"), description="RBT12 em R$")
@@ -298,8 +301,13 @@ class MotorReformaTributaria:
         regime = self.fornecedora.regime
         if regime == "PRESUMIDO":
             return LucroPresumidoEngine(self.fornecedora, self.trilha_auditoria)
-        # REAL e MEI: a implementar nas próximas fases (ROADMAP itens 3 e 6)
-        # Simples Nacional usa os métodos nativos do MotorReformaTributaria
+        if regime == "MEI":
+            return MEIEngine(self.fornecedora, self.trilha_auditoria)
+        if regime == "REAL":
+            return LucroRealEngine(self.fornecedora, self.trilha_auditoria)
+        if regime == "SIMPLES" and self.fornecedora.atividades:
+            return SimplesMultiAtividadeEngine(self.fornecedora, self.trilha_auditoria)
+        # Simples Nacional mono-atividade usa os métodos nativos do MotorReformaTributaria
         return None
 
     def obter_engine_regime(self) -> Optional[BaseRegimeEngine]:

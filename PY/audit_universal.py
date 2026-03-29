@@ -100,23 +100,43 @@ def auditar_empresa(pasta_empresa: str | Path) -> dict:
     operacao = OperacaoFiscal(
         data_emissao=date(2026, 1, 1),  # competencia 01/2026
         valor_operacao=auditoria_params["rpa"],
+        rpa_mensal=auditoria_params["rpa"],  # base real do DAS — sem isso cai em RBT12/12
         ncm_nbs="84099190",  # NCM generico para fins de auditoria
         forma_recebimento="PIX_BOLETO",
     )
 
     motor = MotorReformaTributaria(fornecedora, compradora, operacao)
+    anexo: str = "MULTI"  # default para multi-atividade; sobrescrito no path mono abaixo
 
     # ETAPA 3: Calcular DAS
     print("\n[3/4] Calculando DAS pelo motor...")
     rbt12 = motor.calcular_rbt12()
-    anexo = motor.determinar_anexo()
-    ae = motor.calcular_aliquota_efetiva()
-    das_motor = motor.calcular_das_mensal()
 
-    print(f"      RBT12: R$ {rbt12:,.2f}")
-    print(f"      Anexo: {anexo}")
-    print(f"      Aliquota Efetiva: {ae:.4%}")
-    print(f"      DAS Motor: R$ {das_motor:,.2f}")
+    engine = motor.obter_engine_regime()
+    if engine is not None and hasattr(engine, "calcular_das_multi_atividade"):
+        # Multi-atividade: usa SimplesMultiAtividadeEngine
+        resultado_multi = engine.calcular_carga_total_mensal()
+        das_motor = resultado_multi["total_mensal"]
+        ae = resultado_multi["aliquota_efetiva"]
+        n_atividades = len(resultado_multi["atividades"])
+        print(f"      RBT12: R$ {rbt12:,.2f}")
+        print(f"      Modo: MULTI-ATIVIDADE ({n_atividades} atividades)")
+        for item in resultado_multi["atividades"]:
+            flag_st  = " [ST]"  if item["icms_st"]    else ""
+            flag_iss = " [ISS-ret]" if item["iss_retido"] else ""
+            print(f"        Anexo {item['anexo']}{flag_st}{flag_iss}: "
+                  f"R$ {item['receita']:,.2f} × {item['ae_liquida']*100:.4f}% = R$ {item['das']:,.2f}")
+        print(f"      Aliquota Efetiva: {ae:.4%}")
+        print(f"      DAS Motor: R$ {das_motor:,.2f}")
+    else:
+        # Mono-atividade: caminho original
+        anexo = motor.determinar_anexo()
+        ae = motor.calcular_aliquota_efetiva()
+        das_motor = motor.calcular_das_mensal()
+        print(f"      RBT12: R$ {rbt12:,.2f}")
+        print(f"      Anexo: {anexo}")
+        print(f"      Aliquota Efetiva: {ae:.4%}")
+        print(f"      DAS Motor: R$ {das_motor:,.2f}")
 
     # ETAPA 4: Comparar com e-CAC
     print("\n[4/4] Comparando com e-CAC...")
@@ -154,7 +174,7 @@ def auditar_empresa(pasta_empresa: str | Path) -> dict:
         "das_motor": das_motor,
         "das_ecac": das_ecac,
         "delta": delta,
-        "delta_pct": float(delta_pct),
+        "delta_pct": delta_pct,
         "status": status,
         "anexo": anexo,
         "rbt12": rbt12,
@@ -167,9 +187,9 @@ def auditar_empresa(pasta_empresa: str | Path) -> dict:
 def main():
     if len(sys.argv) < 2:
         print("USO: python audit_universal.py <pasta_empresa>")
-        print("     python audit_universal.py docs/doc\ calculo/CANAVEZI")
-        print("     python audit_universal.py docs/doc\ calculo/CONFI_AR")
-        print("     python audit_universal.py docs/doc\ calculo/ITANGUA")
+        print("     python audit_universal.py docs/doc\\ calculo/CANAVEZI")
+        print("     python audit_universal.py docs/doc\\ calculo/CONFI_AR")
+        print("     python audit_universal.py docs/doc\\ calculo/ITANGUA")
         sys.exit(1)
 
     pasta = sys.argv[1]
