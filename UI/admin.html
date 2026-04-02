@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Administração — Motor Tributário Conect</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; }
+    input:focus, select:focus {
+      outline: none; border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59,130,246,.18);
+    }
+    .btn-primary { background:#1e40af;color:#fff;border-radius:8px;padding:8px 20px;font-weight:600;transition:background .2s; }
+    .btn-primary:hover:not(:disabled) { background:#1d3a9e; }
+    .btn-primary:disabled { opacity:.45;cursor:not-allowed; }
+    .btn-ghost { background:transparent;color:#64748b;border:1px solid #cbd5e1;border-radius:8px;padding:8px 16px;font-weight:500;transition:background .2s; }
+    .btn-ghost:hover { background:#f1f5f9; }
+    .badge-admin { background:#dbeafe;color:#1e40af;font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:999px; }
+    .badge-usuario { background:#f1f5f9;color:#475569;font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:999px; }
+    .badge-ativo { background:#dcfce7;color:#166534;font-size:.7rem;font-weight:600;padding:2px 8px;border-radius:999px; }
+    .badge-inativo { background:#fee2e2;color:#991b1b;font-size:.7rem;font-weight:600;padding:2px 8px;border-radius:999px; }
+    #modal-criar, #modal-confirm { display:none; }
+    #modal-criar.open, #modal-confirm.open { display:flex; }
+    .msg-error { color:#ef4444;font-size:.72rem;margin-top:2px; }
+    .toast {
+      position:fixed;bottom:24px;right:24px;z-index:9999;
+      background:#1e293b;color:#f8fafc;padding:12px 20px;border-radius:10px;
+      font-size:.85rem;font-weight:500;
+      transform:translateY(100px);opacity:0;transition:all .3s;
+      pointer-events:none;
+    }
+    .toast.show { transform:translateY(0);opacity:1; }
+    .toast.success { border-left:4px solid #22c55e; }
+    .toast.error   { border-left:4px solid #ef4444; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between sticky top-0 z-40">
+    <div class="flex items-center gap-3">
+      <a href="dashboard.html" class="text-slate-400 hover:text-slate-600 transition-colors" title="Voltar ao Dashboard">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      </a>
+      <span class="font-bold text-slate-800 text-lg">Administração</span>
+      <span class="text-xs bg-red-100 text-red-700 font-semibold px-2 py-0.5 rounded-full">Admin</span>
+    </div>
+    <span id="header-user" class="text-xs text-slate-400"></span>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 py-8 space-y-6">
+
+    <!-- Stats row -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div class="card p-4">
+        <p class="text-xs text-slate-500 font-medium">Total de Usuários</p>
+        <p id="stat-total" class="text-2xl font-bold text-slate-800 mt-1">—</p>
+      </div>
+      <div class="card p-4">
+        <p class="text-xs text-slate-500 font-medium">Ativos</p>
+        <p id="stat-ativos" class="text-2xl font-bold text-emerald-700 mt-1">—</p>
+      </div>
+      <div class="card p-4">
+        <p class="text-xs text-slate-500 font-medium">Administradores</p>
+        <p id="stat-admins" class="text-2xl font-bold text-blue-700 mt-1">—</p>
+      </div>
+      <div class="card p-4">
+        <p class="text-xs text-slate-500 font-medium">Inativos</p>
+        <p id="stat-inativos" class="text-2xl font-bold text-red-600 mt-1">—</p>
+      </div>
+    </div>
+
+    <!-- Tabela de usuários -->
+    <div class="card overflow-hidden">
+      <div class="px-5 py-4 flex items-center justify-between border-b border-slate-100">
+        <h2 class="font-bold text-slate-800">Usuários do Sistema</h2>
+        <button class="btn-primary text-sm" onclick="openModalCriar()">+ Novo Usuário</button>
+      </div>
+
+      <!-- Loading state -->
+      <div id="table-loading" class="py-12 flex justify-center">
+        <svg class="animate-spin w-8 h-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+        </svg>
+      </div>
+
+      <!-- Empty state -->
+      <div id="table-empty" class="py-12 text-center text-slate-400 hidden">
+        <p class="text-sm">Nenhum usuário encontrado.</p>
+      </div>
+
+      <!-- Table -->
+      <div id="table-wrap" class="hidden overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide">
+              <th class="text-left px-5 py-3 font-semibold">Usuário</th>
+              <th class="text-left px-5 py-3 font-semibold">E-mail</th>
+              <th class="text-left px-5 py-3 font-semibold">Perfil</th>
+              <th class="text-left px-5 py-3 font-semibold">Status</th>
+              <th class="text-left px-5 py-3 font-semibold">Último acesso</th>
+              <th class="text-right px-5 py-3 font-semibold">Ação</th>
+            </tr>
+          </thead>
+          <tbody id="user-table-body" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Modal: Criar usuário -->
+  <div id="modal-criar" class="fixed inset-0 z-50 items-center justify-center bg-slate-900/60 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6 space-y-4">
+      <h3 class="text-base font-bold text-slate-800">Novo Usuário</h3>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Nome de usuário <span class="text-red-500">*</span></label>
+        <input id="new-username" type="text" maxlength="50" placeholder="ex: joao.silva"
+          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          oninput="checkNewUser()">
+        <p id="new-username-err" class="msg-error hidden">Mínimo 3 caracteres, apenas letras, números, ponto e underline.</p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">E-mail <span class="text-red-500">*</span></label>
+        <input id="new-email" type="email" placeholder="usuario@escritorio.com.br"
+          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          oninput="checkNewUser()">
+        <p id="new-email-err" class="msg-error hidden">E-mail inválido.</p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Senha temporária <span class="text-red-500">*</span></label>
+        <input id="new-password" type="password" placeholder="Mínimo 8 caracteres"
+          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          oninput="checkNewUser()">
+        <p class="text-xs text-slate-400 mt-1">O usuário deverá alterar a senha no primeiro acesso.</p>
+        <p id="new-password-err" class="msg-error hidden">Mínimo 8 caracteres.</p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Perfil <span class="text-red-500">*</span></label>
+        <select id="new-role" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" onchange="checkNewUser()">
+          <option value="">Selecione</option>
+          <option value="usuario">Usuário (analisa clientes)</option>
+          <option value="admin">Administrador (acesso total)</option>
+        </select>
+      </div>
+
+      <p id="criar-api-err" class="msg-error hidden"></p>
+
+      <div class="flex gap-3 justify-end pt-2">
+        <button class="btn-ghost text-sm" onclick="closeModalCriar()">Cancelar</button>
+        <button id="btn-criar-usuario" class="btn-primary text-sm" onclick="criarUsuario()" disabled>Criar usuário</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Confirmar desativar -->
+  <div id="modal-confirm" class="fixed inset-0 z-50 items-center justify-center bg-slate-900/60 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6 space-y-4">
+      <h3 class="text-base font-bold text-slate-800">Confirmar desativação</h3>
+      <p id="confirm-msg" class="text-sm text-slate-600"></p>
+      <p class="text-xs text-slate-400">O usuário não poderá mais acessar o sistema. Você pode reativá-lo manualmente via banco de dados.</p>
+      <div class="flex gap-3 justify-end">
+        <button class="btn-ghost text-sm" onclick="closeConfirm()">Cancelar</button>
+        <button id="btn-confirmar-desat" class="bg-red-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-red-700 transition-colors" onclick="confirmarDesativar()">
+          Sim, desativar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast"></div>
+
+<script>
+  const API_BASE   = 'http://localhost:8000';
+  const token      = sessionStorage.getItem('token');
+  const role       = sessionStorage.getItem('role');
+  const username   = sessionStorage.getItem('username');
+  let pendingDesat = null;
+
+  // Auth + role guard
+  if (!token) { window.location.href = 'login.html'; }
+  if (role !== 'admin') { window.location.href = 'dashboard.html'; }
+  document.getElementById('header-user').textContent = username || '';
+
+  // ── Carregar usuários ──
+  async function carregarUsuarios() {
+    try {
+      const res = await fetch(`${API_BASE}/admin/usuarios`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.status === 401) { sessionStorage.clear(); window.location.href = 'login.html'; return; }
+      if (res.status === 403) { window.location.href = 'dashboard.html'; return; }
+      if (!res.ok) throw new Error('Erro ao carregar usuários');
+
+      const lista = await res.json();
+      document.getElementById('table-loading').classList.add('hidden');
+
+      if (!lista.length) {
+        document.getElementById('table-empty').classList.remove('hidden');
+        return;
+      }
+
+      document.getElementById('table-wrap').classList.remove('hidden');
+
+      // Stats
+      const total   = lista.length;
+      const ativos  = lista.filter(u => u.ativo).length;
+      const admins  = lista.filter(u => u.role === 'admin').length;
+      const inats   = total - ativos;
+      document.getElementById('stat-total').textContent   = total;
+      document.getElementById('stat-ativos').textContent  = ativos;
+      document.getElementById('stat-admins').textContent  = admins;
+      document.getElementById('stat-inativos').textContent = inats;
+
+      // Rows
+      const tbody = document.getElementById('user-table-body');
+      tbody.innerHTML = '';
+      lista.forEach(u => {
+        const isMe = u.username === username;
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition-colors';
+        tr.innerHTML = `
+          <td class="px-5 py-3 font-medium text-slate-800">${escHtml(u.username)}${isMe ? ' <span class="text-xs text-slate-400">(você)</span>' : ''}</td>
+          <td class="px-5 py-3 text-slate-600">${escHtml(u.email || '—')}</td>
+          <td class="px-5 py-3"><span class="badge-${u.role}">${u.role === 'admin' ? 'Admin' : 'Usuário'}</span></td>
+          <td class="px-5 py-3"><span class="badge-${u.ativo ? 'ativo' : 'inativo'}">${u.ativo ? 'Ativo' : 'Inativo'}</span></td>
+          <td class="px-5 py-3 text-slate-400 text-xs">${formatDate(u.ultimo_acesso)}</td>
+          <td class="px-5 py-3 text-right">
+            ${u.ativo && !isMe
+              ? `<button onclick="abrirConfirmDesat(${u.id}, '${escHtml(u.username)}')"
+                   class="text-xs text-red-600 hover:text-red-800 font-medium transition-colors">Desativar</button>`
+              : `<span class="text-xs text-slate-300">—</span>`
+            }
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+    } catch (e) {
+      document.getElementById('table-loading').classList.add('hidden');
+      showToast('Erro ao carregar usuários: ' + e.message, 'error');
+    }
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function formatDate(iso) {
+    if (!iso) return '—';
+    try {
+      return new Date(iso).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    } catch { return iso; }
+  }
+
+  // ── Modal criar usuário ──
+  function openModalCriar() {
+    ['new-username','new-email','new-password'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('new-role').value = '';
+    document.getElementById('criar-api-err').classList.add('hidden');
+    checkNewUser();
+    document.getElementById('modal-criar').classList.add('open');
+  }
+  function closeModalCriar() {
+    document.getElementById('modal-criar').classList.remove('open');
+  }
+
+  function checkNewUser() {
+    const u = document.getElementById('new-username').value.trim();
+    const e = document.getElementById('new-email').value.trim();
+    const p = document.getElementById('new-password').value;
+    const r = document.getElementById('new-role').value;
+    const uOk = /^[a-zA-Z0-9._]{3,50}$/.test(u);
+    const eOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+    const pOk = p.length >= 8;
+    const rOk = r !== '';
+    document.getElementById('btn-criar-usuario').disabled = !(uOk && eOk && pOk && rOk);
+  }
+
+  async function criarUsuario() {
+    const btn = document.getElementById('btn-criar-usuario');
+    btn.disabled = true; btn.textContent = 'Criando…';
+    document.getElementById('criar-api-err').classList.add('hidden');
+
+    const payload = {
+      username: document.getElementById('new-username').value.trim(),
+      email:    document.getElementById('new-email').value.trim(),
+      password: document.getElementById('new-password').value,
+      role:     document.getElementById('new-role').value,
+    };
+
+    try {
+      const res = await fetch(`${API_BASE}/admin/usuarios`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+      if (res.status === 401) { sessionStorage.clear(); window.location.href = 'login.html'; return; }
+
+      const data = await res.json();
+      if (!res.ok) {
+        const errMsg = data.detail || 'Erro ao criar usuário.';
+        document.getElementById('criar-api-err').textContent = errMsg;
+        document.getElementById('criar-api-err').classList.remove('hidden');
+        btn.disabled = false; btn.textContent = 'Criar usuário';
+        return;
+      }
+
+      closeModalCriar();
+      showToast(`Usuário "${data.username}" criado com sucesso.`, 'success');
+      carregarUsuarios();
+
+    } catch (e) {
+      document.getElementById('criar-api-err').textContent = 'Erro de conexão.';
+      document.getElementById('criar-api-err').classList.remove('hidden');
+      btn.disabled = false; btn.textContent = 'Criar usuário';
+    }
+  }
+
+  // ── Desativar ──
+  function abrirConfirmDesat(id, nome) {
+    pendingDesat = id;
+    document.getElementById('confirm-msg').textContent = `Desativar o usuário "${nome}"? Ele perderá acesso imediato ao sistema.`;
+    document.getElementById('modal-confirm').classList.add('open');
+  }
+  function closeConfirm() {
+    document.getElementById('modal-confirm').classList.remove('open');
+    pendingDesat = null;
+  }
+
+  async function confirmarDesativar() {
+    if (!pendingDesat) return;
+    const id = pendingDesat;
+    closeConfirm();
+
+    try {
+      const res = await fetch(`${API_BASE}/admin/usuarios/${id}/desativar`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (res.status === 401) { sessionStorage.clear(); window.location.href = 'login.html'; return; }
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.detail || 'Erro ao desativar.', 'error');
+        return;
+      }
+      showToast('Usuário desativado com sucesso.', 'success');
+      carregarUsuarios();
+    } catch {
+      showToast('Erro de conexão.', 'error');
+    }
+  }
+
+  // ── Toast ──
+  function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className   = `toast ${type}`;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3500);
+  }
+
+  // Init
+  carregarUsuarios();
+</script>
+</body>
+</html>

@@ -13,6 +13,8 @@ ENDPOINTS:
   GET  /admin/usuarios                  → listar usuários (admin)
   POST /admin/usuarios/{id}/desativar   → desativar usuário (admin)
   POST /analise/manual                  → cálculo direto sem PDF (autenticado)
+  POST /analise/pdf                     → upload PDFs e-CAC → extração → diagnóstico (autenticado)
+  POST /relatorio/pdf                   → gera PDF do diagnóstico via weasyprint (autenticado)
 
 USO:
   cd PY && uvicorn api_motor:app --reload --port 8000
@@ -35,9 +37,9 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal, Optional
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic import ValidationError as PydanticValidationError
@@ -62,6 +64,7 @@ from motor_tributario import (
     MotorReformaTributaria,
     OperacaoFiscal,
 )
+from relatorio_pdf import gerar_pdf
 
 logger = logging.getLogger("motor_conect.api")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -648,4 +651,116 @@ def analise_manual(
         raise HTTPException(
             status_code=500,
             detail="Erro interno no motor de cálculo — contate o suporte.",
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# POST /relatorio/pdf — Geração de PDF via weasyprint (FASE 5)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.post(
+    "/relatorio/pdf",
+    summary="Gera PDF do diagnóstico fiscal",
+    tags=["Relatório"],
+    responses={
+        200: {"content": {"application/pdf": {}}, "description": "PDF gerado com sucesso"},
+        422: {"description": "Diagnóstico inválido"},
+        503: {"description": "weasyprint não disponível"},
+    },
+)
+async def gerar_relatorio_pdf(
+    diagnostico: dict,
+    current_user: dict = Depends(get_current_user),  # noqa: ARG001 — autenticação obrigatória
+) -> Response:
+    """
+    Recebe o objeto diagnóstico no body JSON e retorna um PDF gerado via weasyprint.
+
+    O diagnóstico é o mesmo objeto retornado por POST /analise/manual ou POST /analise/pdf.
+    Dados sensíveis trafegam no body (POST), nunca na query string (GET).
+    Exige Bearer token JWT válido.
+    """
+    try:
+        pdf_bytes = gerar_pdf(diagnostico)
+    except RuntimeError as exc:
+        if "não instalado" in str(exc):
+            raise HTTPException(
+                status_code=503,
+                detail="Geração de PDF indisponível — weasyprint não instalado no servidor.",
+            )
+        logger.error("Erro ao gerar PDF: %s", exc)
+        raise HTTPException(status_code=500, detail="Falha na geração do PDF.")
+
+    razao = (
+        diagnostico.get("empresa", {}).get("razao_social")
+        or diagnostico.get("razao_social")
+        or "relatorio"
+    )
+    filename = "".join(c if c.isalnum() or c in " _-" else "_" for c in str(razao))[:50]
+    filename = filename.strip("_").replace(" ", "_") or "relatorio"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}_diagnostico.pdf"'},
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# POST /analise/pdf — Upload PDFs e-CAC → extração → diagnóstico (FASE 3)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.post(
+    "/analise/pdf",
+    summary="Extrai dados de PDFs e-CAC e gera diagnóstico",
+    tags=["Análise"],
+)
+async def analise_pdf(
+    files: list[UploadFile] = File(..., description="PDFs do e-CAC (máx. 10 arquivos)"),
+    current_user: dict = Depends(get_current_user),  # noqa: ARG001
+) -> JSONResponse:
+    """
+    Aceita múltiplos PDFs do e-CAC (PGDAS-D, DAS, SIMEI, comprovantes).
+    Extrai dados via pipeline extrator_pdfs.py + Claude Vision API.
+    Retorna diagnóstico fiscal completo.
+    Exige Bearer token JWT válido.
+    """
+    if not files:
+        raise HTTPException(status_code=422, detail="Nenhum arquivo enviado.")
+    if len(files) > 10:
+        raise HTTPException(status_code=422, detail="Máximo de 10 arquivos por requisição.")
+
+    # Validar tipo e tamanho
+    MAX_BYTES = 50 * 1024 * 1024  # 50 MB por arquivo
+    conteudos: list[bytes] = []
+    for f in files:
+        if not (f.filename or "").lower().endswith(".pdf"):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Arquivo '{f.filename}' não é um PDF.",
+            )
+        conteudo = await f.read()
+        if len(conteudo) > MAX_BYTES:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Arquivo '{f.filename}' excede o limite de 50 MB.",
+            )
+        conteudos.append(conteudo)
+
+    # Pipeline de extração
+    try:
+        from extrator_pdfs import processar_pdfs_bytes  # importação lazy — evita falha no startup se ANTHROPIC_API_KEY ausente
+
+        diagnostico = processar_pdfs_bytes(conteudos)
+        return JSONResponse(content=_serializar_decimal(diagnostico))
+
+    except ImportError:
+        raise HTTPException(
+            status_code=503,
+            detail="Pipeline de extração de PDFs não disponível — verifique a instalação.",
+        )
+    except Exception as exc:
+        logger.error("Erro em POST /analise/pdf: %s", type(exc).__name__)
+        raise HTTPException(
+            status_code=500,
+            detail="Falha na extração dos documentos. Verifique se os PDFs são do e-CAC.",
         )
