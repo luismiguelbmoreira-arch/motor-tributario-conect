@@ -30,6 +30,7 @@ from uuid import uuid4
 from sqlmodel import Field, Session, SQLModel, create_engine, Column, TEXT
 from sqlalchemy import event, text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import IntegrityError, OperationalError
 
 logger = logging.getLogger("motor_conect.database")
 
@@ -310,30 +311,41 @@ def salvar_empresa(empresa_domain: Any) -> EmpresaDB:
             EmpresaDB.cnpj == empresa_domain.cnpj
         ).first()
 
-        if existente:
-            existente.razao_social = empresa_domain.razao_social
-            existente.regime = empresa_domain.regime
-            existente.cnae_principal = empresa_domain.cnae_principal
-            existente.uf_origem = empresa_domain.uf_origem
-            existente.faturamento_12m = str(empresa_domain.faturamento_12m)
-            existente.folha_salarios_12m = (
-                str(empresa_domain.folha_salarios_12m)
-                if empresa_domain.folha_salarios_12m is not None else None
-            )
-            existente.anexo_simples = empresa_domain.anexo_simples
-            existente.updated_at = datetime.now().isoformat()
-            session.add(existente)
-            session.commit()
-            session.refresh(existente)
-            logger.info("Empresa atualizada | id=%s", existente.id)
-            return existente
-        else:
-            nova = EmpresaDB.from_domain(empresa_domain)
-            session.add(nova)
-            session.commit()
-            session.refresh(nova)
-            logger.info("Empresa criada | id=%s", nova.id)
-            return nova
+        try:
+            if existente:
+                existente.razao_social = empresa_domain.razao_social
+                existente.regime = empresa_domain.regime
+                existente.cnae_principal = empresa_domain.cnae_principal
+                existente.uf_origem = empresa_domain.uf_origem
+                existente.faturamento_12m = str(empresa_domain.faturamento_12m)
+                existente.folha_salarios_12m = (
+                    str(empresa_domain.folha_salarios_12m)
+                    if empresa_domain.folha_salarios_12m is not None else None
+                )
+                existente.anexo_simples = empresa_domain.anexo_simples
+                existente.updated_at = datetime.now().isoformat()
+                session.add(existente)
+                session.commit()
+                session.refresh(existente)
+                logger.info("Empresa atualizada | id=%s", existente.id)
+                return existente
+            else:
+                nova = EmpresaDB.from_domain(empresa_domain)
+                session.add(nova)
+                session.commit()
+                session.refresh(nova)
+                logger.info("Empresa criada | id=%s", nova.id)
+                return nova
+        except IntegrityError as exc:
+            session.rollback()
+            logger.error("IntegrityError em salvar_empresa | cnpj=%s | %s", empresa_domain.cnpj, exc)
+            raise RuntimeError(
+                f"Conflito ao salvar empresa (CNPJ duplicado ou constraint violada): {exc.orig}"
+            ) from exc
+        except OperationalError as exc:
+            session.rollback()
+            logger.error("OperationalError em salvar_empresa | %s", exc)
+            raise RuntimeError("Banco de dados indisponível — tente novamente.") from exc
 
 
 def buscar_empresa_por_cnpj(cnpj: str) -> Optional[EmpresaDB]:
@@ -391,11 +403,26 @@ def salvar_diagnostico(
     )
 
     with get_session() as session:
-        session.add(diag)
-        session.commit()
-        session.refresh(diag)
-        logger.info("Diagnóstico salvo | empresa_id=%s | competencia=%s", empresa_id, competencia)
-        return diag
+        try:
+            session.add(diag)
+            session.commit()
+            session.refresh(diag)
+            logger.info("Diagnóstico salvo | empresa_id=%s | competencia=%s", empresa_id, competencia)
+            return diag
+        except IntegrityError as exc:
+            session.rollback()
+            logger.error(
+                "IntegrityError em salvar_diagnostico | empresa_id=%s | competencia=%s | %s",
+                empresa_id, competencia, exc,
+            )
+            raise RuntimeError(
+                f"Diagnóstico duplicado para empresa_id={empresa_id} competencia={competencia}. "
+                "Use a competência correta ou atualize o diagnóstico existente."
+            ) from exc
+        except OperationalError as exc:
+            session.rollback()
+            logger.error("OperationalError em salvar_diagnostico | %s", exc)
+            raise RuntimeError("Banco de dados indisponível — tente novamente.") from exc
 
 
 def salvar_alertas(empresa_id: int, competencia: str, alertas: List[Dict[str, str]]) -> None:
@@ -420,8 +447,19 @@ def salvar_alertas(empresa_id: int, competencia: str, alertas: List[Dict[str, st
                 status="ABERTO",
             )
             session.add(db_alerta)
-        session.commit()
-        logger.info("Alertas salvos | empresa_id=%s | qtd=%d", empresa_id, len(alertas))
+        try:
+            session.commit()
+            logger.info("Alertas salvos | empresa_id=%s | qtd=%d", empresa_id, len(alertas))
+        except IntegrityError as exc:
+            session.rollback()
+            logger.error("IntegrityError em salvar_alertas | empresa_id=%s | %s", empresa_id, exc)
+            raise RuntimeError(
+                f"Conflito ao salvar alertas para empresa_id={empresa_id}: {exc.orig}"
+            ) from exc
+        except OperationalError as exc:
+            session.rollback()
+            logger.error("OperationalError em salvar_alertas | %s", exc)
+            raise RuntimeError("Banco de dados indisponível — tente novamente.") from exc
 
 
 def buscar_diagnosticos_por_empresa(empresa_id: int) -> List[DiagnosticoDB]:
@@ -488,14 +526,19 @@ def resolver_alerta(
         alerta.resolvido_em = datetime.now().isoformat()
         alerta.resolvido_por = resolvido_por.strip()
         alerta.acao_tomada = acao_tomada.strip()
-        session.add(alerta)
-        session.commit()
-        session.refresh(alerta)
-        logger.info(
-            "Alerta resolvido | id=%s | por=%s | status=%s",
-            alerta_id, resolvido_por, status,
-        )
-        return alerta
+        try:
+            session.add(alerta)
+            session.commit()
+            session.refresh(alerta)
+            logger.info(
+                "Alerta resolvido | id=%s | por=%s | status=%s",
+                alerta_id, resolvido_por, status,
+            )
+            return alerta
+        except (IntegrityError, OperationalError) as exc:
+            session.rollback()
+            logger.error("Erro ao resolver alerta | id=%s | %s", alerta_id, exc)
+            raise RuntimeError(f"Falha ao persistir resolução do alerta id={alerta_id}.") from exc
 
 
 # ─────────────────────────────────────────────────────────────────────────────
