@@ -12,5 +12,12 @@ fastapi>=0.111.0
 uvicorn[standard]>=0.29.0   # Servidor ASGI com websockets + httptools
 python-multipart>=0.0.9     # Dependência runtime do FastAPI
 
+# ── Autenticação ──────────────────────────────────────────────────────────────
+passlib[bcrypt]>=1.7.4              # Hash de senhas bcrypt
+python-jose[cryptography]>=3.3.0    # JWT tokens
+
+# ── Geração de PDF ─────────────────────────────────────────────────────────────
+weasyprint>=61.0                    # HTML → PDF (relatórios tributários)
+
 # ── Testes ────────────────────────────────────────────────────────────────────
 pytest>=8.0.0
