@@ -272,6 +272,40 @@ class DiagnosticoDB(SQLModel, table=True):
         return Decimal(self.delta) if self.delta else None
 
 
+class EmpresaHistoricoDB(SQLModel, table=True):
+    """
+    Rastreabilidade de alterações em dados da empresa.
+
+    CTN Art. 180: A imunidade tributária não extingue a obrigação de
+    comprovar os fatos que a justificam. Alterações em dados fiscais
+    (faturamento, regime, CNAE) devem ser rastreáveis.
+
+    LGPD: Registra o CAMPO alterado (não o CNPJ) para minimizar PII.
+    O empresa_id serve de referência sem expor dados sensíveis nos logs.
+
+    Uso:
+        registrar_historico_empresa(empresa_id=5, campo="faturamento_12m",
+            valor_anterior="500000.00", valor_novo="620000.00",
+            alterado_por="joao.silva")
+    """
+    __tablename__ = "empresa_historico"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    empresa_id: int = Field(foreign_key="empresas.id", index=True)
+
+    # O que mudou
+    campo_alterado: str = Field(max_length=50)   # ex: "faturamento_12m", "regime", "cnae_principal"
+    valor_anterior: Optional[str] = Field(default=None, sa_column=Column(TEXT, nullable=True))
+    valor_novo: str = Field(sa_column=Column(TEXT, nullable=False))
+
+    # Quem e quando — rastreabilidade CTN Art. 180
+    alterado_por: str = Field(max_length=100)    # username do operador
+    alterado_em: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+    # Contexto opcional (ex: "Atualização via PGDAS-D jan/2026")
+    motivo: Optional[str] = Field(default=None, sa_column=Column(TEXT, nullable=True))
+
+
 class AlertaDB(SQLModel, table=True):
     """
     Histórico de alertas gerados pelo motor.
@@ -346,6 +380,75 @@ def salvar_empresa(empresa_domain: Any) -> EmpresaDB:
             session.rollback()
             logger.error("OperationalError em salvar_empresa | %s", exc)
             raise RuntimeError("Banco de dados indisponível — tente novamente.") from exc
+
+
+def registrar_historico_empresa(
+    empresa_id: int,
+    campo_alterado: str,
+    valor_novo: str,
+    alterado_por: str,
+    valor_anterior: Optional[str] = None,
+    motivo: Optional[str] = None,
+) -> EmpresaHistoricoDB:
+    """
+    Registra uma alteração em dado da empresa na tabela de histórico.
+    Exigência: CTN Art. 180 — rastreabilidade de alterações contábeis.
+
+    Deve ser chamado ANTES de cada salvar_empresa() que altere campos fiscais,
+    passando o valor anterior (se conhecido) e o novo valor.
+
+    Args:
+        empresa_id: ID da empresa no banco
+        campo_alterado: Nome do campo alterado (ex: "faturamento_12m", "regime")
+        valor_novo: Novo valor como string
+        alterado_por: Username do operador responsável
+        valor_anterior: Valor anterior como string (None se campo era inexistente)
+        motivo: Contexto da alteração (ex: "Atualização via PGDAS-D 01/2026")
+
+    Returns:
+        EmpresaHistoricoDB persistido
+    """
+    registro = EmpresaHistoricoDB(
+        empresa_id=empresa_id,
+        campo_alterado=campo_alterado,
+        valor_anterior=valor_anterior,
+        valor_novo=valor_novo,
+        alterado_por=alterado_por,
+        motivo=motivo,
+    )
+    with get_session() as session:
+        try:
+            session.add(registro)
+            session.commit()
+            session.refresh(registro)
+            logger.info(
+                "Histórico registrado | empresa_id=%s | campo=%s | por=%s",
+                empresa_id, campo_alterado, alterado_por,
+            )
+            return registro
+        except (IntegrityError, OperationalError) as exc:
+            session.rollback()
+            logger.error(
+                "Erro ao registrar histórico | empresa_id=%s | campo=%s | %s",
+                empresa_id, campo_alterado, exc,
+            )
+            raise RuntimeError(
+                f"Falha ao registrar histórico de alteração (empresa_id={empresa_id}, campo={campo_alterado})."
+            ) from exc
+
+
+def buscar_historico_empresa(empresa_id: int) -> List[EmpresaHistoricoDB]:
+    """
+    Lista todo o histórico de alterações de uma empresa, ordem cronológica inversa.
+    CTN Art. 180 — permite auditoria de mudanças fiscais.
+    """
+    with get_session() as session:
+        return list(
+            session.query(EmpresaHistoricoDB)
+            .filter(EmpresaHistoricoDB.empresa_id == empresa_id)
+            .order_by(EmpresaHistoricoDB.alterado_em.desc())
+            .all()
+        )
 
 
 def buscar_empresa_por_cnpj(cnpj: str) -> Optional[EmpresaDB]:

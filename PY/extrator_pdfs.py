@@ -50,13 +50,29 @@ logger = logging.getLogger("motor_conect.extrator")
 # VERSIONAMENTO DO PROMPT — rastreia qual versão extraiu os dados
 # Se o layout do e-CAC mudar, incrementar PROMPT_VERSION e registrar na trilha.
 # ─────────────────────────────────────────────────────────────────────────────
-PROMPT_VERSION: str = "v2.1-2026-03-26"
+PROMPT_VERSION: str = "v2.2-2026-04-02"
 """
 Histórico:
   v1.0-2026-03-20: extração mono-atividade (CANAVEZI)
   v2.0-2026-03-26: multi-atividade + ST + ISS retido (CONFI-AR, ITANGUA)
   v2.1-2026-03-26: RPA mensal + formato US/BR auto-detect (to_decimal)
+  v2.2-2026-04-02: confiança mínima 0.8 + versionamento layout e-CAC + processar_pdfs_bytes
 """
+
+# Layout do e-CAC por ano — incrementar quando Receita Federal mudar os campos
+# Se a extração degradar após mudança de ano fiscal, verificar aqui primeiro.
+VERSAO_LAYOUT_ECAC: str = "2026"
+"""
+Histórico de layouts:
+  2024: Campo "Receita Bruta Acumulada nos 12 meses anteriores ao período de apuração"
+  2025: Sem mudança de layout conhecida
+  2026: Campo RBT12 pode aparecer abreviado como "RBT12" em novos layouts do PGDAS-D
+  → Se a extração falhar sistematicamente após virada do ano, incrementar aqui e no PROMPT_EXTRACAO.
+"""
+
+# Limiar mínimo de confiança — abaixo disso, recusa processar para evitar cálculos sobre dados
+# incorretos. Configurável via variável de ambiente para ajuste sem redeploy.
+_CONFIANCA_MINIMA: float = float(os.environ.get("EXTRATOR_CONFIANCA_MINIMA", "0.8"))
 
 # Campos obrigatórios — motor para se ausentes
 _CAMPOS_OBRIGATORIOS: tuple[str, ...] = ("cnpj", "razao_social", "faturamento_12m", "cnae_principal")
@@ -209,9 +225,14 @@ class DadosExtraidosPDF(BaseModel):
 # PROMPT DE EXTRAÇÃO — Instrução para Claude Vision
 # ─────────────────────────────────────────────────────────────────────────────
 
-PROMPT_EXTRACAO = """
+PROMPT_EXTRACAO = f"""
 Voce e um especialista tributario brasileiro analisando documentos do PGDAS-D (Simples Nacional).
 Extraia os dados tributarios dos documentos fornecidos e retorne EXCLUSIVAMENTE um JSON valido.
+
+VERSAO DO LAYOUT e-CAC ESPERADO: {VERSAO_LAYOUT_ECAC}
+- Layout 2024-2025: campo RBT12 aparece como "Receita Bruta Acumulada nos 12 meses anteriores ao periodo de apuracao"
+- Layout 2026+: campo pode aparecer como "RBT12" diretamente no cabecalho do PGDAS-D
+- Se o layout do documento nao corresponder ao esperado, informe em "observacoes" e reduza confianca_extracao
 
 CAMPOS OBRIGATORIOS:
 - cnpj: CNPJ completo (ex: "12.345.678/0001-90")
@@ -229,15 +250,15 @@ CAMPOS OPCIONAIS (null se nao encontrado):
 - receita_com_st_icms: Valor MENSAL da receita sujeita a Substituicao Tributaria ICMS em R$ (quando o ICMS e zerado no DAS porque ja foi retido pelo substituto)
 - atividades_detalhadas: Lista de atividades quando a empresa tem MAIS DE UM segmento de receita com Anexos DIFERENTES. OBRIGATORIO quando houver mix de comercio (Anexo I/II) + servicos (Anexo III/IV). Formato:
   [
-    {"receita": "95594.08", "anexo": "III", "icms_st": false, "iss_retido": false},
-    {"receita": "4929.43",  "anexo": "I",   "icms_st": false, "iss_retido": false},
-    {"receita": "32970.57", "anexo": "I",   "icms_st": true,  "iss_retido": false},
-    {"receita": "5650.00",  "anexo": "III", "icms_st": false, "iss_retido": true}
+    {{"receita": "95594.08", "anexo": "III", "icms_st": false, "iss_retido": false}},
+    {{"receita": "4929.43",  "anexo": "I",   "icms_st": false, "iss_retido": false}},
+    {{"receita": "32970.57", "anexo": "I",   "icms_st": true,  "iss_retido": false}},
+    {{"receita": "5650.00",  "anexo": "III", "icms_st": false, "iss_retido": true}}
   ]
   Regras: (1) Receita em formato numerico sem R$ (ex: "32970.57"). (2) icms_st=true quando ICMS zerado por ST. (3) iss_retido=true quando ISS retido pelo tomador. (4) Se empresa so tem um Anexo, deixe null.
 
 BREAKDOWN DO DAS (valores em R$, 0.00 se nao encontrado):
-- das_breakdown: {
+- das_breakdown: {{
     "IRPJ": "valor",
     "CSLL": "valor",
     "COFINS": "valor",
@@ -246,7 +267,7 @@ BREAKDOWN DO DAS (valores em R$, 0.00 se nao encontrado):
     "ICMS": "valor",
     "ISS": "valor",
     "IPI": "valor"
-  }
+  }}
 
 METADADOS:
 - campos_nao_encontrados: lista de campos que voce nao encontrou nos documentos
@@ -377,6 +398,21 @@ def extrair_dados_pdfs(caminhos_pdf: list[str | Path]) -> DadosExtraidosPDF:
         len(dados.campos_nao_encontrados),
     )
 
+    # Rejeitar extração com confiança abaixo do limiar — evita cálculos sobre dados incorretos.
+    # Limiar configurável via EXTRATOR_CONFIANCA_MINIMA (padrão: 0.8).
+    if dados.confianca_extracao < _CONFIANCA_MINIMA:
+        campos_ausentes_str = ", ".join(dados.campos_nao_encontrados) if dados.campos_nao_encontrados else "nenhum informado"
+        obs = dados.observacoes or "sem detalhes"
+        raise RuntimeError(
+            f"Confiança de extração insuficiente: {dados.confianca_extracao:.0%} "
+            f"(mínimo exigido: {_CONFIANCA_MINIMA:.0%}). "
+            f"Campos ausentes ou ambíguos: {campos_ausentes_str}. "
+            f"Observações da IA: {obs}. "
+            f"Ação recomendada: forneça PDFs com melhor qualidade ou informe os dados manualmente "
+            f"via formulário de análise. "
+            f"[PROMPT_VERSION={PROMPT_VERSION} | LAYOUT_ECAC={VERSAO_LAYOUT_ECAC}]"
+        )
+
     return dados
 
 
@@ -468,5 +504,167 @@ def dados_para_motor(dados: DadosExtraidosPDF) -> dict:
             "confianca": dados.confianca_extracao,
             "campos_ausentes": dados.campos_nao_encontrados,
             "observacoes": dados.observacoes,
+            "prompt_version": PROMPT_VERSION,
+            "layout_ecac": VERSAO_LAYOUT_ECAC,
         },
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENTRY POINT PARA API — Recebe bytes em memória (sem disco)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def processar_pdfs_bytes(conteudos: list[bytes]) -> dict:
+    """
+    Extrai dados tributários a partir de bytes de PDFs em memória.
+    Usado pelo endpoint POST /analise/pdf — PDFs chegam via HTTP upload, sem gravar em disco.
+
+    Args:
+        conteudos: Lista de bytes de cada PDF (já lidos pelo FastAPI UploadFile)
+
+    Returns:
+        dict diagnóstico fiscal — mesmo formato de MotorReformaTributaria.gerar_diagnostico()
+
+    Raises:
+        ValueError: ANTHROPIC_API_KEY ausente
+        RuntimeError: Confiança insuficiente, campos obrigatórios ausentes, ou falha de API
+    """
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise ValueError(
+            "ANTHROPIC_API_KEY nao configurada. "
+            "Defina a variavel de ambiente antes de usar o extrator."
+        )
+
+    if not conteudos:
+        raise RuntimeError("Nenhum conteúdo de PDF fornecido.")
+
+    cliente = anthropic.Anthropic(api_key=api_key)
+
+    # Monta conteúdo da mensagem com todos os PDFs (em memória — sem disco)
+    conteudo_msg: list[dict[str, Any]] = []
+    for i, pdf_bytes in enumerate(conteudos):
+        pdf_b64 = base64.standard_b64encode(pdf_bytes).decode("utf-8")
+        conteudo_msg.append({
+            "type": "document",
+            "source": {
+                "type": "base64",
+                "media_type": "application/pdf",
+                "data": pdf_b64,
+            },
+        })
+        logger.info("PDF[%d] carregado em memória: %d KB", i + 1, len(pdf_bytes) // 1024)
+
+    conteudo_msg.append({"type": "text", "text": PROMPT_EXTRACAO})
+
+    logger.info("Enviando %d PDF(s) bytes para Claude Vision...", len(conteudos))
+
+    resposta = cliente.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=2048,
+        messages=[{"role": "user", "content": conteudo_msg}],
+    )
+
+    texto_resposta = resposta.content[0].text.strip()
+    if texto_resposta.startswith("```"):
+        linhas = texto_resposta.split("\n")
+        texto_resposta = "\n".join(linhas[1:-1])
+
+    try:
+        dados_brutos = json.loads(texto_resposta)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            f"IA retornou resposta inválida (não é JSON): {exc}\n"
+            f"Resposta recebida: {texto_resposta[:500]}"
+        ) from exc
+
+    dados = DadosExtraidosPDF(**dados_brutos)
+
+    # Log de campos ausentes
+    if dados.campos_nao_encontrados:
+        for campo in dados.campos_nao_encontrados:
+            if campo in _CAMPOS_OBRIGATORIOS:
+                logger.error(
+                    "CAMPO_OBRIGATORIO_AUSENTE | campo=%s | prompt_version=%s",
+                    campo, PROMPT_VERSION,
+                )
+            else:
+                fallback_msg = _CAMPOS_OPCIONAIS.get(campo, "sem fallback documentado")
+                logger.warning(
+                    "CAMPO_OPCIONAL_AUSENTE | campo=%s | fallback=%s",
+                    campo, fallback_msg,
+                )
+
+    # Rejeitar confiança baixa
+    if dados.confianca_extracao < _CONFIANCA_MINIMA:
+        campos_ausentes_str = ", ".join(dados.campos_nao_encontrados) or "nenhum informado"
+        raise RuntimeError(
+            f"Confiança de extração insuficiente: {dados.confianca_extracao:.0%} "
+            f"(mínimo: {_CONFIANCA_MINIMA:.0%}). "
+            f"Campos problemáticos: {campos_ausentes_str}. "
+            f"Tente PDFs com melhor qualidade ou use o formulário manual."
+        )
+
+    # Converte para parâmetros do motor e executa diagnóstico
+    params = dados_para_motor(dados)
+    empresa_params = params["empresa"]
+    auditoria_params = params["auditoria"]
+
+    from motor_tributario import (
+        EmpresaCompradora,
+        EmpresaFornecedora,
+        MotorReformaTributaria,
+        OperacaoFiscal,
+    )
+    from datetime import date
+
+    fornecedora = EmpresaFornecedora(
+        cnpj=empresa_params["cnpj"],
+        razao_social=empresa_params["razao_social"],
+        regime=empresa_params["regime"],
+        cnae_principal=empresa_params["cnae_principal"],
+        uf_origem=empresa_params["uf_origem"],
+        faturamento_12m=empresa_params["faturamento_12m"],
+        folha_salarios_12m=empresa_params.get("folha_salarios_12m"),
+        anexo_simples=empresa_params.get("anexo_simples"),
+        receita_com_st_icms=empresa_params.get("receita_com_st_icms"),
+        atividades=empresa_params.get("atividades"),
+    )
+    compradora = EmpresaCompradora(tipo="B2C_CONSUMIDOR_FINAL")
+
+    # Usar competência extraída para definir data_emissao
+    competencia = auditoria_params.get("competencia", "")
+    try:
+        mes_str, ano_str = competencia.split("/")
+        data_emissao = date(int(ano_str), int(mes_str), 1)
+    except (ValueError, AttributeError):
+        data_emissao = date.today()
+
+    operacao = OperacaoFiscal(
+        data_emissao=data_emissao,
+        valor_operacao=auditoria_params.get("rpa") or fornecedora.faturamento_12m / 12,
+        rpa_mensal=auditoria_params.get("rpa"),
+    )
+
+    motor = MotorReformaTributaria(
+        fornecedora=fornecedora,
+        compradora=compradora,
+        operacao=operacao,
+    )
+    diagnostico = motor.gerar_diagnostico()
+
+    # Injeta metadados da extração no diagnóstico
+    diagnostico["_extracao"] = {
+        "confianca": dados.confianca_extracao,
+        "campos_ausentes": dados.campos_nao_encontrados,
+        "observacoes": dados.observacoes,
+        "prompt_version": PROMPT_VERSION,
+        "layout_ecac": VERSAO_LAYOUT_ECAC,
+        "das_ecac_referencia": str(auditoria_params.get("das_ecac") or ""),
+        "competencia": competencia,
+    }
+
+    # LGPD: purge após uso
+    dados.purge()
+
+    return diagnostico

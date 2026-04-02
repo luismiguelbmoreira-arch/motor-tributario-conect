@@ -36,20 +36,28 @@ TETO_IRPJ_SEM_ADICIONAL_TRIMESTRAL = Decimal("60000.00")  # R$ 60.000/trimestre
 ALIQUOTA_CSLL_COMERCIO  = Decimal("0.09")       # 9% (comércio/indústria)
 ALIQUOTA_CSLL_SERVICOS  = Decimal("0.09")       # 9% (serviços — igual)
 
-# Percentuais de Presunção por Atividade (Lei 9.249/1995, Art. 15)
+# Percentuais de Presunção por Atividade (Lei 9.249/1995, Art. 15 — IRPJ; Art. 20 — CSLL)
 # Formato: CNAE prefixo → (presunção_IRPJ, presunção_CSLL)
+# Âncora: RIR/2018 (Decreto 9.580/2018), Art. 591-604 — consolida Art. 15 da Lei 9.249/1995.
 PRESUNCAO_IRPJ_CSLL: Dict[str, tuple] = {
-    # Comércio (Seção G)
-    "45": (Decimal("0.08"), Decimal("0.12")),
-    "46": (Decimal("0.08"), Decimal("0.12")),
-    "47": (Decimal("0.08"), Decimal("0.12")),
-    # Serviços hospitalares/médicos (Seção Q)
-    "86": (Decimal("0.08"), Decimal("0.12")),
-    # Transporte de carga
-    "49": (Decimal("0.08"), Decimal("0.12")),
-    # Demais serviços — 32% IRPJ, 32% CSLL (regra geral)
+    # Comércio atacadista/varejista (Seção G — CNAE 45xx, 46xx, 47xx)
+    # Lei 9.249/1995, Art. 15, I: presunção IRPJ = 8%; CSLL = 12% (RIR/2018, Art. 592, I)
+    "45": (Decimal("0.08"), Decimal("0.12")),  # Comércio e reparação de veículos
+    "46": (Decimal("0.08"), Decimal("0.12")),  # Comércio atacadista
+    "47": (Decimal("0.08"), Decimal("0.12")),  # Comércio varejista
+    # Serviços hospitalares, laboratoriais e clínicas (Seção Q — CNAE 86xx)
+    # Lei 9.249/1995, Art. 15, III: presunção IRPJ = 8% para serviços hospitalares
+    # (tratamento igual ao comércio; exceção ao 32% geral para serviços de saúde)
+    "86": (Decimal("0.08"), Decimal("0.12")),  # Atividades de atenção à saúde humana
+    # Transporte de cargas (CNAE 49xx — somente cargas, não passageiros)
+    # Lei 9.249/1995, Art. 15, II: presunção IRPJ = 8%; passageiros = 16% (não implementado)
+    "49": (Decimal("0.08"), Decimal("0.12")),  # Transporte terrestre (carga)
+    # Demais serviços — regra geral residual
+    # Lei 9.249/1995, Art. 15, caput + §1º: presunção IRPJ = 32%; CSLL = 32%
+    # Inclui: consultoria, TI, serviços profissionais, publicidade, educação privada, etc.
     "_default_servicos": (Decimal("0.32"), Decimal("0.32")),
-    # Indústria
+    # Indústria e equiparados (Seção C — CNAE 10xx a 33xx)
+    # Lei 9.249/1995, Art. 15, I: presunção IRPJ = 8%; CSLL = 12%
     "_default_industria": (Decimal("0.08"), Decimal("0.12")),
 }
 
