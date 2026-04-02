@@ -176,14 +176,14 @@ class AnaliseManualRequest(BaseModel):
     regime_comprador: str = Field(
         default="NAO_INFORMADO", description="Regime tributário do comprador"
     )
-    uf_destino: str = Field(..., description="UF de destino (2 letras)")
+    uf_destino: str = Field(default="SP", description="UF de destino (2 letras; padrão: SP)")
 
     # ── OperacaoFiscal ────────────────────────────────────────────────────────
     data_emissao: str = Field(
         ..., description="Data de emissão ISO (YYYY-MM-DD) — deve estar em 2026-2033"
     )
     valor_operacao: Decimal = Field(..., gt=Decimal("0"), description="Valor da operação em R$")
-    ncm_nbs: str = Field(..., description="NCM/NBS (8 dígitos)")
+    ncm_nbs: str = Field(default="00000000", description="NCM/NBS (8 dígitos; padrão: 00000000)")
     forma_recebimento: Literal["DINHEIRO", "PIX_BOLETO", "CARTAO"] = Field(
         default="PIX_BOLETO", description="Forma de recebimento (impacta Split Payment)"
     )
