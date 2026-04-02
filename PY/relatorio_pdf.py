@@ -15,11 +15,15 @@ logger = logging.getLogger(__name__)
 try:
     from weasyprint import HTML as WeasyprintHTML  # type: ignore
     _WEASYPRINT_DISPONIVEL = True
-except ImportError:
+except Exception:
+    # ImportError: weasyprint não instalado
+    # OSError: bibliotecas nativas (GTK/Cairo) ausentes — comum no Windows sem GTK3
     _WEASYPRINT_DISPONIVEL = False
+    WeasyprintHTML = None  # type: ignore
     logger.warning(
-        "weasyprint não instalado — geração de PDF indisponível. "
-        "Execute: pip install weasyprint>=61.0"
+        "weasyprint indisponível (bibliotecas nativas GTK/Cairo ausentes). "
+        "Geração de PDF desativada. No Windows instale GTK3: "
+        "https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer"
     )
 
 

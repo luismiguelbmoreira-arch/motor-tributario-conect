@@ -65,7 +65,13 @@ from motor_tributario import (
     MotorReformaTributaria,
     OperacaoFiscal,
 )
-from relatorio_pdf import gerar_pdf
+# relatorio_pdf importado lazy no endpoint — evita crash de startup se GTK ausente (Windows)
+try:
+    from relatorio_pdf import gerar_pdf as _gerar_pdf
+    _RELATORIO_DISPONIVEL = True
+except Exception:
+    _gerar_pdf = None  # type: ignore
+    _RELATORIO_DISPONIVEL = False
 
 logger = logging.getLogger("motor_conect.api")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -684,8 +690,16 @@ async def gerar_relatorio_pdf(
     Dados sensíveis trafegam no body (POST), nunca na query string (GET).
     Exige Bearer token JWT válido.
     """
+    if not _RELATORIO_DISPONIVEL or _gerar_pdf is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Geração de PDF indisponível — weasyprint/GTK não instalado. "
+                "No Windows: instale GTK3 Runtime em https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer"
+            ),
+        )
     try:
-        pdf_bytes = gerar_pdf(diagnostico)
+        pdf_bytes = _gerar_pdf(diagnostico)
     except RuntimeError as exc:
         if "não instalado" in str(exc):
             raise HTTPException(
