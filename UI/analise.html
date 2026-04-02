@@ -554,23 +554,24 @@
     const st         = parseMoneyField('receita_st');
     const valor      = parseMoneyField('valor_operacao');
 
+    // Payload flat — espelha AnaliseManualRequest do backend
     const payload = {
-      fornecedora: {
-        cnpj: cnpjRaw,
-        razao_social: document.getElementById('razao_social').value.trim(),
-        regime: document.getElementById('regime').value,
-        cnae_principal: cnaeDigits,
-        uf: document.getElementById('uf').value,
-        rbt12: rbt12,
-        folha_salarios_12m: folha12m,
-      },
-      operacao: {
-        data_emissao: document.getElementById('data_emissao').value,
-        valor: valor,
-        rpa_mensal: rpa,
-        receita_com_st_icms: st,
-        tipo_comprador: tipoCompradorSelecionado,
-      }
+      // EmpresaFornecedora
+      cnpj:              cnpjRaw,
+      razao_social:      document.getElementById('razao_social').value.trim(),
+      regime:            document.getElementById('regime').value,
+      cnae_principal:    cnaeDigits,
+      uf_origem:         document.getElementById('uf').value,
+      uf_destino:        document.getElementById('uf').value,
+      faturamento_12m:   rbt12,
+      folha_salarios_12m: folha12m,
+      // EmpresaCompradora
+      tipo_comprador:    tipoCompradorSelecionado,
+      // OperacaoFiscal
+      data_emissao:      document.getElementById('data_emissao').value,
+      valor_operacao:    valor,
+      rpa_mensal:        rpa,
+      tinha_st_icms:     st !== null && st > 0,
     };
 
     try {

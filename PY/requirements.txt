@@ -14,6 +14,7 @@ python-multipart>=0.0.9     # Dependência runtime do FastAPI
 
 # ── Autenticação ──────────────────────────────────────────────────────────────
 passlib[bcrypt]>=1.7.4              # Hash de senhas bcrypt
+bcrypt>=4.0.1,<5.0.0               # Pinado: 5.x+ quebra passlib detect_wrap_bug
 python-jose[cryptography]>=3.3.0    # JWT tokens
 
 # ── Geração de PDF ─────────────────────────────────────────────────────────────
