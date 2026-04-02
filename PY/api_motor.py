@@ -41,6 +41,7 @@ from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic import ValidationError as PydanticValidationError
 
@@ -323,6 +324,10 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["Authorization", "Content-Type"],
 )
+
+# Servir UI como arquivos estáticos — montado APÓS todos os routes no final do módulo
+# Calculado aqui para suportar execução a partir de qualquer diretório
+_UI_DIR = Path(__file__).parent.parent / "UI"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -764,3 +769,14 @@ async def analise_pdf(
             status_code=500,
             detail="Falha na extração dos documentos. Verifique se os PDFs são do e-CAC.",
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STATIC FILES — UI servida em /ui/ para não colidir com rotas da API
+# Montagem no final garante que todos os routes têm prioridade.
+# Acesse: http://localhost:8000/ui/login.html
+# ─────────────────────────────────────────────────────────────────────────────
+if _UI_DIR.is_dir():
+    app.mount("/ui", StaticFiles(directory=str(_UI_DIR), html=True), name="ui")
+else:
+    logger.warning("Pasta UI não encontrada em %s — interface web indisponível.", _UI_DIR)
