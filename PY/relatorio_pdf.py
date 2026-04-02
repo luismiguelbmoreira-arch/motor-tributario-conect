@@ -47,32 +47,38 @@ def _esc(s: Any) -> str:
 def _gerar_html(diagnostico: dict) -> str:
     """Gera string HTML completo do relatório — CSS inline, sem CDN."""
 
-    empresa = diagnostico.get("empresa", {})
-    razao   = _esc(empresa.get("razao_social") or diagnostico.get("razao_social") or "—")
-    cnpj    = _esc(empresa.get("cnpj") or diagnostico.get("cnpj") or "—")
-    regime  = _esc(diagnostico.get("regime") or "—")
-    anexo   = _esc(diagnostico.get("anexo") or "—")
-    rbt12   = _fmt_moeda(diagnostico.get("rbt12", 0))
-    aliq_ef = _fmt_pct(diagnostico.get("aliquota_efetiva", 0))
-    das_m   = _fmt_moeda(diagnostico.get("das_mensal", 0))
-    fator_r = _esc(diagnostico.get("fator_r") or "—")
-    data_c  = _esc(diagnostico.get("data_calculo") or diagnostico.get("timestamp") or "—")
+    empresa   = diagnostico.get("empresa", {})
+    aliquotas = diagnostico.get("aliquotas", {})
+    razao   = _esc(empresa.get("razao_social") or "—")
+    cnpj    = _esc(empresa.get("cnpj") or "—")
+    regime  = _esc(empresa.get("regime") or "—")
+    anexo   = _esc(empresa.get("anexo_simples") or "—")
+    rbt12   = _fmt_moeda(empresa.get("rbt12", 0))
+    aliq_ef = _fmt_pct(aliquotas.get("efetiva_das_total", 0))
+    # DAS mensal estimado: alíquota efetiva × RBT12 / 12
+    try:
+        das_m = _fmt_moeda(Decimal(str(aliquotas.get("efetiva_das_total", 0))) * Decimal(str(empresa.get("rbt12", 0))) / 12)
+    except Exception:
+        das_m = "—"
+    fator_r = _esc(empresa.get("fator_r") or "—")
+    data_c  = _esc(diagnostico.get("data_analise") or "—")
 
     # Alertas
     alertas_html = ""
     for alerta in diagnostico.get("alertas", []):
-        tipo   = str(alerta.get("tipo", ""))
-        detalhe = _esc(alerta.get("detalhe") or alerta.get("descricao") or "")
-        lei    = _esc(alerta.get("amparo_legal") or "")
-        if "CRITICO" in tipo:
+        nivel  = str(alerta.get("nivel", "")).upper()
+        codigo = str(alerta.get("codigo", nivel))
+        detalhe = _esc(alerta.get("mensagem") or "")
+        lei    = ""
+        if "CRITICO" in nivel:
             cor = "#fef2f2"; borda = "#ef4444"; titulo_cor = "#991b1b"
-        elif "ALTO" in tipo:
+        elif "ALTO" in nivel:
             cor = "#fffbeb"; borda = "#f59e0b"; titulo_cor = "#92400e"
         else:
             cor = "#fefce8"; borda = "#eab308"; titulo_cor = "#713f12"
         alertas_html += f"""
         <div style="background:{cor};border-left:4px solid {borda};padding:10px 14px;border-radius:4px;margin-bottom:8px;">
-          <div style="font-weight:700;color:{titulo_cor};font-size:10px;text-transform:uppercase;margin-bottom:4px;">{_esc(tipo)}</div>
+          <div style="font-weight:700;color:{titulo_cor};font-size:10px;text-transform:uppercase;margin-bottom:4px;">{_esc(codigo)}</div>
           <div style="font-size:11px;color:#374151;">{detalhe}</div>
           {f'<div style="font-size:10px;color:#6b7280;margin-top:4px;">⚖ {lei}</div>' if lei else ''}
         </div>"""
@@ -96,10 +102,10 @@ def _gerar_html(diagnostico: dict) -> str:
     cenarios      = diagnostico.get("cenarios", {})
     simples_puro  = cenarios.get("simples_puro", {})
     opt_out       = cenarios.get("opt_out", {})
-    carga_simples = _fmt_moeda(simples_puro.get("carga_anual", 0))
-    carga_opt     = _fmt_moeda(opt_out.get("carga_anual", 0))
-    economia      = opt_out.get("economia")
-    economia_str  = _fmt_moeda(economia) if economia else "—"
+    carga_simples = _fmt_moeda(simples_puro.get("custo_das_por_operacao", 0))
+    carga_opt     = _fmt_moeda(opt_out.get("custo_total", 0))
+    disparidade   = cenarios.get("disparidade_anual_estimada")
+    economia_str  = _fmt_moeda(disparidade) if disparidade else "—"
 
     # Trilha de auditoria
     trilha_html = ""
@@ -216,7 +222,7 @@ def _gerar_html(diagnostico: dict) -> str:
     <h3 style="color:#065f46;">Opt-Out IVA</h3>
     <div style="font-size:18px;font-weight:700;color:#065f46;margin-top:4px;">{carga_opt}</div>
     <div style="font-size:10px;color:#047857;margin-top:2px;">Carga tributária anual estimada</div>
-    {f'<div style="margin-top:6px;background:#d1fae5;border-radius:4px;padding:4px 8px;font-size:10px;font-weight:700;color:#065f46;display:inline-block;">Economia potencial: {economia_str}</div>' if economia and str(economia) not in ('0', '0.00', 'None') else ''}
+    {f'<div style="margin-top:6px;background:#d1fae5;border-radius:4px;padding:4px 8px;font-size:10px;font-weight:700;color:#065f46;display:inline-block;">Disparidade anual: {economia_str}</div>' if disparidade and str(disparidade) not in ('0', '0.00', 'None') else ''}
   </div>
 </div>
 
@@ -250,22 +256,25 @@ def _gerar_html(diagnostico: dict) -> str:
 def _servicos_recomendados(diagnostico: dict) -> str:
     """Gera linhas de serviços recomendados baseado nos alertas do diagnóstico."""
     alertas   = diagnostico.get("alertas", [])
-    tipos_alerta = {str(a.get("tipo", "")) for a in alertas}
+    codigos_alerta = {str(a.get("codigo", a.get("nivel", ""))) for a in alertas}
     cenarios   = diagnostico.get("cenarios", {})
-    opt_out    = cenarios.get("opt_out", {})
+    disparidade = cenarios.get("disparidade_anual_estimada")
 
     rows = ""
-    if any("FATOR_R" in t for t in tipos_alerta):
+    if any("FATOR_R" in t for t in codigos_alerta):
         rows += "<tr><td style='font-weight:600;'>Adequação de Folha de Pagamento</td><td>Fator R em zona de risco — rebalancear pró-labore/folha pode reduzir carga</td></tr>"
 
-    if any("B2B" in t or "IVA" in t or "CBS" in t or "IBS" in t for t in tipos_alerta):
+    if any("B2B" in t or "IVA" in t or "CBS" in t or "IBS" in t for t in codigos_alerta):
         rows += "<tr><td style='font-weight:600;'>Diagnóstico de Impacto Tributário 2026</td><td>Operações B2B com fornecedores expostos ao IVA a partir de 2026</td></tr>"
 
-    economia = opt_out.get("economia")
-    if economia and Decimal(str(economia)) > Decimal("0"):
-        rows += "<tr><td style='font-weight:600;'>Análise de Viabilidade Opt-Out</td><td>Potencial de economia identificado — avaliação completa de viabilidade</td></tr>"
+    if disparidade:
+        try:
+            if Decimal(str(disparidade)) != Decimal("0"):
+                rows += "<tr><td style='font-weight:600;'>Análise de Viabilidade Opt-Out</td><td>Disparidade entre cenários identificada — avaliação completa de viabilidade</td></tr>"
+        except Exception:
+            pass
 
-    if any("TETO" in t or "MEI" in t for t in tipos_alerta):
+    if any("TETO" in t or "MEI" in t for t in codigos_alerta):
         rows += "<tr><td style='font-weight:600;'>Planejamento de Transição MEI→ME</td><td>Receita próxima do teto MEI — planejamento preventivo de reenquadramento</td></tr>"
 
     return rows
