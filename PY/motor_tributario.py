@@ -330,8 +330,9 @@ class MotorReformaTributaria:
         )
 
     def _registrar_passo(
-        self, id: str, titulo: str, base: Any, deducoes: Any, 
-        aliquota: Any, valor: Any, lei: str, detalhe: str = ""
+        self, id: str, titulo: str, base: Any, deducoes: Any,
+        aliquota: Any, valor: Any, lei: str, detalhe: str = "",
+        vigente_desde: str = "",
     ) -> None:
         """Registro obrigatório de Memória de Cálculo (MAX_FISCAL_01/02)."""
         passo = {
@@ -342,11 +343,12 @@ class MotorReformaTributaria:
                 "base": str(base),
                 "deducoes": str(deducoes),
                 "aliquota": str(aliquota),
-                "valor_final": str(valor)
+                "valor_final": str(valor),
             },
             "amparo_legal": lei,
+            "vigente_desde": vigente_desde,
             "detalhe": detalhe,
-            "timestamp": str(datetime.now())
+            "timestamp": str(datetime.now()),
         }
         self.trilha_auditoria.append(passo)
 
@@ -387,16 +389,54 @@ class MotorReformaTributaria:
         LC 123/2006, Art. 18, §§ 1º e 24.
         """
         if self.fornecedora.anexo_simples:
-            return self.fornecedora.anexo_simples
+            anexo = self.fornecedora.anexo_simples
+            motivo = f"Anexo {anexo} informado explicitamente pelo operador."
+            self._registrar_passo(
+                id="DECISAO_ANEXO",
+                titulo=f"Anexo Simples Nacional: {anexo} (explícito)",
+                base=f"CNAE {self.fornecedora.cnae_principal}",
+                deducoes="N/A",
+                aliquota="N/A",
+                valor=anexo,
+                lei="LC 123/2006, Art. 18, §§ 1º e 24",
+                detalhe=motivo,
+                vigente_desde="01/07/2007 (LC 123/2006)",
+            )
+            return anexo
 
         fator_r = self.calcular_fator_r()
         if fator_r is not None and fator_r >= FATOR_R_LIMIAR:
-            # Fator R >= 0.28: migra de Anexo V para Anexo III
-            # LC 123/2006, Art. 18, § 24
+            motivo = (
+                f"Fator R = {fator_r:.4f} ≥ {FATOR_R_LIMIAR} → migra Anexo V → Anexo III. "
+                f"Folha R$ {self.fornecedora.folha_salarios_12m:,.2f} / RBT12 R$ {self.calcular_rbt12():,.2f}."
+            )
+            self._registrar_passo(
+                id="DECISAO_ANEXO",
+                titulo="Anexo Simples Nacional: III (Fator R ≥ 0,28)",
+                base=f"Folha R$ {self.fornecedora.folha_salarios_12m:,.2f}",
+                deducoes="N/A",
+                aliquota=f"Fator R {fator_r:.4f}",
+                valor="Anexo III",
+                lei="LC 123/2006, Art. 18, § 24",
+                detalhe=motivo,
+                vigente_desde="01/01/2018 (LC 155/2016, alterou LC 123/2006)",
+            )
             return "III"
 
         cnae = self.fornecedora.cnae_principal
-        return determinar_anexo_por_cnae(cnae)
+        anexo = determinar_anexo_por_cnae(cnae)
+        self._registrar_passo(
+            id="DECISAO_ANEXO",
+            titulo=f"Anexo Simples Nacional: {anexo} (por CNAE {cnae})",
+            base=f"CNAE {cnae}",
+            deducoes="N/A",
+            aliquota="N/A",
+            valor=anexo,
+            lei="LC 123/2006, Art. 18, §§ 1º e 24 | Res. CGSN 140/2018",
+            detalhe=f"CNAE {cnae} mapeado para Anexo {anexo} conforme tabela CGSN.",
+            vigente_desde="01/01/2018 (Res. CGSN 140/2018)",
+        )
+        return anexo
 
     def _buscar_faixa(self, rbt12: Decimal, anexo: str):
         """
@@ -491,8 +531,26 @@ class MotorReformaTributaria:
 
         # CASO B: Comportamento Legado (Única Atividade ou RPA Global)
         # ERR-007: RPA real tem precedência sobre estimativa RBT12/12
-        base = self.operacao.rpa_mensal if self.operacao.rpa_mensal is not None \
-            else (rbt12 / Decimal("12"))
+        if self.operacao.rpa_mensal is not None:
+            base = self.operacao.rpa_mensal
+            base_motivo = f"RPA mensal real R$ {base:,.2f} (informado pelo operador)"
+            base_lei = "LC 123/2006, Art. 18, § 1º — base de cálculo mensal real"
+        else:
+            base = rbt12 / Decimal("12")
+            base_motivo = f"RBT12/12 = R$ {base:,.2f} (RPA não informado — aproximação mensal)"
+            base_lei = "LC 123/2006, Art. 18, § 1º — estimativa por RBT12 médio (ERR-007: delta aceito < 0,3%)"
+
+        self._registrar_passo(
+            id="BASE_CALCULO_DAS",
+            titulo="Base de Cálculo do DAS Mensal",
+            base=f"RBT12 R$ {rbt12:,.2f}",
+            deducoes="N/A",
+            aliquota="N/A",
+            valor=f"R$ {base:,.2f}",
+            lei=base_lei,
+            detalhe=base_motivo,
+            vigente_desde="01/07/2007 (LC 123/2006)",
+        )
         aliquota = self.calcular_aliquota_efetiva()
 
         if self.fornecedora.receita_com_st_icms is None:
