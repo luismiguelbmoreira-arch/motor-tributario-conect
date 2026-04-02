@@ -141,6 +141,7 @@ class BaseRegimeEngine:
         valor: Any,
         lei: str,
         detalhe: str = "",
+        vigente_desde: str = "",
     ) -> None:
         """Registro de Memória de Cálculo (MAX_FISCAL_01/02) — herdado por todos os engines."""
         passo = {
@@ -156,6 +157,7 @@ class BaseRegimeEngine:
             },
             "amparo_legal": lei,
             "detalhe": detalhe,
+            "vigente_desde": vigente_desde,
             "timestamp": str(datetime.now()),
         }
         self.trilha.append(passo)
