@@ -977,6 +977,19 @@ class MotorReformaTributaria:
         fator_r = self.calcular_fator_r()
         aliquotas_iva = self.get_aliquotas_iva_por_ano()
 
+        das_mensal = self.calcular_das_mensal()
+
+        # Serializa cronograma IVA 2026-2033 como lista ordenada
+        cronograma_iva_lista = [
+            {
+                "ano": ano,
+                "cbs": str(vals["CBS"]),
+                "ibs": str(vals["IBS"]),
+                "total": str(vals["CBS"] + vals["IBS"]),
+            }
+            for ano, vals in sorted(CRONOGRAMA_IVA.items())
+        ]
+
         diagnostico = {
             "versao_schema": "1.0",
             "versao_lei": "LC123_2006_LC214_2025",
@@ -1026,6 +1039,9 @@ class MotorReformaTributaria:
             },
 
             "split_payment": self.calcular_split_payment_impacto(),
+
+            # Cronograma de transição IVA 2026-2033 — LC 214/2025, Art. 348
+            "cronograma_iva": cronograma_iva_lista,
 
             "alertas": self._gerar_alertas(),
 

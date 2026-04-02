@@ -603,6 +603,7 @@
       const diagnostico = await res.json();
       sessionStorage.setItem('diagnostico', JSON.stringify(diagnostico));
       sessionStorage.setItem('analise_empresa', document.getElementById('razao_social').value.trim());
+      sessionStorage.setItem('analise_cnpj', document.getElementById('cnpj').value.replace(/\D/g, ''));
       window.location.href = 'resultado.html';
 
     } catch (e) {

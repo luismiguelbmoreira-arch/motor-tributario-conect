@@ -382,15 +382,21 @@
 
       // Cards de resumo
       document.getElementById('card-regime').textContent = regime;
-      document.getElementById('card-cnpj').textContent = formatCNPJ(d.empresa?.cnpj || '--');
-      document.getElementById('card-rbt12').textContent = formatBRL(d.rbt12);
-      document.getElementById('card-aliquota').textContent = formatPct(d.aliquota_efetiva);
+      document.getElementById('card-cnpj').textContent = formatCNPJ(sessionStorage.getItem('analise_cnpj') || '--');
+      document.getElementById('card-rbt12').textContent = formatBRL(d.empresa?.rbt12);
+      document.getElementById('card-aliquota').textContent = formatPct(d.aliquotas?.efetiva_das_total);
 
-      const fatorR = d.fator_r ? 'Fator R: ' + parseFloat(d.fator_r).toFixed(2) : '';
+      const fatorRVal = d.empresa?.fator_r;
+      const fatorR = fatorRVal ? 'Fator R: ' + parseFloat(fatorRVal).toFixed(2) : '';
       document.getElementById('card-fator-r').textContent = fatorR;
 
-      document.getElementById('card-das').textContent = formatBRL(d.das_mensal);
-      document.getElementById('card-anexo').textContent = d.anexo ? 'Anexo ' + d.anexo : '';
+      // DAS mensal estimado: alíquota efetiva × RBT12 / 12
+      const aliqEf = parseFloat(d.aliquotas?.efetiva_das_total || 0);
+      const rbt12Val = parseFloat(d.empresa?.rbt12 || 0);
+      const dasMensal = aliqEf * rbt12Val / 12;
+      document.getElementById('card-das').textContent = formatBRL(dasMensal.toFixed(2));
+      const anexoSimples = d.empresa?.anexo_simples;
+      document.getElementById('card-anexo').textContent = anexoSimples ? 'Anexo ' + anexoSimples : '';
 
       // Rodapé dinâmico
       const dataRodape = agora.toLocaleDateString('pt-BR');
@@ -420,15 +426,15 @@
       container.innerHTML = '';
 
       alertas.forEach(function (alerta) {
-        const tipo = (alerta.tipo || '').toUpperCase();
+        const nivel = (alerta.nivel || '').toUpperCase();
         let borderClass, bgClass, textClass, iconSvg;
 
-        if (tipo.includes('CRITICO')) {
+        if (nivel === 'CRITICO') {
           borderClass = 'border-red-300';
           bgClass = 'bg-red-50';
           textClass = 'text-red-800';
           iconSvg = '<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />';
-        } else if (tipo.includes('ALTO')) {
+        } else if (nivel === 'ALTO') {
           borderClass = 'border-amber-300';
           bgClass = 'bg-amber-50';
           textClass = 'text-amber-800';
@@ -440,8 +446,8 @@
           iconSvg = '<path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />';
         }
 
-        const tipoLabel = sanitize(alerta.tipo || '').replace(/_/g, ' ');
-        const detalhe = sanitize(alerta.detalhe || '');
+        const tipoLabel = sanitize(alerta.codigo || nivel).replace(/_/g, ' ');
+        const detalhe = sanitize(alerta.mensagem || '');
 
         const el = document.createElement('div');
         el.setAttribute('role', 'listitem');
@@ -590,13 +596,15 @@
       const simples = cenarios.simples_puro || {};
       const optout = cenarios.opt_out || {};
 
-      document.getElementById('cen-simples-carga').textContent = formatBRL(simples.carga_anual);
-      document.getElementById('cen-optout-carga').textContent = formatBRL(optout.carga_anual);
+      // custo_das_por_operacao é por operação; custo_total inclui IVA por fora
+      document.getElementById('cen-simples-carga').textContent = formatBRL(simples.custo_das_por_operacao);
+      document.getElementById('cen-optout-carga').textContent = formatBRL(optout.custo_total);
 
-      const economia = parseFloat(optout.economia || 0);
-      if (economia > 0) {
+      // disparidade_anual_estimada: positivo = opt-out custa mais (IVA por fora)
+      const disparidade = parseFloat(cenarios.disparidade_anual_estimada || 0);
+      if (disparidade !== 0) {
         showElement('cen-economia-badge');
-        document.getElementById('cen-economia-valor').textContent = formatBRL(optout.economia);
+        document.getElementById('cen-economia-valor').textContent = formatBRL(Math.abs(disparidade).toFixed(2));
       }
     }
 
@@ -607,8 +615,8 @@
       const container = document.getElementById('servicos-container');
       container.innerHTML = '';
 
-      const tiposAlerta = alertas.map(function (a) { return (a.tipo || '').toUpperCase(); });
-      const economia = parseFloat((cenarios.opt_out || {}).economia || 0);
+      const tiposAlerta = alertas.map(function (a) { return (a.codigo || a.nivel || '').toUpperCase(); });
+      const economia = parseFloat(cenarios.disparidade_anual_estimada || 0);
 
       const servicos = [];
 
