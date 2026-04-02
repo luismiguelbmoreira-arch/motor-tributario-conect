@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Análise por PDF — Motor Tributário Conect</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600&display=swap');
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #F7F7F5;
+      color: #1C1C1C;
+    }
+
+    h1, h2 {
+      font-family: 'Playfair Display', serif;
+    }
+
+    .drop-zone {
+      transition: border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    .drop-zone.dragging {
+      border-color: #0284C7;
+      background-color: #eff6ff;
+    }
+
+    .drop-zone.has-files {
+      border-color: #059669;
+      background-color: #f0fdf4;
+    }
+
+    .focus-ring:focus-visible {
+      outline: 2px solid #C9943A;
+      outline-offset: 2px;
+    }
+
+    .fade-in {
+      animation: fadeIn 0.35s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .file-item {
+      animation: slideIn 0.25s ease-out;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-8px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    .btn-primary {
+      background-color: #1C1C1C;
+      color: #fff;
+      transition: background-color 0.2s ease, opacity 0.2s ease, transform 0.1s ease;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background-color: #3A3A3A;
+    }
+
+    .btn-primary:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .spinner {
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+
+    .progress-bar-fill {
+      animation: progressPulse 1.6s ease-in-out infinite;
+    }
+
+    @keyframes progressPulse {
+      0%, 100% { opacity: 0.8; }
+      50%       { opacity: 1; }
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- HEADER -->
+  <header class="bg-white border-b border-gray-200 shadow-sm">
+    <div class="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+      <a href="dashboard.html"
+         class="focus-ring inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+        Voltar ao Dashboard
+      </a>
+      <span class="text-xs text-slate-400 font-medium hidden sm:block">Motor Tributário Conect v2.1</span>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="max-w-3xl mx-auto px-4 py-10 space-y-8">
+
+    <!-- TÍTULO -->
+    <div class="fade-in">
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Upload de Documentos</p>
+      <h1 class="text-3xl font-semibold text-slate-900">Análise por PDF do e-CAC</h1>
+      <p class="text-sm text-slate-500 mt-2 leading-relaxed">
+        Envie os documentos exportados do e-CAC. O sistema extrai os dados automaticamente via IA e gera o diagnóstico fiscal.
+      </p>
+    </div>
+
+    <!-- INFORMAÇÃO CONTEXTUAL -->
+    <div class="fade-in bg-slate-100 border border-slate-200 rounded-xl px-5 py-4">
+      <p class="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Documentos aceitos</p>
+      <ul class="text-sm text-slate-600 space-y-1" aria-label="Lista de documentos aceitos">
+        <li class="flex items-center gap-2">
+          <span class="w-1.5 h-1.5 rounded-full bg-slate-400 flex-shrink-0" aria-hidden="true"></span>
+          Declaração SIMEI
+        </li>
+        <li class="flex items-center gap-2">
+          <span class="w-1.5 h-1.5 rounded-full bg-slate-400 flex-shrink-0" aria-hidden="true"></span>
+          DAS e-CAC (guias mensais)
+        </li>
+        <li class="flex items-center gap-2">
+          <span class="w-1.5 h-1.5 rounded-full bg-slate-400 flex-shrink-0" aria-hidden="true"></span>
+          PGDAS-D (Declaração Anual)
+        </li>
+        <li class="flex items-center gap-2">
+          <span class="w-1.5 h-1.5 rounded-full bg-slate-400 flex-shrink-0" aria-hidden="true"></span>
+          Comprovantes mensais de receita
+        </li>
+      </ul>
+      <p class="text-xs text-slate-500 mt-3 pt-3 border-t border-slate-200">
+        Os dados são processados via Claude Vision API e não são armazenados permanentemente.
+        Máximo de 10 arquivos por envio, 50 MB por arquivo.
+      </p>
+    </div>
+
+    <!-- ÁREA DE DRAG AND DROP -->
+    <div class="fade-in">
+      <div id="drop-zone"
+           class="drop-zone border-2 border-dashed border-slate-300 rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer bg-white hover:border-slate-400 hover:bg-slate-50 transition-colors"
+           role="button"
+           tabindex="0"
+           aria-label="Área de upload. Arraste PDFs do e-CAC aqui ou pressione Enter para selecionar arquivos"
+           onclick="triggerFileInput()"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();triggerFileInput();}"
+           ondragover="handleDragOver(event)"
+           ondragleave="handleDragLeave(event)"
+           ondrop="handleDrop(event)">
+
+        <!-- Ícone upload -->
+        <div id="drop-icon" class="mb-4" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-14 w-14 text-slate-300 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+        </div>
+
+        <p class="text-base font-semibold text-slate-700">Arraste os PDFs do e-CAC aqui</p>
+        <p class="text-sm text-slate-400 mt-1">
+          ou
+          <span class="text-blue-600 underline font-medium">clique para selecionar</span>
+        </p>
+        <p class="text-xs text-slate-400 mt-3">Somente arquivos .pdf — até 10 arquivos — 50 MB cada</p>
+
+        <input type="file"
+               id="file-input"
+               class="hidden"
+               accept=".pdf,application/pdf"
+               multiple
+               aria-label="Selecionar arquivos PDF"
+               onchange="handleFileSelect(event)" />
+      </div>
+    </div>
+
+    <!-- ERROS DE VALIDAÇÃO -->
+    <div id="validation-errors" class="hidden fade-in" role="alert" aria-live="assertive">
+      <div class="bg-red-50 border border-red-200 rounded-xl px-5 py-4">
+        <div class="flex items-start gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <div>
+            <p class="text-sm font-semibold text-red-800 mb-1">Arquivos não aceitos</p>
+            <ul id="validation-errors-list" class="text-sm text-red-700 space-y-0.5 list-disc list-inside"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LISTA DE ARQUIVOS -->
+    <div id="file-list-section" class="hidden fade-in">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-slate-700">
+          Arquivos selecionados (<span id="file-count">0</span>)
+        </h2>
+        <button onclick="clearAllFiles()"
+                class="focus-ring text-xs text-slate-400 hover:text-red-600 transition-colors font-medium">
+          Remover todos
+        </button>
+      </div>
+      <ul id="file-list"
+          class="space-y-2"
+          role="list"
+          aria-label="Arquivos PDF selecionados para análise">
+        <!-- Preenchido por JS -->
+      </ul>
+    </div>
+
+    <!-- ESTADO DE LOADING (extração) -->
+    <div id="loading-state" class="hidden fade-in" role="status" aria-live="polite" aria-label="Processando documentos">
+      <div class="bg-white border border-blue-200 rounded-xl p-6">
+        <div class="flex items-start gap-4">
+          <div class="flex-shrink-0">
+            <svg class="spinner h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <p class="text-sm font-semibold text-slate-900">Extraindo dados dos documentos via IA...</p>
+            <p class="text-xs text-slate-500 mt-1">
+              Isso pode levar alguns segundos dependendo do número de arquivos.
+            </p>
+            <!-- Barra de progresso indeterminada -->
+            <div class="mt-3 h-1.5 bg-blue-100 rounded-full overflow-hidden">
+              <div class="progress-bar-fill h-full w-2/3 bg-blue-500 rounded-full"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ERRO DE ENVIO -->
+    <div id="submit-error" class="hidden fade-in" role="alert" aria-live="assertive">
+      <div class="bg-red-50 border border-red-200 rounded-xl px-5 py-4">
+        <div class="flex items-start gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <div class="flex-1">
+            <p class="text-sm font-semibold text-red-800">Não foi possível processar os documentos</p>
+            <p id="submit-error-msg" class="text-sm text-red-700 mt-1">Verifique sua conexão e tente novamente.</p>
+            <button onclick="hideError()"
+                    class="focus-ring mt-2 text-xs text-red-600 underline font-medium">
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BOTÃO PRINCIPAL -->
+    <div class="fade-in pb-8">
+      <button id="btn-analisar"
+              onclick="submitFiles()"
+              disabled
+              class="btn-primary focus-ring w-full py-3.5 px-6 rounded-xl text-sm font-semibold flex items-center justify-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7l2 2 4-4" />
+        </svg>
+        Extrair e Analisar
+      </button>
+      <p class="text-xs text-center text-slate-400 mt-3">
+        Selecione ao menos um PDF para habilitar a análise
+      </p>
+    </div>
+
+  </main>
+
+  <script>
+    // ─────────────────────────────────────────────
+    // ESTADO
+    // ─────────────────────────────────────────────
+    var selectedFiles = []; // Array de File
+    var MAX_FILES = 10;
+    var MAX_SIZE_MB = 50;
+    var MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+
+    // ─────────────────────────────────────────────
+    // INIT
+    // ─────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
+      var token = sessionStorage.getItem('token');
+      if (!token) {
+        window.location.href = 'login.html';
+      }
+    });
+
+    // ─────────────────────────────────────────────
+    // UTILITÁRIOS
+    // ─────────────────────────────────────────────
+    function sanitize(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+    }
+
+    function showElement(id) {
+      document.getElementById(id)?.classList.remove('hidden');
+    }
+
+    function hideElement(id) {
+      document.getElementById(id)?.classList.add('hidden');
+    }
+
+    function hideError() {
+      hideElement('submit-error');
+    }
+
+    // ─────────────────────────────────────────────
+    // DRAG AND DROP
+    // ─────────────────────────────────────────────
+    function handleDragOver(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      document.getElementById('drop-zone').classList.add('dragging');
+    }
+
+    function handleDragLeave(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      // Verifica se realmente saiu da zona (não apenas entrou num filho)
+      var zone = document.getElementById('drop-zone');
+      if (!zone.contains(event.relatedTarget)) {
+        zone.classList.remove('dragging');
+      }
+    }
+
+    function handleDrop(event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      var zone = document.getElementById('drop-zone');
+      zone.classList.remove('dragging');
+
+      var dt = event.dataTransfer;
+      if (dt && dt.files && dt.files.length > 0) {
+        processNewFiles(Array.from(dt.files));
+      }
+    }
+
+    function triggerFileInput() {
+      document.getElementById('file-input').click();
+    }
+
+    function handleFileSelect(event) {
+      var files = Array.from(event.target.files);
+      processNewFiles(files);
+      // Reset input para permitir re-seleção do mesmo arquivo
+      event.target.value = '';
+    }
+
+    // ─────────────────────────────────────────────
+    // VALIDAÇÃO E ADIÇÃO DE ARQUIVOS
+    // ─────────────────────────────────────────────
+    function processNewFiles(newFiles) {
+      hideElement('validation-errors');
+      var errors = [];
+      var validFiles = [];
+
+      newFiles.forEach(function (file) {
+        var isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+        var isTooBig = file.size > MAX_SIZE_BYTES;
+        var isDuplicate = selectedFiles.some(function (f) {
+          return f.name === file.name && f.size === file.size;
+        });
+
+        if (!isPDF) {
+          errors.push('"' + sanitize(file.name) + '" não é um arquivo PDF.');
+        } else if (isTooBig) {
+          errors.push('"' + sanitize(file.name) + '" excede o limite de ' + MAX_SIZE_MB + ' MB (' + formatFileSize(file.size) + ').');
+        } else if (isDuplicate) {
+          errors.push('"' + sanitize(file.name) + '" já foi adicionado.');
+        } else {
+          validFiles.push(file);
+        }
+      });
+
+      // Verifica limite total
+      var totalApos = selectedFiles.length + validFiles.length;
+      if (totalApos > MAX_FILES) {
+        var aceitos = MAX_FILES - selectedFiles.length;
+        if (aceitos <= 0) {
+          errors.push('Limite de ' + MAX_FILES + ' arquivos atingido. Remova arquivos para adicionar novos.');
+          validFiles = [];
+        } else {
+          errors.push('Apenas ' + aceitos + ' arquivo(s) adicionado(s). O limite é ' + MAX_FILES + ' arquivos no total.');
+          validFiles = validFiles.slice(0, aceitos);
+        }
+      }
+
+      if (errors.length > 0) {
+        showValidationErrors(errors);
+      }
+
+      if (validFiles.length > 0) {
+        selectedFiles = selectedFiles.concat(validFiles);
+        renderFileList();
+        updateDropZoneState();
+        updateSubmitButton();
+      }
+    }
+
+    function showValidationErrors(errors) {
+      var list = document.getElementById('validation-errors-list');
+      list.innerHTML = '';
+      errors.forEach(function (err) {
+        var li = document.createElement('li');
+        li.textContent = err;
+        list.appendChild(li);
+      });
+      showElement('validation-errors');
+    }
+
+    // ─────────────────────────────────────────────
+    // RENDER LISTA DE ARQUIVOS
+    // ─────────────────────────────────────────────
+    function renderFileList() {
+      var listEl = document.getElementById('file-list');
+      var countEl = document.getElementById('file-count');
+
+      if (!selectedFiles.length) {
+        hideElement('file-list-section');
+        listEl.innerHTML = '';
+        countEl.textContent = '0';
+        return;
+      }
+
+      showElement('file-list-section');
+      countEl.textContent = String(selectedFiles.length);
+      listEl.innerHTML = '';
+
+      selectedFiles.forEach(function (file, idx) {
+        var li = document.createElement('li');
+        li.className = 'file-item bg-white border border-slate-200 rounded-lg px-4 py-3 flex items-center gap-3';
+        li.setAttribute('role', 'listitem');
+        li.innerHTML =
+          '<div class="flex-shrink-0" aria-hidden="true">' +
+            '<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">' +
+              '<path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />' +
+              '<path stroke-linecap="round" stroke-linejoin="round" d="M10 12h4M10 16h2" />' +
+            '</svg>' +
+          '</div>' +
+          '<div class="flex-1 min-w-0">' +
+            '<p class="text-sm font-medium text-slate-900 truncate" title="' + sanitize(file.name) + '">' + sanitize(file.name) + '</p>' +
+            '<p class="text-xs text-slate-400 mt-0.5">' + formatFileSize(file.size) + '</p>' +
+          '</div>' +
+          '<button onclick="removeFile(' + idx + ')"' +
+                  ' aria-label="Remover ' + sanitize(file.name) + '"' +
+                  ' class="focus-ring flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">' +
+            '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">' +
+              '<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />' +
+            '</svg>' +
+          '</button>';
+        listEl.appendChild(li);
+      });
+    }
+
+    function removeFile(idx) {
+      selectedFiles.splice(idx, 1);
+      renderFileList();
+      updateDropZoneState();
+      updateSubmitButton();
+    }
+
+    function clearAllFiles() {
+      selectedFiles = [];
+      renderFileList();
+      updateDropZoneState();
+      updateSubmitButton();
+      hideElement('validation-errors');
+    }
+
+    function updateDropZoneState() {
+      var zone = document.getElementById('drop-zone');
+      if (selectedFiles.length > 0) {
+        zone.classList.add('has-files');
+      } else {
+        zone.classList.remove('has-files');
+      }
+    }
+
+    function updateSubmitButton() {
+      var btn = document.getElementById('btn-analisar');
+      btn.disabled = selectedFiles.length === 0;
+    }
+
+    // ─────────────────────────────────────────────
+    // ENVIO
+    // ─────────────────────────────────────────────
+    async function submitFiles() {
+      var token = sessionStorage.getItem('token');
+      if (!token) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      if (!selectedFiles.length) return;
+
+      hideElement('submit-error');
+      hideElement('file-list-section');
+      hideElement('validation-errors');
+      showElement('loading-state');
+
+      var btn = document.getElementById('btn-analisar');
+      btn.disabled = true;
+
+      var formData = new FormData();
+      selectedFiles.forEach(function (file) {
+        formData.append('files', file);
+      });
+
+      try {
+        var response = await fetch('http://localhost:8000/analise/pdf', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+          },
+          body: formData,
+        });
+
+        if (response.status === 401) {
+          sessionStorage.clear();
+          window.location.href = 'login.html';
+          return;
+        }
+
+        if (!response.ok) {
+          var errorBody = null;
+          try { errorBody = await response.json(); } catch (e) {}
+          var msgErro = (errorBody && (errorBody.detail || errorBody.message))
+            ? String(errorBody.detail || errorBody.message)
+            : 'O servidor retornou um erro (' + response.status + '). Tente novamente em instantes.';
+          throw new Error(msgErro);
+        }
+
+        var diagnostico = await response.json();
+        sessionStorage.setItem('diagnostico', JSON.stringify(diagnostico));
+
+        // Salva nome da empresa se vier no payload
+        if (diagnostico && diagnostico.empresa && diagnostico.empresa.razao_social) {
+          sessionStorage.setItem('analise_empresa', diagnostico.empresa.razao_social);
+        }
+
+        window.location.href = 'resultado.html';
+
+      } catch (err) {
+        hideElement('loading-state');
+        showElement('file-list-section');
+        btn.disabled = false;
+
+        var msgExibir = err.message || 'Não foi possível processar os documentos. Verifique sua conexão e tente novamente.';
+        document.getElementById('submit-error-msg').textContent = msgExibir;
+        showElement('submit-error');
+
+        // Foco no erro para acessibilidade
+        document.getElementById('submit-error')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  </script>
+</body>
+</html>

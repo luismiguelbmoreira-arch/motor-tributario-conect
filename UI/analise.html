@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nova Análise — Motor Tributário Conect</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --azul: #1e40af;
+      --verde: #065f46;
+      --amber: #92400e;
+    }
+    .step-line { transition: width 0.4s ease; }
+    .field-tooltip { position: relative; }
+    .field-tooltip .tip {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 0;
+      z-index: 50;
+      background: #1e293b;
+      color: #f1f5f9;
+      font-size: 0.75rem;
+      line-height: 1.4;
+      padding: 8px 12px;
+      border-radius: 8px;
+      width: 260px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.35);
+      pointer-events: none;
+    }
+    .field-tooltip:hover .tip,
+    .field-tooltip:focus-within .tip { display: block; }
+    .input-error { border-color: #ef4444 !important; }
+    .msg-error { color: #ef4444; font-size: 0.72rem; margin-top: 2px; }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59,130,246,.18);
+    }
+    .btn-primary {
+      background: #1e40af;
+      color: #fff;
+      border-radius: 8px;
+      padding: 10px 28px;
+      font-weight: 600;
+      transition: background .2s;
+    }
+    .btn-primary:hover:not(:disabled) { background: #1d3a9e; }
+    .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-ghost {
+      background: transparent;
+      color: #64748b;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-weight: 500;
+      transition: background .2s;
+    }
+    .btn-ghost:hover { background: #f1f5f9; }
+    .step-badge {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: .85rem;
+      transition: all .3s;
+    }
+    .step-active { background: #1e40af; color: #fff; }
+    .step-done  { background: #059669; color: #fff; }
+    .step-idle  { background: #e2e8f0; color: #94a3b8; }
+    #modal-confirm { display: none; }
+    #modal-confirm.open { display: flex; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between sticky top-0 z-40">
+    <div class="flex items-center gap-3">
+      <a href="dashboard.html" class="text-slate-400 hover:text-slate-600 transition-colors" title="Voltar ao Dashboard">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      </a>
+      <span class="font-bold text-slate-800 text-lg">Nova Análise Fiscal</span>
+      <span class="text-xs bg-blue-100 text-blue-700 font-semibold px-2 py-0.5 rounded-full">Manual</span>
+    </div>
+    <span class="text-xs text-slate-400">LC 123/2006 · LC 214/2025</span>
+  </header>
+
+  <main class="max-w-2xl mx-auto px-4 py-8">
+
+    <!-- Stepper -->
+    <div class="flex items-center gap-0 mb-8">
+      <!-- Step 1 -->
+      <div class="flex flex-col items-center gap-1 flex-1">
+        <div id="badge-1" class="step-badge step-active">1</div>
+        <span class="text-xs font-medium text-slate-600">Empresa</span>
+      </div>
+      <div class="flex-1 h-0.5 bg-slate-200 mb-4"><div id="line-1" class="step-line h-full bg-blue-600" style="width:0%"></div></div>
+      <!-- Step 2 -->
+      <div class="flex flex-col items-center gap-1 flex-1">
+        <div id="badge-2" class="step-badge step-idle">2</div>
+        <span class="text-xs font-medium text-slate-400">Faturamento</span>
+      </div>
+      <div class="flex-1 h-0.5 bg-slate-200 mb-4"><div id="line-2" class="step-line h-full bg-blue-600" style="width:0%"></div></div>
+      <!-- Step 3 -->
+      <div class="flex flex-col items-center gap-1 flex-1">
+        <div id="badge-3" class="step-badge step-idle">3</div>
+        <span class="text-xs font-medium text-slate-400">Operação</span>
+      </div>
+    </div>
+
+    <!-- ── PASSO 1 — EMPRESA ── -->
+    <div id="step-1" class="card p-6 space-y-5">
+      <h2 class="text-base font-bold text-slate-800">Dados da Empresa</h2>
+
+      <!-- CNPJ -->
+      <div class="field-tooltip">
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          CNPJ <span class="text-red-500">*</span>
+        </label>
+        <span class="tip">14 dígitos (validação Módulo 11 obrigatória). Informe somente números ou com pontuação.</span>
+        <input id="cnpj" type="text" maxlength="18" placeholder="00.000.000/0000-00"
+          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          oninput="maskCNPJ(this)" onblur="validateCNPJ()">
+        <p id="cnpj-err" class="msg-error hidden">CNPJ inválido (dígitos verificadores incorretos).</p>
+      </div>
+
+      <!-- Razão Social -->
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          Razão Social <span class="text-red-500">*</span>
+        </label>
+        <input id="razao_social" type="text" maxlength="140" placeholder="Nome da empresa conforme CNPJ"
+          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          oninput="checkStep1()">
+        <p id="rs-err" class="msg-error hidden">Campo obrigatório.</p>
+      </div>
+
+      <!-- Regime -->
+      <div class="field-tooltip">
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          Regime Tributário <span class="text-red-500">*</span>
+        </label>
+        <span class="tip">Simples Nacional: faturamento anual ≤ R$4,8M. Lucro Presumido: presunção de lucro por setor. MEI: faturamento ≤ R$81k/ano.</span>
+        <select id="regime" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" onchange="checkStep1()">
+          <option value="">Selecione o regime</option>
+          <option value="SIMPLES">Simples Nacional</option>
+          <option value="PRESUMIDO">Lucro Presumido</option>
+          <option value="REAL">Lucro Real</option>
+          <option value="MEI">MEI</option>
+        </select>
+      </div>
+
+      <!-- CNAE -->
+      <div class="field-tooltip">
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          CNAE Principal <span class="text-red-500">*</span>
+        </label>
+        <span class="tip">Código de 7 dígitos da atividade principal (ex: 6201-5/01). Usado para determinar o Anexo do Simples e o Fator R.</span>
+        <input id="cnae" type="text" maxlength="9" placeholder="0000-0/00"
+          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          oninput="maskCNAE(this); checkStep1()">
+        <p id="cnae-err" class="msg-error hidden">CNAE deve ter 7 dígitos.</p>
+      </div>
+
+      <!-- UF -->
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          UF (Estado) <span class="text-red-500">*</span>
+        </label>
+        <select id="uf" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" onchange="checkStep1()">
+          <option value="">Selecione o estado</option>
+          <option>AC</option><option>AL</option><option>AP</option><option>AM</option>
+          <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
+          <option>GO</option><option>MA</option><option>MT</option><option>MS</option>
+          <option>MG</option><option>PA</option><option>PB</option><option>PR</option>
+          <option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
+          <option>RS</option><option>RO</option><option>RR</option><option>SC</option>
+          <option selected>SP</option><option>SE</option><option>TO</option>
+        </select>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button id="btn-next-1" class="btn-primary" onclick="goStep(2)" disabled>
+          Próximo — Faturamento →
+        </button>
+      </div>
+    </div>
+
+    <!-- ── PASSO 2 — FATURAMENTO ── -->
+    <div id="step-2" class="card p-6 space-y-5 hidden">
+      <h2 class="text-base font-bold text-slate-800">Faturamento e Folha</h2>
+
+      <!-- RBT12 -->
+      <div class="field-tooltip">
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          Receita Bruta 12 meses (RBT12) <span class="text-red-500">*</span>
+        </label>
+        <span class="tip">RBT12: soma das receitas brutas dos últimos 12 meses. Máximo R$4.800.000 para o Simples Nacional (LC 123/2006, Art. 3º, II).</span>
+        <div class="relative">
+          <span class="absolute left-3 top-2.5 text-slate-400 text-sm">R$</span>
+          <input id="rbt12" type="text" placeholder="0,00"
+            class="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm"
+            oninput="maskMoeda(this,'rbt12'); checkStep2()" onblur="validateRBT12()">
+        </div>
+        <p id="rbt12-err" class="msg-error hidden">RBT12 deve estar entre R$ 1,00 e R$ 4.800.000,00.</p>
+      </div>
+
+      <!-- Folha 12m (opcional) -->
+      <div class="field-tooltip">
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          Folha de Salários 12 meses
+          <span class="text-xs text-slate-400 font-normal ml-1">(opcional)</span>
+        </label>
+        <span class="tip">Fator R = Folha 12m ÷ RBT12. Se ≥ 28%, empresa do Anexo III pode migrar para Anexo V com alíquota menor (LC 123/2006, Art. 18, §24). Informe para cálculo preciso.</span>
+        <div class="relative">
+          <span class="absolute left-3 top-2.5 text-slate-400 text-sm">R$</span>
+          <input id="folha12m" type="text" placeholder="0,00 (deixe vazio se não souber)"
+            class="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm"
+            oninput="maskMoeda(this,'folha12m')">
+        </div>
+      </div>
+
+      <!-- RPA mensal (opcional) -->
+      <div class="field-tooltip">
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          Receita do mês de referência (RPA)
+          <span class="text-xs text-slate-400 font-normal ml-1">(opcional)</span>
+        </label>
+        <span class="tip">Receita do mês específico da operação. Se não informado, o motor usará RBT12 ÷ 12 como aproximação (pode variar ±30% em atividades sazonais).</span>
+        <div class="relative">
+          <span class="absolute left-3 top-2.5 text-slate-400 text-sm">R$</span>
+          <input id="rpa_mensal" type="text" placeholder="0,00 (deixe vazio para usar média)"
+            class="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm"
+            oninput="maskMoeda(this,'rpa_mensal')">
+        </div>
+      </div>
+
+      <!-- Receita com ICMS-ST (opcional) -->
+      <div class="field-tooltip">
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          Receita com ICMS-ST no período
+          <span class="text-xs text-slate-400 font-normal ml-1">(opcional)</span>
+        </label>
+        <span class="tip">Vendas onde o ICMS já foi retido pelo substituto tributário. Essas receitas são deduzidas da base de cálculo do DAS (LC 123/2006, Art. 2º, §6º).</span>
+        <div class="relative">
+          <span class="absolute left-3 top-2.5 text-slate-400 text-sm">R$</span>
+          <input id="receita_st" type="text" placeholder="0,00 (deixe vazio se não houver)"
+            class="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm"
+            oninput="maskMoeda(this,'receita_st')">
+        </div>
+      </div>
+
+      <div class="flex justify-between pt-2">
+        <button class="btn-ghost" onclick="goStep(1)">← Empresa</button>
+        <button id="btn-next-2" class="btn-primary" onclick="goStep(3)" disabled>
+          Próximo — Operação →
+        </button>
+      </div>
+    </div>
+
+    <!-- ── PASSO 3 — OPERAÇÃO ── -->
+    <div id="step-3" class="card p-6 space-y-5 hidden">
+      <h2 class="text-base font-bold text-slate-800">Dados da Operação</h2>
+
+      <!-- Data de emissão -->
+      <div class="field-tooltip">
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          Data de Emissão <span class="text-red-500">*</span>
+        </label>
+        <span class="tip">Data da NF-e ou operação. Importante: a legislação IVA (CBS/IBS) muda a cada ano 2026-2033 (LC 214/2025). A data determina as alíquotas aplicáveis.</span>
+        <input id="data_emissao" type="date" min="2026-01-01" max="2033-12-31"
+          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          onchange="checkStep3()">
+        <p id="data-err" class="msg-error hidden">Data deve estar entre 01/01/2026 e 31/12/2033.</p>
+      </div>
+
+      <!-- Valor da operação -->
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          Valor da Operação <span class="text-red-500">*</span>
+        </label>
+        <div class="relative">
+          <span class="absolute left-3 top-2.5 text-slate-400 text-sm">R$</span>
+          <input id="valor_operacao" type="text" placeholder="0,00"
+            class="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm"
+            oninput="maskMoeda(this,'valor_operacao'); checkStep3()" onblur="validateValor()">
+        </div>
+        <p id="valor-err" class="msg-error hidden">Valor deve ser maior que R$ 0,00.</p>
+      </div>
+
+      <!-- Tipo do comprador -->
+      <div class="field-tooltip">
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          Tipo do Comprador <span class="text-red-500">*</span>
+        </label>
+        <span class="tip">B2B (empresa para empresa): o comprador pode aproveitar créditos de IVA. B2C (para consumidor final): sem crédito — impacto maior na cadeia.</span>
+        <div class="grid grid-cols-2 gap-3">
+          <label id="lbl-b2b" class="flex items-start gap-2 border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-blue-400 transition-colors" onclick="setTipoComprador('B2B_CONTRIBUINTE')">
+            <input type="radio" name="tipo_comprador" value="B2B_CONTRIBUINTE" class="mt-0.5 accent-blue-600">
+            <div>
+              <p class="text-sm font-semibold text-slate-800">B2B — Empresa</p>
+              <p class="text-xs text-slate-500">CNPJ contribuinte, pode usar crédito IVA</p>
+            </div>
+          </label>
+          <label id="lbl-b2c" class="flex items-start gap-2 border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-blue-400 transition-colors" onclick="setTipoComprador('B2C_CONSUMIDOR_FINAL')">
+            <input type="radio" name="tipo_comprador" value="B2C_CONSUMIDOR_FINAL" class="mt-0.5 accent-blue-600">
+            <div>
+              <p class="text-sm font-semibold text-slate-800">B2C — Consumidor</p>
+              <p class="text-xs text-slate-500">CPF, sem crédito IVA</p>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Resumo rápido -->
+      <div id="resumo-box" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
+        <p class="font-semibold text-blue-900 mb-2">Resumo para análise:</p>
+        <ul id="resumo-list" class="text-blue-800 space-y-1 text-xs list-disc list-inside"></ul>
+      </div>
+
+      <div class="flex justify-between pt-2">
+        <button class="btn-ghost" onclick="goStep(2)">← Faturamento</button>
+        <button id="btn-analisar" class="btn-primary" onclick="openConfirm()" disabled>
+          Analisar →
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Modal de confirmação -->
+  <div id="modal-confirm" class="fixed inset-0 z-50 items-center justify-center bg-slate-900/60 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6 space-y-4">
+      <h3 class="text-base font-bold text-slate-800">Confirmar análise</h3>
+      <p class="text-sm text-slate-600">Analisar a empresa abaixo com as informações fornecidas?</p>
+      <div id="confirm-details" class="bg-slate-50 rounded-lg p-3 text-sm text-slate-700 space-y-1"></div>
+      <p class="text-xs text-slate-400">O cálculo é baseado em LC 123/2006 + LC 214/2025 e ficará registrado na trilha de auditoria.</p>
+      <div class="flex gap-3 justify-end">
+        <button class="btn-ghost text-sm" onclick="closeConfirm()">Cancelar</button>
+        <button id="btn-confirmar" class="btn-primary text-sm" onclick="submitAnalise()">Sim, analisar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading overlay -->
+  <div id="loading" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/70 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4 max-w-xs w-full mx-4">
+      <svg class="animate-spin w-10 h-10 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+      </svg>
+      <p class="text-slate-700 font-semibold text-center">Calculando diagnóstico fiscal…</p>
+      <p class="text-xs text-slate-400 text-center">Aplicando LC 123/2006 + LC 214/2025</p>
+    </div>
+  </div>
+
+<script>
+  // ── Constantes ──
+  const API_BASE = 'http://localhost:8000';
+  let tipoCompradorSelecionado = '';
+  let currentStep = 1;
+
+  // ── Auth guard ──
+  const token = sessionStorage.getItem('token');
+  if (!token) { window.location.href = 'login.html'; }
+
+  // ── Máscaras ──
+  function maskCNPJ(el) {
+    let v = el.value.replace(/\D/g, '').slice(0, 14);
+    if (v.length > 12) v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+    else if (v.length > 8) v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})/, '$1.$2.$3/$4');
+    else if (v.length > 5) v = v.replace(/^(\d{2})(\d{3})(\d{3})/, '$1.$2.$3');
+    else if (v.length > 2) v = v.replace(/^(\d{2})(\d{3})/, '$1.$2');
+    el.value = v;
+    checkStep1();
+  }
+
+  function maskCNAE(el) {
+    let v = el.value.replace(/[^\d]/g, '').slice(0, 7);
+    if (v.length > 4) v = v.replace(/^(\d{4})(\d)/, '$1-$2');
+    if (v.length > 6) v = v.replace(/^(\d{4}-\d)(\d)/, '$1/$2');
+    el.value = v;
+  }
+
+  function maskMoeda(el, id) {
+    let v = el.value.replace(/\D/g, '');
+    if (!v) { el.value = ''; return; }
+    let num = parseInt(v, 10) / 100;
+    el.value = num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (id === 'rbt12') validateRBT12();
+  }
+
+  // ── Validações ──
+  function calcCNPJDig(cnpj) {
+    const pesos1 = [5,4,3,2,9,8,7,6,5,4,3,2];
+    const pesos2 = [6,5,4,3,2,9,8,7,6,5,4,3,2];
+    const soma = (arr) => arr.reduce((s,p,i) => s + parseInt(cnpj[i]) * p, 0);
+    const dig = (s) => { const r = s % 11; return r < 2 ? 0 : 11 - r; };
+    return dig(soma(pesos1)) === parseInt(cnpj[12]) && dig(soma(pesos2)) === parseInt(cnpj[13]);
+  }
+
+  function validateCNPJ() {
+    const raw = document.getElementById('cnpj').value.replace(/\D/g, '');
+    const err = document.getElementById('cnpj-err');
+    if (raw.length === 14 && !/^(\d)\1+$/.test(raw) && calcCNPJDig(raw)) {
+      err.classList.add('hidden');
+      document.getElementById('cnpj').classList.remove('input-error');
+      return true;
+    }
+    if (raw.length === 14) {
+      err.classList.remove('hidden');
+      document.getElementById('cnpj').classList.add('input-error');
+    } else {
+      err.classList.add('hidden');
+      document.getElementById('cnpj').classList.remove('input-error');
+    }
+    return false;
+  }
+
+  function getCNAEDigits() {
+    return document.getElementById('cnae').value.replace(/\D/g, '');
+  }
+
+  function validateRBT12() {
+    const raw = parseMoneyField('rbt12');
+    const err = document.getElementById('rbt12-err');
+    if (raw === null || raw <= 0 || raw > 4800000) {
+      if (raw !== null) err.classList.remove('hidden');
+      return false;
+    }
+    err.classList.add('hidden');
+    return true;
+  }
+
+  function validateValor() {
+    const raw = parseMoneyField('valor_operacao');
+    const err = document.getElementById('valor-err');
+    if (raw === null || raw <= 0) {
+      if (raw !== null) err.classList.remove('hidden');
+      return false;
+    }
+    err.classList.add('hidden');
+    return true;
+  }
+
+  function parseMoneyField(id) {
+    const v = document.getElementById(id).value.trim();
+    if (!v) return null;
+    return parseFloat(v.replace(/\./g, '').replace(',', '.'));
+  }
+
+  // ── Checagem de steps ──
+  function checkStep1() {
+    const cnpjRaw = document.getElementById('cnpj').value.replace(/\D/g, '');
+    const cnpjOk = cnpjRaw.length === 14 && !/^(\d)\1+$/.test(cnpjRaw) && calcCNPJDig(cnpjRaw);
+    const rsOk   = document.getElementById('razao_social').value.trim().length >= 3;
+    const regOk  = document.getElementById('regime').value !== '';
+    const cnaeOk = getCNAEDigits().length === 7;
+    const ufOk   = document.getElementById('uf').value !== '';
+    document.getElementById('btn-next-1').disabled = !(cnpjOk && rsOk && regOk && cnaeOk && ufOk);
+  }
+
+  function checkStep2() {
+    const rbt12Ok = validateRBT12();
+    document.getElementById('btn-next-2').disabled = !rbt12Ok;
+  }
+
+  function checkStep3() {
+    const dataVal = document.getElementById('data_emissao').value;
+    const dataOk  = dataVal >= '2026-01-01' && dataVal <= '2033-12-31';
+    const valorOk = validateValor();
+    const tipoOk  = tipoCompradorSelecionado !== '';
+    const ok = dataOk && valorOk && tipoOk;
+    document.getElementById('btn-analisar').disabled = !ok;
+    if (ok) buildResumo();
+    return ok;
+  }
+
+  function setTipoComprador(tipo) {
+    tipoCompradorSelecionado = tipo;
+    document.querySelectorAll('label[id^="lbl-"]').forEach(l => l.classList.remove('border-blue-400', 'bg-blue-50'));
+    document.getElementById(tipo === 'B2B_CONTRIBUINTE' ? 'lbl-b2b' : 'lbl-b2c')
+      .classList.add('border-blue-400', 'bg-blue-50');
+    checkStep3();
+  }
+
+  function buildResumo() {
+    const box  = document.getElementById('resumo-box');
+    const list = document.getElementById('resumo-list');
+    const rbt12 = parseMoneyField('rbt12');
+    const items = [
+      `<strong>${document.getElementById('razao_social').value.trim()}</strong>`,
+      `CNPJ: ${document.getElementById('cnpj').value}`,
+      `Regime: ${document.getElementById('regime').options[document.getElementById('regime').selectedIndex].text}`,
+      `CNAE: ${document.getElementById('cnae').value}  |  UF: ${document.getElementById('uf').value}`,
+      `RBT12: R$ ${rbt12 ? rbt12.toLocaleString('pt-BR', {minimumFractionDigits:2}) : '—'}`,
+      `Data operação: ${document.getElementById('data_emissao').value}`,
+      `Comprador: ${tipoCompradorSelecionado === 'B2B_CONTRIBUINTE' ? 'B2B (Empresa)' : 'B2C (Consumidor)'}`,
+    ];
+    list.innerHTML = items.map(i => `<li>${i}</li>`).join('');
+    box.classList.remove('hidden');
+  }
+
+  // ── Navegação entre steps ──
+  function goStep(n) {
+    document.getElementById(`step-${currentStep}`).classList.add('hidden');
+    document.getElementById(`step-${n}`).classList.remove('hidden');
+
+    // Atualizar badges
+    for (let i = 1; i <= 3; i++) {
+      const b = document.getElementById(`badge-${i}`);
+      b.className = 'step-badge ' + (i < n ? 'step-done' : i === n ? 'step-active' : 'step-idle');
+    }
+    // Atualizar linhas
+    for (let i = 1; i <= 2; i++) {
+      document.getElementById(`line-${i}`).style.width = i < n ? '100%' : '0%';
+    }
+    currentStep = n;
+    if (n === 2) checkStep2();
+    if (n === 3) checkStep3();
+  }
+
+  // ── Modal de confirmação ──
+  function openConfirm() {
+    if (!checkStep3()) return;
+    const rbt12 = parseMoneyField('rbt12');
+    const valor = parseMoneyField('valor_operacao');
+    const det   = document.getElementById('confirm-details');
+    det.innerHTML = `
+      <div><strong>${document.getElementById('razao_social').value.trim()}</strong></div>
+      <div>CNPJ: ${document.getElementById('cnpj').value}</div>
+      <div>Regime: ${document.getElementById('regime').options[document.getElementById('regime').selectedIndex].text} · UF: ${document.getElementById('uf').value}</div>
+      <div>RBT12: R$ ${rbt12.toLocaleString('pt-BR',{minimumFractionDigits:2})} · Data: ${document.getElementById('data_emissao').value}</div>
+    `;
+    document.getElementById('modal-confirm').classList.add('open');
+  }
+  function closeConfirm() {
+    document.getElementById('modal-confirm').classList.remove('open');
+  }
+
+  // ── Submit ──
+  async function submitAnalise() {
+    closeConfirm();
+    document.getElementById('loading').classList.remove('hidden');
+    document.getElementById('loading').style.display = 'flex';
+
+    const cnpjRaw    = document.getElementById('cnpj').value.replace(/\D/g, '');
+    const cnaeDigits = getCNAEDigits();
+    const rbt12      = parseMoneyField('rbt12');
+    const folha12m   = parseMoneyField('folha12m');
+    const rpa        = parseMoneyField('rpa_mensal');
+    const st         = parseMoneyField('receita_st');
+    const valor      = parseMoneyField('valor_operacao');
+
+    const payload = {
+      fornecedora: {
+        cnpj: cnpjRaw,
+        razao_social: document.getElementById('razao_social').value.trim(),
+        regime: document.getElementById('regime').value,
+        cnae_principal: cnaeDigits,
+        uf: document.getElementById('uf').value,
+        rbt12: rbt12,
+        folha_salarios_12m: folha12m,
+      },
+      operacao: {
+        data_emissao: document.getElementById('data_emissao').value,
+        valor: valor,
+        rpa_mensal: rpa,
+        receita_com_st_icms: st,
+        tipo_comprador: tipoCompradorSelecionado,
+      }
+    };
+
+    try {
+      const res = await fetch(`${API_BASE}/analise/manual`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.status === 401) {
+        sessionStorage.clear();
+        window.location.href = 'login.html';
+        return;
+      }
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Erro desconhecido.' }));
+        const detail = Array.isArray(err.detail)
+          ? err.detail.map(e => e.msg || JSON.stringify(e)).join('\n')
+          : (err.detail || 'Erro no servidor.');
+        document.getElementById('loading').style.display = 'none';
+        alert(`Não foi possível calcular o diagnóstico:\n\n${detail}`);
+        return;
+      }
+
+      const diagnostico = await res.json();
+      sessionStorage.setItem('diagnostico', JSON.stringify(diagnostico));
+      sessionStorage.setItem('analise_empresa', document.getElementById('razao_social').value.trim());
+      window.location.href = 'resultado.html';
+
+    } catch (e) {
+      document.getElementById('loading').style.display = 'none';
+      alert('Erro de conexão com o servidor. Verifique se a API está rodando em localhost:8000.');
+    }
+  }
+
+  // Inicializar data com hoje se estiver dentro do intervalo
+  (function() {
+    const today = new Date().toISOString().split('T')[0];
+    const input = document.getElementById('data_emissao');
+    if (today >= '2026-01-01' && today <= '2033-12-31') input.value = today;
+  })();
+</script>
+</body>
+</html>

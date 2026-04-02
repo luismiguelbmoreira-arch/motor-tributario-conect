@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diagnóstico Fiscal — Motor Tributário Conect</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600&display=swap');
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #F7F7F5;
+      color: #1C1C1C;
+    }
+
+    h1, h2, h3 {
+      font-family: 'Playfair Display', serif;
+    }
+
+    .accordion-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.4s ease-in-out, opacity 0.3s ease;
+      opacity: 0;
+    }
+
+    .accordion-content.open {
+      max-height: 9999px;
+      opacity: 1;
+    }
+
+    .audit-item-details {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+
+    .audit-item-details.open {
+      max-height: 500px;
+    }
+
+    .fade-in {
+      animation: fadeIn 0.4s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .skeleton {
+      background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+      background-size: 200% 100%;
+      animation: skeleton-loading 1.4s infinite;
+    }
+
+    @keyframes skeleton-loading {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .focus-ring:focus-visible {
+      outline: 2px solid #C9943A;
+      outline-offset: 2px;
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- FIXED ACTION BAR -->
+  <div class="sticky top-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <a href="dashboard.html"
+         class="focus-ring inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+        Voltar ao Dashboard
+      </a>
+
+      <div class="flex items-center gap-2 flex-wrap">
+        <button id="btn-nova-analise"
+                onclick="window.location.href='analise.html'"
+                class="focus-ring inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors">
+          Nova Análise
+        </button>
+        <button id="btn-baixar-pdf"
+                onclick="downloadPDF()"
+                class="focus-ring inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-slate-800 text-white hover:bg-slate-700 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17v3a1 1 0 001 1h16a1 1 0 001-1v-3" />
+          </svg>
+          Baixar PDF
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <main class="max-w-5xl mx-auto px-4 py-8 space-y-8" id="main-content">
+
+    <!-- HEADER DIAGNÓSTICO -->
+    <div class="fade-in">
+      <div class="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Diagnóstico Fiscal</p>
+          <h1 class="text-3xl font-semibold text-slate-900" id="header-empresa">--</h1>
+          <p class="text-sm text-slate-500 mt-1" id="header-data-calculo">--</p>
+        </div>
+        <span id="header-regime-badge"
+              class="inline-block px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full bg-blue-100 text-blue-800">
+          --
+        </span>
+      </div>
+    </div>
+
+    <!-- LOADING STATE -->
+    <div id="loading-state" class="space-y-4">
+      <div class="skeleton rounded-lg h-36 w-full"></div>
+      <div class="skeleton rounded-lg h-24 w-full"></div>
+      <div class="skeleton rounded-lg h-48 w-full"></div>
+    </div>
+
+    <!-- CONTENT (hidden while loading) -->
+    <div id="content-area" class="hidden space-y-8">
+
+      <!-- SEÇÃO 1: CABEÇALHO DO DIAGNÓSTICO -->
+      <section aria-labelledby="sec-resumo-titulo" class="fade-in">
+        <h2 id="sec-resumo-titulo" class="sr-only">Resumo do Diagnóstico</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="col-span-2 md:col-span-1 bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Regime</p>
+            <p class="text-xl font-bold text-slate-900 mt-1" id="card-regime">--</p>
+            <p class="text-xs text-slate-500 mt-1" id="card-cnpj">--</p>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Receita Bruta 12 meses</p>
+            <p class="text-xl font-bold text-slate-900 mt-1" id="card-rbt12">--</p>
+            <p class="text-xs text-slate-500 mt-1">RBT12</p>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Alíquota Efetiva</p>
+            <p class="text-xl font-bold text-slate-900 mt-1" id="card-aliquota">--</p>
+            <p class="text-xs text-slate-500 mt-1" id="card-fator-r">--</p>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">DAS Mensal Estimado</p>
+            <p class="text-xl font-bold text-emerald-700 mt-1" id="card-das">--</p>
+            <p class="text-xs text-slate-500 mt-1" id="card-anexo">--</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEÇÃO 2: ALERTAS DE RISCO -->
+      <section id="sec-alertas" aria-labelledby="sec-alertas-titulo" class="fade-in hidden">
+        <h2 id="sec-alertas-titulo" class="text-xl font-semibold text-slate-900 mb-4">Pontos de Atenção</h2>
+        <div id="alertas-container" class="space-y-3" role="list" aria-label="Alertas fiscais"></div>
+      </section>
+
+      <!-- SEÇÃO 3: CRONOGRAMA IVA -->
+      <section aria-labelledby="sec-iva-titulo" class="fade-in">
+        <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+          <div class="flex items-start justify-between flex-wrap gap-4 mb-6">
+            <div>
+              <h2 id="sec-iva-titulo" class="text-xl font-semibold text-slate-900">Cronograma IVA 2026–2033</h2>
+              <p class="text-sm text-slate-500 mt-1">Transição conforme <span class="text-blue-700 font-medium">LC 214/2025, Art. 348</span></p>
+            </div>
+          </div>
+
+          <!-- Tabela IVA -->
+          <div class="overflow-x-auto mb-6">
+            <table class="w-full text-sm" aria-label="Cronograma de alíquotas IVA por ano">
+              <thead>
+                <tr class="border-b border-slate-200">
+                  <th scope="col" class="text-left py-2 pr-4 font-semibold text-slate-700">Ano</th>
+                  <th scope="col" class="text-right py-2 px-4 font-semibold text-blue-700">CBS (%)</th>
+                  <th scope="col" class="text-right py-2 px-4 font-semibold text-emerald-700">IBS (%)</th>
+                  <th scope="col" class="text-right py-2 pl-4 font-semibold text-slate-700">Total (%)</th>
+                </tr>
+              </thead>
+              <tbody id="tabela-iva-body" class="divide-y divide-slate-100">
+                <!-- Preenchido por JS -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Gráfico IVA -->
+          <div class="w-full h-64" role="img" aria-label="Gráfico de linha mostrando evolução das alíquotas IVA de 2026 a 2033">
+            <canvas id="chart-iva" aria-hidden="true"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- SEÇÃO 4: CENÁRIOS COMPARATIVOS -->
+      <section aria-labelledby="sec-cenarios-titulo" class="fade-in">
+        <h2 id="sec-cenarios-titulo" class="text-xl font-semibold text-slate-900 mb-4">Comparativo de Cenários</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          <!-- Simples Puro -->
+          <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Cenário Atual</p>
+                <h3 class="text-base font-semibold text-slate-900">Simples Nacional Puro</h3>
+              </div>
+            </div>
+            <p class="text-xs text-slate-500 mb-1">Carga tributária anual estimada</p>
+            <p class="text-2xl font-bold text-slate-800" id="cen-simples-carga">--</p>
+          </div>
+
+          <!-- Opt-Out -->
+          <div class="bg-white border border-emerald-200 rounded-xl p-6 shadow-sm" id="card-optout">
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+              </div>
+              <div>
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Cenário Alternativo</p>
+                <h3 class="text-base font-semibold text-slate-900">Opt-Out IVA</h3>
+              </div>
+            </div>
+            <p class="text-xs text-slate-500 mb-1">Carga tributária anual estimada</p>
+            <p class="text-2xl font-bold text-slate-800" id="cen-optout-carga">--</p>
+            <div id="cen-economia-badge" class="hidden mt-3">
+              <span class="inline-block px-3 py-1 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800">
+                Economia de <span id="cen-economia-valor">--</span> por ano
+              </span>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- SEÇÃO 5: SERVIÇOS RECOMENDADOS -->
+      <section aria-labelledby="sec-servicos-titulo" class="fade-in">
+        <h2 id="sec-servicos-titulo" class="text-xl font-semibold text-slate-900 mb-4">Serviços Recomendados</h2>
+        <div id="servicos-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4" role="list" aria-label="Serviços recomendados com base no diagnóstico">
+          <!-- Preenchido por JS -->
+        </div>
+      </section>
+
+      <!-- SEÇÃO 6: TRILHA DE AUDITORIA (ACCORDION) -->
+      <section aria-labelledby="sec-auditoria-titulo" class="fade-in">
+        <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          <button id="btn-auditoria"
+                  onclick="toggleAuditoria()"
+                  aria-expanded="false"
+                  aria-controls="auditoria-content"
+                  class="focus-ring w-full flex items-center justify-between px-6 py-5 text-left hover:bg-slate-50 transition-colors">
+            <div class="flex items-center gap-3">
+              <span class="text-lg" aria-hidden="true">⚖</span>
+              <div>
+                <h2 id="sec-auditoria-titulo" class="text-base font-semibold text-slate-900">Como foi calculado?</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Trilha de auditoria completa — memória de cálculo</p>
+              </div>
+            </div>
+            <svg id="icon-auditoria" xmlns="http://www.w3.org/2000/svg"
+                 class="h-5 w-5 text-slate-400 transition-transform duration-300"
+                 fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <div id="auditoria-content" class="accordion-content" role="region" aria-labelledby="btn-auditoria">
+            <div class="px-6 pb-6 space-y-3" id="auditoria-items">
+              <!-- Preenchido por JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /content-area -->
+
+  </main>
+
+  <!-- RODAPÉ LEGAL -->
+  <footer class="mt-12 bg-slate-800 text-slate-400">
+    <div class="max-w-5xl mx-auto px-4 py-5">
+      <p class="text-xs text-center leading-relaxed" id="rodape-texto">
+        Calculado com base em LC 123/2006 + LC 214/2025 (vigente 01/01/2026) |
+        Auditado por Luiz Moreira 26/03/2026 |
+        Motor Tributário Conect v2.1
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    // ─────────────────────────────────────────────
+    // UTILITÁRIOS
+    // ─────────────────────────────────────────────
+    function formatBRL(value) {
+      const num = parseFloat(value);
+      if (isNaN(num)) return '--';
+      return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    function formatPct(value) {
+      const num = parseFloat(value);
+      if (isNaN(num)) return '--';
+      return (num * 100).toFixed(2) + '%';
+    }
+
+    function formatPctDirect(value) {
+      const num = parseFloat(value);
+      if (isNaN(num)) return '--';
+      return (num * 100).toFixed(3) + '%';
+    }
+
+    function sanitize(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function formatCNPJ(cnpj) {
+      const d = String(cnpj).replace(/\D/g, '');
+      if (d.length !== 14) return cnpj;
+      return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12)}`;
+    }
+
+    function showElement(id) {
+      document.getElementById(id)?.classList.remove('hidden');
+    }
+
+    function hideElement(id) {
+      document.getElementById(id)?.classList.add('hidden');
+    }
+
+    // ─────────────────────────────────────────────
+    // INICIALIZAÇÃO
+    // ─────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
+      const token = sessionStorage.getItem('token');
+      if (!token) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      const raw = sessionStorage.getItem('diagnostico');
+      if (!raw) {
+        window.location.href = 'analise.html';
+        return;
+      }
+
+      let diagnostico;
+      try {
+        diagnostico = JSON.parse(raw);
+      } catch (e) {
+        window.location.href = 'analise.html';
+        return;
+      }
+
+      renderDiagnostico(diagnostico);
+    });
+
+    // ─────────────────────────────────────────────
+    // RENDER PRINCIPAL
+    // ─────────────────────────────────────────────
+    function renderDiagnostico(d) {
+      // Header empresa
+      const nomeEmpresa = sessionStorage.getItem('analise_empresa') || d.empresa?.razao_social || 'Empresa';
+      document.getElementById('header-empresa').textContent = nomeEmpresa;
+
+      const agora = new Date();
+      document.getElementById('header-data-calculo').textContent =
+        'Diagnóstico gerado em ' + agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+      const regime = d.regime || d.empresa?.regime || '--';
+      document.getElementById('header-regime-badge').textContent = regime;
+
+      // Cards de resumo
+      document.getElementById('card-regime').textContent = regime;
+      document.getElementById('card-cnpj').textContent = formatCNPJ(d.empresa?.cnpj || '--');
+      document.getElementById('card-rbt12').textContent = formatBRL(d.rbt12);
+      document.getElementById('card-aliquota').textContent = formatPct(d.aliquota_efetiva);
+
+      const fatorR = d.fator_r ? 'Fator R: ' + parseFloat(d.fator_r).toFixed(2) : '';
+      document.getElementById('card-fator-r').textContent = fatorR;
+
+      document.getElementById('card-das').textContent = formatBRL(d.das_mensal);
+      document.getElementById('card-anexo').textContent = d.anexo ? 'Anexo ' + d.anexo : '';
+
+      // Rodapé dinâmico
+      const dataRodape = agora.toLocaleDateString('pt-BR');
+      document.getElementById('rodape-texto').textContent =
+        `Calculado em ${dataRodape} com base em LC 123/2006 + LC 214/2025 (vigente 01/01/2026) | Auditado por Luiz Moreira 26/03/2026 | Motor Tributário Conect v2.1`;
+
+      // Seções
+      renderAlertas(d.alertas || []);
+      renderCronogramaIVA(d.cronograma_iva || []);
+      renderCenarios(d.cenarios || {});
+      renderServicos(d.alertas || [], d.cenarios || {});
+      renderTrilhaAuditoria(d.trilha_auditoria || []);
+
+      // Mostrar conteúdo
+      hideElement('loading-state');
+      showElement('content-area');
+    }
+
+    // ─────────────────────────────────────────────
+    // ALERTAS
+    // ─────────────────────────────────────────────
+    function renderAlertas(alertas) {
+      if (!alertas.length) return;
+
+      showElement('sec-alertas');
+      const container = document.getElementById('alertas-container');
+      container.innerHTML = '';
+
+      alertas.forEach(function (alerta) {
+        const tipo = (alerta.tipo || '').toUpperCase();
+        let borderClass, bgClass, textClass, iconSvg;
+
+        if (tipo.includes('CRITICO')) {
+          borderClass = 'border-red-300';
+          bgClass = 'bg-red-50';
+          textClass = 'text-red-800';
+          iconSvg = '<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />';
+        } else if (tipo.includes('ALTO')) {
+          borderClass = 'border-amber-300';
+          bgClass = 'bg-amber-50';
+          textClass = 'text-amber-800';
+          iconSvg = '<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />';
+        } else {
+          borderClass = 'border-yellow-300';
+          bgClass = 'bg-yellow-50';
+          textClass = 'text-yellow-800';
+          iconSvg = '<path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />';
+        }
+
+        const tipoLabel = sanitize(alerta.tipo || '').replace(/_/g, ' ');
+        const detalhe = sanitize(alerta.detalhe || '');
+
+        const el = document.createElement('div');
+        el.setAttribute('role', 'listitem');
+        el.className = `border ${borderClass} ${bgClass} rounded-lg p-4 flex items-start gap-3`;
+        el.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0 mt-0.5 ${textClass}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            ${iconSvg}
+          </svg>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-bold ${textClass} uppercase tracking-wider mb-1">${tipoLabel}</p>
+            <p class="text-sm ${textClass}">${detalhe}</p>
+          </div>
+        `;
+        container.appendChild(el);
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // CRONOGRAMA IVA
+    // ─────────────────────────────────────────────
+    function renderCronogramaIVA(cronograma) {
+      const tbody = document.getElementById('tabela-iva-body');
+      tbody.innerHTML = '';
+
+      const anos = [];
+      const cbsData = [];
+      const ibsData = [];
+      const totalData = [];
+
+      cronograma.forEach(function (item) {
+        const cbs = parseFloat(item.cbs) * 100;
+        const ibs = parseFloat(item.ibs) * 100;
+        const total = parseFloat(item.total) * 100;
+
+        anos.push(item.ano);
+        cbsData.push(cbs.toFixed(3));
+        ibsData.push(ibs.toFixed(3));
+        totalData.push(total.toFixed(3));
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition-colors';
+        tr.innerHTML = `
+          <td class="py-2.5 pr-4 font-medium text-slate-900">${sanitize(String(item.ano))}</td>
+          <td class="py-2.5 px-4 text-right text-blue-700 font-medium">${cbs.toFixed(3)}%</td>
+          <td class="py-2.5 px-4 text-right text-emerald-700 font-medium">${ibs.toFixed(3)}%</td>
+          <td class="py-2.5 pl-4 text-right text-slate-700 font-semibold">${total.toFixed(3)}%</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Gráfico Chart.js
+      const ctx = document.getElementById('chart-iva');
+      if (!ctx || !anos.length) return;
+
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: anos,
+          datasets: [
+            {
+              label: 'CBS',
+              data: cbsData,
+              borderColor: '#0284C7',
+              backgroundColor: 'rgba(2, 132, 199, 0.08)',
+              borderWidth: 2,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              tension: 0.3,
+              fill: true,
+            },
+            {
+              label: 'IBS',
+              data: ibsData,
+              borderColor: '#059669',
+              backgroundColor: 'rgba(5, 150, 105, 0.08)',
+              borderWidth: 2,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              tension: 0.3,
+              fill: true,
+            },
+            {
+              label: 'Total',
+              data: totalData,
+              borderColor: '#6B7280',
+              backgroundColor: 'rgba(107, 114, 128, 0.05)',
+              borderWidth: 2,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              tension: 0.3,
+              borderDash: [4, 4],
+              fill: false,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: {
+                font: { family: 'Inter', size: 12 },
+                color: '#374151',
+                padding: 16,
+              },
+            },
+            tooltip: {
+              backgroundColor: '#fff',
+              borderColor: '#e5e7eb',
+              borderWidth: 1,
+              titleColor: '#1f2937',
+              bodyColor: '#374151',
+              titleFont: { family: 'Inter', size: 12, weight: '600' },
+              bodyFont: { family: 'Inter', size: 12 },
+              callbacks: {
+                label: function (ctx) {
+                  return ` ${ctx.dataset.label}: ${ctx.parsed.y}%`;
+                },
+              },
+            },
+          },
+          scales: {
+            x: {
+              grid: { color: '#f3f4f6' },
+              ticks: { font: { family: 'Inter', size: 11 }, color: '#6B7280' },
+            },
+            y: {
+              grid: { color: '#f3f4f6' },
+              ticks: {
+                font: { family: 'Inter', size: 11 },
+                color: '#6B7280',
+                callback: function (v) { return v + '%'; },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // CENÁRIOS
+    // ─────────────────────────────────────────────
+    function renderCenarios(cenarios) {
+      const simples = cenarios.simples_puro || {};
+      const optout = cenarios.opt_out || {};
+
+      document.getElementById('cen-simples-carga').textContent = formatBRL(simples.carga_anual);
+      document.getElementById('cen-optout-carga').textContent = formatBRL(optout.carga_anual);
+
+      const economia = parseFloat(optout.economia || 0);
+      if (economia > 0) {
+        showElement('cen-economia-badge');
+        document.getElementById('cen-economia-valor').textContent = formatBRL(optout.economia);
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // SERVIÇOS RECOMENDADOS
+    // ─────────────────────────────────────────────
+    function renderServicos(alertas, cenarios) {
+      const container = document.getElementById('servicos-container');
+      container.innerHTML = '';
+
+      const tiposAlerta = alertas.map(function (a) { return (a.tipo || '').toUpperCase(); });
+      const economia = parseFloat((cenarios.opt_out || {}).economia || 0);
+
+      const servicos = [];
+
+      if (tiposAlerta.some(function (t) { return t.includes('FATOR_R'); })) {
+        servicos.push({
+          icone: '📋',
+          titulo: 'Adequação de Folha de Pagamento',
+          descricao: 'Revisão da relação folha/receita para enquadramento no Fator R',
+        });
+      }
+
+      if (tiposAlerta.some(function (t) { return t.includes('B2B') || t.includes('IVA'); })) {
+        servicos.push({
+          icone: '🔍',
+          titulo: 'Diagnóstico de Impacto Tributário 2026',
+          descricao: 'Análise detalhada do CBS/IBS nas operações B2B da empresa',
+        });
+      }
+
+      if (economia > 0) {
+        servicos.push({
+          icone: '⚡',
+          titulo: 'Análise de Viabilidade Opt-Out',
+          descricao: 'Estudo aprofundado para validar a conveniência do Opt-Out IVA',
+        });
+      }
+
+      // Sempre mostrar
+      servicos.push({
+        icone: '📄',
+        titulo: 'Relatório de Conformidade Fiscal 2026',
+        descricao: 'Documentação completa das obrigações na nova legislação tributária',
+      });
+
+      servicos.forEach(function (s) {
+        const el = document.createElement('div');
+        el.setAttribute('role', 'listitem');
+        el.className = 'bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex items-start gap-4';
+        el.innerHTML = `
+          <div class="text-2xl flex-shrink-0 mt-0.5" aria-hidden="true">${s.icone}</div>
+          <div>
+            <h3 class="text-sm font-semibold text-slate-900">${sanitize(s.titulo)}</h3>
+            <p class="text-xs text-slate-500 mt-1 leading-relaxed">${sanitize(s.descricao)}</p>
+          </div>
+        `;
+        container.appendChild(el);
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // TRILHA DE AUDITORIA
+    // ─────────────────────────────────────────────
+    function toggleAuditoria() {
+      const content = document.getElementById('auditoria-content');
+      const btn = document.getElementById('btn-auditoria');
+      const icon = document.getElementById('icon-auditoria');
+      const isOpen = content.classList.contains('open');
+
+      content.classList.toggle('open', !isOpen);
+      icon.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+      btn.setAttribute('aria-expanded', String(!isOpen));
+    }
+
+    function renderTrilhaAuditoria(trilha) {
+      const container = document.getElementById('auditoria-items');
+      container.innerHTML = '';
+
+      if (!trilha.length) {
+        container.innerHTML = '<p class="text-sm text-slate-500 py-4">Nenhum registro na trilha de auditoria.</p>';
+        return;
+      }
+
+      trilha.forEach(function (item, idx) {
+        const tipo = sanitize(item.tipo || '');
+        const titulo = sanitize(item.titulo || item.id || '');
+        const formula = item.formula ? sanitize(item.formula) : null;
+        const amparo = item.amparo_legal ? sanitize(item.amparo_legal) : null;
+        const detalhe = item.detalhe ? sanitize(item.detalhe) : null;
+        const ts = item.timestamp ? sanitize(item.timestamp.replace('T', ' ').substring(0, 19)) : null;
+
+        let tipoClass = 'bg-slate-100 text-slate-600';
+        if (tipo === 'CALCULO') tipoClass = 'bg-blue-100 text-blue-700';
+        else if (tipo === 'VIOLACAO_SEGURANCA') tipoClass = 'bg-red-100 text-red-700';
+        else if (tipo.startsWith('ALERTA')) tipoClass = 'bg-amber-100 text-amber-700';
+
+        const detailsId = `audit-details-${idx}`;
+        const btnId = `audit-btn-${idx}`;
+
+        const temDetalhes = formula || detalhe || (item.memoria && Object.keys(item.memoria).length);
+
+        const el = document.createElement('div');
+        el.className = 'border border-slate-100 rounded-lg overflow-hidden';
+        el.innerHTML = `
+          <div class="flex items-start gap-3 p-4">
+            <span class="inline-block px-2 py-0.5 text-xs font-bold rounded uppercase ${tipoClass} flex-shrink-0 mt-0.5">${tipo}</span>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-slate-900">${titulo}</p>
+              ${amparo ? `
+                <p class="text-xs text-blue-700 mt-1 flex items-center gap-1">
+                  <span aria-hidden="true">⚖</span>
+                  <span>${amparo}</span>
+                </p>
+              ` : ''}
+              ${ts ? `<p class="text-xs text-slate-400 mt-1">${ts}</p>` : ''}
+            </div>
+            ${temDetalhes ? `
+              <button id="${btnId}"
+                      onclick="toggleAuditItem('${detailsId}', '${btnId}')"
+                      aria-expanded="false"
+                      aria-controls="${detailsId}"
+                      class="focus-ring text-xs text-slate-500 hover:text-slate-800 flex-shrink-0 underline">
+                Ver detalhes
+              </button>
+            ` : ''}
+          </div>
+          ${temDetalhes ? `
+            <div id="${detailsId}" class="audit-item-details bg-slate-50 border-t border-slate-100">
+              <div class="px-4 py-3 space-y-2">
+                ${formula ? `
+                  <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Fórmula</p>
+                    <p class="text-xs font-mono text-slate-700 bg-white border border-slate-200 rounded px-3 py-2 break-all">${formula}</p>
+                  </div>
+                ` : ''}
+                ${detalhe ? `
+                  <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Detalhe</p>
+                    <p class="text-xs text-slate-700">${detalhe}</p>
+                  </div>
+                ` : ''}
+                ${item.memoria && Object.keys(item.memoria).length ? `
+                  <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Memória de Cálculo</p>
+                    <dl class="grid grid-cols-2 gap-x-4 gap-y-1">
+                      ${Object.entries(item.memoria).map(function ([k, v]) {
+                        return `
+                          <dt class="text-xs text-slate-500">${sanitize(k)}</dt>
+                          <dd class="text-xs text-slate-800 font-medium">${sanitize(String(v))}</dd>
+                        `;
+                      }).join('')}
+                    </dl>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          ` : ''}
+        `;
+        container.appendChild(el);
+      });
+    }
+
+    function toggleAuditItem(detailsId, btnId) {
+      const details = document.getElementById(detailsId);
+      const btn = document.getElementById(btnId);
+      if (!details || !btn) return;
+
+      const isOpen = details.classList.contains('open');
+      details.classList.toggle('open', !isOpen);
+      btn.setAttribute('aria-expanded', String(!isOpen));
+      btn.textContent = isOpen ? 'Ver detalhes' : 'Ocultar detalhes';
+    }
+
+    // ─────────────────────────────────────────────
+    // DOWNLOAD PDF
+    // ─────────────────────────────────────────────
+    async function downloadPDF() {
+      const token = sessionStorage.getItem('token');
+      const diagnostico = sessionStorage.getItem('diagnostico');
+
+      if (!token || !diagnostico) return;
+
+      const btn = document.getElementById('btn-baixar-pdf');
+      const originalText = btn.innerHTML;
+
+      btn.disabled = true;
+      btn.innerHTML = `
+        <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        Gerando PDF...
+      `;
+
+      try {
+        const response = await fetch('http://localhost:8000/relatorio/pdf', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json',
+          },
+          body: diagnostico,
+        });
+
+        if (response.status === 401) {
+          sessionStorage.clear();
+          window.location.href = 'login.html';
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error('Falha ao gerar PDF');
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'diagnostico-fiscal-' + new Date().toISOString().slice(0, 10) + '.pdf';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+
+      } catch (err) {
+        alert('Não foi possível gerar o PDF. Tente novamente em instantes.');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    }
+  </script>
+</body>
+</html>
