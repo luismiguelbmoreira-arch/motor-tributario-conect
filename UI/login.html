@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conect — Motor Tributário 2026-2033</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .font-playfair { font-family: 'Playfair Display', serif; }
+
+    /* Geometric grid pattern — CSS only, sem SVG externo */
+    .geo-pattern {
+      background-image:
+        linear-gradient(rgba(59, 130, 246, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59, 130, 246, 0.06) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+
+    /* Subtle orbs de profundidade */
+    .orb-1 {
+      position: absolute;
+      width: 420px; height: 420px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%);
+      top: -80px; left: -80px;
+      pointer-events: none;
+    }
+    .orb-2 {
+      position: absolute;
+      width: 300px; height: 300px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(245,158,11,0.08) 0%, transparent 70%);
+      bottom: 40px; right: -40px;
+      pointer-events: none;
+    }
+
+    /* Animação de entrada */
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    .animate-fade-slide { animation: fadeSlideUp 0.6s ease-out both; }
+    .animate-fade       { animation: fadeIn 0.8s ease-out both; }
+    .delay-100  { animation-delay: 0.1s; }
+    .delay-200  { animation-delay: 0.2s; }
+    .delay-300  { animation-delay: 0.3s; }
+    .delay-400  { animation-delay: 0.4s; }
+    .delay-500  { animation-delay: 0.5s; }
+
+    /* Botão loading */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    /* Focus ring acessível */
+    input:focus-visible {
+      outline: 2px solid #3B82F6;
+      outline-offset: 2px;
+    }
+    a:focus-visible, button:focus-visible {
+      outline: 2px solid #3B82F6;
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+
+    /* Linhas decorativas laterais esquerda */
+    .stripe-line {
+      position: absolute;
+      width: 1px;
+      background: linear-gradient(to bottom, transparent, rgba(59,130,246,0.25), transparent);
+    }
+  </style>
+</head>
+
+<body class="bg-slate-900 min-h-screen flex items-center justify-center">
+
+  <!-- Container split-screen -->
+  <div class="w-full min-h-screen flex flex-col lg:flex-row">
+
+    <!-- ====== LADO ESQUERDO — Branding / Hero ====== -->
+    <div class="relative lg:w-1/2 bg-slate-900 geo-pattern flex flex-col justify-between p-8 sm:p-12 lg:p-16 overflow-hidden min-h-64 lg:min-h-screen">
+
+      <!-- Orbs decorativos -->
+      <div class="orb-1" aria-hidden="true"></div>
+      <div class="orb-2" aria-hidden="true"></div>
+
+      <!-- Linhas verticais decorativas -->
+      <div class="stripe-line animate-fade delay-200" style="height:60%;top:20%;left:8%;" aria-hidden="true"></div>
+      <div class="stripe-line animate-fade delay-300" style="height:40%;top:30%;left:12%;" aria-hidden="true"></div>
+
+      <!-- Logo + Nome -->
+      <div class="relative z-10 animate-fade-slide">
+        <div class="flex items-center gap-3 mb-2">
+          <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30"
+               role="img" aria-label="Logo Conect">
+            <span class="text-white font-bold text-lg font-playfair">C</span>
+          </div>
+          <span class="text-white text-xl font-semibold tracking-wide">Conect</span>
+        </div>
+        <p class="text-blue-400/70 text-xs uppercase tracking-widest ml-1 mt-1">Motor Tributário</p>
+      </div>
+
+      <!-- Hero Central -->
+      <div class="relative z-10 flex-1 flex flex-col justify-center py-8 lg:py-0">
+
+        <div class="animate-fade-slide delay-100">
+          <p class="text-blue-400 text-xs font-semibold uppercase tracking-widest mb-4">
+            Sorocaba-SP — Reforma Tributária 2026-2033
+          </p>
+          <h1 class="font-playfair text-3xl sm:text-4xl lg:text-5xl text-white leading-tight mb-6">
+            Precisão fiscal.<br>
+            <span class="text-blue-400">Sem margem</span><br>
+            para erro.
+          </h1>
+          <p class="text-slate-400 text-sm sm:text-base leading-relaxed max-w-sm">
+            A plataforma de análise tributária construída para a nova legislação — EC 132/2023, LC 123/2006 e LC 214/2025.
+          </p>
+        </div>
+
+        <!-- Bullet points de valor -->
+        <div class="mt-8 space-y-4 animate-fade-slide delay-200">
+          <div class="flex items-start gap-3">
+            <div class="w-6 h-6 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <div class="w-2 h-2 rounded-full bg-blue-400"></div>
+            </div>
+            <div>
+              <p class="text-white text-sm font-medium">Cálculo por fora com trilha de auditoria</p>
+              <p class="text-slate-500 text-xs mt-0.5">Base → Deduções → Alíquota → Valor final documentado</p>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3">
+            <div class="w-6 h-6 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <div class="w-2 h-2 rounded-full bg-amber-400"></div>
+            </div>
+            <div>
+              <p class="text-white text-sm font-medium">IVA dual — cronograma 2026 a 2033</p>
+              <p class="text-slate-500 text-xs mt-0.5">IBS + CBS com Split Payment e Opt-Out simulados</p>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3">
+            <div class="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <div class="w-2 h-2 rounded-full bg-emerald-400"></div>
+            </div>
+            <div>
+              <p class="text-white text-sm font-medium">Guard Fiscal — 199 testes certificados</p>
+              <p class="text-slate-500 text-xs mt-0.5">Simples Nacional | Lucro Presumido | MEI | Lucro Real</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Badge ano + rodapé esquerdo -->
+      <div class="relative z-10 animate-fade delay-500">
+        <div class="flex items-center gap-3">
+          <span class="inline-flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs font-medium px-3 py-1.5 rounded-full">
+            <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse inline-block"></span>
+            Ano Fiscal 2026
+          </span>
+          <span class="text-slate-600 text-xs">EC 132/2023 vigente</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====== LADO DIREITO — Formulário ====== -->
+    <div class="relative lg:w-1/2 bg-white lg:bg-slate-50 flex items-center justify-center p-8 sm:p-12 lg:p-16">
+
+      <div class="w-full max-w-sm animate-fade-slide delay-200">
+
+        <!-- Cabeçalho do formulário -->
+        <div class="mb-10">
+          <h2 class="font-playfair text-2xl sm:text-3xl text-slate-900 font-medium mb-2">
+            Bem-vindo de volta
+          </h2>
+          <p class="text-slate-500 text-sm">
+            Acesse seu painel tributário com segurança.
+          </p>
+        </div>
+
+        <!-- Formulário -->
+        <form id="loginForm" novalidate>
+
+          <!-- Campo Email -->
+          <div class="mb-5">
+            <label for="email" class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
+              E-mail profissional
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autocomplete="email"
+              required
+              placeholder="contador@escritorio.com.br"
+              aria-describedby="emailError"
+              class="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm placeholder-slate-300 transition-colors duration-200 hover:border-slate-300 focus:border-blue-500 focus:ring-0"
+            >
+            <p id="emailError" role="alert" class="text-red-500 text-xs mt-1.5 hidden">Insira um e-mail válido.</p>
+          </div>
+
+          <!-- Campo Senha -->
+          <div class="mb-6">
+            <div class="flex items-center justify-between mb-2">
+              <label for="password" class="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                Senha
+              </label>
+              <a href="#" class="text-xs text-blue-500 hover:text-blue-600 transition-colors" aria-label="Recuperar senha por e-mail">
+                Esqueci a senha
+              </a>
+            </div>
+            <div class="relative">
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                required
+                placeholder="••••••••"
+                aria-describedby="passwordError"
+                class="w-full px-4 py-3 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm placeholder-slate-300 transition-colors duration-200 hover:border-slate-300 focus:border-blue-500 focus:ring-0 pr-12"
+              >
+              <!-- Toggle visibilidade senha -->
+              <button
+                type="button"
+                id="togglePassword"
+                aria-label="Mostrar ou ocultar senha"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+              >
+                <!-- Olho fechado (estado inicial: senha oculta) -->
+                <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+              </button>
+            </div>
+            <p id="passwordError" role="alert" class="text-red-500 text-xs mt-1.5 hidden">A senha deve ter ao menos 6 caracteres.</p>
+          </div>
+
+          <!-- Botão Entrar -->
+          <button
+            id="submitBtn"
+            type="submit"
+            class="w-full bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-semibold text-sm py-3.5 rounded-lg transition-all duration-200 shadow-md shadow-blue-500/25 hover:shadow-lg hover:shadow-blue-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <span id="btnText">Entrar no sistema</span>
+          </button>
+
+          <!-- Feedback de erro geral -->
+          <div
+            id="generalError"
+            role="alert"
+            aria-live="polite"
+            class="hidden mt-4 flex items-start gap-2.5 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="flex-shrink-0 mt-0.5" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="0.5" fill="currentColor" stroke="none"/>
+            </svg>
+            <span id="generalErrorText">Credenciais inválidas. Verifique e tente novamente.</span>
+          </div>
+
+        </form>
+
+        <!-- Divisor -->
+        <div class="relative my-8" aria-hidden="true">
+          <div class="absolute inset-0 flex items-center">
+            <div class="w-full border-t border-slate-200"></div>
+          </div>
+        </div>
+
+        <!-- Badge LGPD -->
+        <div class="flex items-center gap-2.5 justify-center animate-fade delay-400">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="text-slate-400 flex-shrink-0" aria-hidden="true">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <p class="text-slate-400 text-xs text-center">
+            Dados protegidos — <span class="font-medium text-slate-500">LGPD Lei 13.709/2018</span>
+          </p>
+        </div>
+
+        <!-- Versão do sistema -->
+        <p class="text-center text-slate-300 text-xs mt-6">
+          Motor Tributário v2.0 &middot; 199 testes &middot; Fase 2 Certificada
+        </p>
+
+      </div>
+    </div>
+
+  </div><!-- fim split-screen -->
+
+  <script>
+    // ===== Toggle de visibilidade da senha =====
+    const toggleBtn  = document.getElementById('togglePassword');
+    const passwordField = document.getElementById('password');
+    const eyeIcon    = document.getElementById('eyeIcon');
+
+    const eyeOpenPath  = `<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>`;
+    const eyeClosedPath = `<path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>`;
+
+    let passwordVisible = false;
+    toggleBtn.addEventListener('click', () => {
+      passwordVisible = !passwordVisible;
+      passwordField.type = passwordVisible ? 'text' : 'password';
+      eyeIcon.innerHTML  = passwordVisible ? eyeClosedPath : eyeOpenPath;
+      toggleBtn.setAttribute('aria-label', passwordVisible ? 'Ocultar senha' : 'Mostrar senha');
+    });
+
+    // ===== Validacao e submit do formulário =====
+    const form          = document.getElementById('loginForm');
+    const submitBtn     = document.getElementById('submitBtn');
+    const btnText       = document.getElementById('btnText');
+    const emailField    = document.getElementById('email');
+    const emailError    = document.getElementById('emailError');
+    const passwordError = document.getElementById('passwordError');
+    const generalError  = document.getElementById('generalError');
+
+    function clearErrors() {
+      emailError.classList.add('hidden');
+      passwordError.classList.add('hidden');
+      generalError.classList.add('hidden');
+      emailField.classList.remove('border-red-300');
+      passwordField.classList.remove('border-red-300');
+    }
+
+    function validateEmail(val) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearErrors();
+
+      const email    = emailField.value.trim();
+      const password = passwordField.value;
+      let valid      = true;
+
+      if (!validateEmail(email)) {
+        emailError.classList.remove('hidden');
+        emailField.classList.add('border-red-300');
+        emailField.focus();
+        valid = false;
+      }
+
+      if (password.length < 6) {
+        passwordError.classList.remove('hidden');
+        passwordField.classList.add('border-red-300');
+        if (valid) passwordField.focus();
+        valid = false;
+      }
+
+      if (!valid) return;
+
+      // Estado de loading
+      submitBtn.disabled = true;
+      btnText.innerHTML  = '<span class="spinner" aria-hidden="true"></span>Verificando credenciais...';
+
+      // Simula autenticação — 1.5s depois redireciona
+      await new Promise(r => setTimeout(r, 1500));
+
+      // Produção: substituir pelo fetch real da API
+      // const res = await fetch('/api/auth/login', { method: 'POST', ... });
+      // if (!res.ok) { ... }
+
+      window.location.href = 'dashboard.html';
+    });
+
+    // Limpa erros ao digitar
+    emailField.addEventListener('input', () => {
+      emailError.classList.add('hidden');
+      emailField.classList.remove('border-red-300');
+    });
+    passwordField.addEventListener('input', () => {
+      passwordError.classList.add('hidden');
+      passwordField.classList.remove('border-red-300');
+    });
+  </script>
+
+</body>
+</html>
