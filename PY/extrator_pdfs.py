@@ -47,6 +47,29 @@ except ImportError:
 logger = logging.getLogger("motor_conect.extrator")
 
 # ─────────────────────────────────────────────────────────────────────────────
+# VERSIONAMENTO DO PROMPT — rastreia qual versão extraiu os dados
+# Se o layout do e-CAC mudar, incrementar PROMPT_VERSION e registrar na trilha.
+# ─────────────────────────────────────────────────────────────────────────────
+PROMPT_VERSION: str = "v2.1-2026-03-26"
+"""
+Histórico:
+  v1.0-2026-03-20: extração mono-atividade (CANAVEZI)
+  v2.0-2026-03-26: multi-atividade + ST + ISS retido (CONFI-AR, ITANGUA)
+  v2.1-2026-03-26: RPA mensal + formato US/BR auto-detect (to_decimal)
+"""
+
+# Campos obrigatórios — motor para se ausentes
+_CAMPOS_OBRIGATORIOS: tuple[str, ...] = ("cnpj", "razao_social", "faturamento_12m", "cnae_principal")
+# Campos opcionais — fallback documentado se ausentes
+_CAMPOS_OPCIONAIS: dict[str, str] = {
+    "folha_salarios_12m": "Fator R indisponível — Anexo calculado apenas por CNAE",
+    "rpa_mensal":         "RPA ausente — usando RBT12/12 como aproximação (ERR-007, delta < 0,3%)",
+    "receita_com_st_icms": "ST não declarado — DAS calculado sem segregação ICMS-ST",
+    "das_ecac":           "DAS do e-CAC ausente — comparação delta indisponível",
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SCHEMA DE SAÍDA — O que a IA extrai dos PDFs
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -330,15 +353,28 @@ def extrair_dados_pdfs(caminhos_pdf: list[str | Path]) -> DadosExtraidosPDF:
     # Valida com Pydantic V2
     dados = DadosExtraidosPDF(**dados_brutos)
 
+    # Log estruturado de campos ausentes — com motivo e fallback documentado
     if dados.campos_nao_encontrados:
-        logger.warning(
-            "Campos nao encontrados nos PDFs: %s", ", ".join(dados.campos_nao_encontrados)
-        )
+        for campo in dados.campos_nao_encontrados:
+            if campo in _CAMPOS_OBRIGATORIOS:
+                logger.error(
+                    "CAMPO_OBRIGATORIO_AUSENTE | campo=%s | prompt_version=%s | "
+                    "motivo=ausente_no_pdf | impacto=motor_bloqueado",
+                    campo, PROMPT_VERSION,
+                )
+            else:
+                fallback_msg = _CAMPOS_OPCIONAIS.get(campo, "sem fallback documentado")
+                logger.warning(
+                    "CAMPO_OPCIONAL_AUSENTE | campo=%s | prompt_version=%s | fallback=%s",
+                    campo, PROMPT_VERSION, fallback_msg,
+                )
 
     logger.info(
-        "Extracao concluida. Empresa: %s | Confianca: %.0f%%",
+        "Extracao concluida | empresa=%s | confianca=%.0f%% | prompt=%s | campos_ausentes=%d",
         dados.razao_social,
         dados.confianca_extracao * 100,
+        PROMPT_VERSION,
+        len(dados.campos_nao_encontrados),
     )
 
     return dados
