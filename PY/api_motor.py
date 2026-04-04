@@ -426,6 +426,31 @@ def health():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# ENDPOINTS — Inferência CNAE (autenticado)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/cnae/{cnae}/perfil", tags=["infra"])
+def perfil_cnae(
+    cnae: str,
+    _current_user: dict = Depends(get_current_user),
+):
+    """
+    Retorna sugestão de perfil B2B/B2C e Anexo para o CNAE informado.
+    Usado pelo frontend para pré-preencher campos automaticamente.
+    """
+    from tabelas_simples import determinar_anexo_por_cnae_com_fonte, estimar_perfil_b2b
+    anexo, fonte = determinar_anexo_por_cnae_com_fonte(cnae)
+    pct_b2b = estimar_perfil_b2b(cnae)
+    return {
+        "cnae": cnae,
+        "anexo_sugerido": anexo,
+        "anexo_fonte": fonte,
+        "percentual_b2b_estimado": pct_b2b,
+        "perfil_sugerido": "B2B_CONTRIBUINTE" if pct_b2b >= 80 else "B2C_CONSUMIDOR_FINAL" if pct_b2b <= 20 else "MISTO",
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # ENDPOINTS — Auditoria PDF (existentes — sem auth por ora)
 # ─────────────────────────────────────────────────────────────────────────────
 

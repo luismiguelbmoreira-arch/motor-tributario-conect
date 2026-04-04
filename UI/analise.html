@@ -164,8 +164,9 @@
         <span class="tip">Código de 7 dígitos da atividade principal. Onde encontrar: Cartão CNPJ ou PGDAS-D pág. 1, campo "CNAE Principal".</span>
         <input id="cnae" type="text" maxlength="9" placeholder="0000-0/00"
           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-          oninput="maskCNAE(this); checkStep1()">
+          oninput="maskCNAE(this); checkStep1()" onblur="sugerirPerfilCNAE()">
         <p id="cnae-err" class="msg-error hidden">CNAE deve ter 7 dígitos.</p>
+        <p id="cnae-sugestao" class="hidden text-xs text-blue-600 mt-1"></p>
       </div>
 
       <!-- UF -->
@@ -668,6 +669,33 @@
       slider.classList.add('hidden');
     }
     checkStep3();
+  }
+
+  async function sugerirPerfilCNAE() {
+    var cnaeDigits = getCNAEDigits();
+    var sug = document.getElementById('cnae-sugestao');
+    if (cnaeDigits.length !== 7) { sug.classList.add('hidden'); return; }
+    try {
+      var res = await fetch(API_BASE + '/cnae/' + cnaeDigits + '/perfil', {
+        headers: { 'Authorization': 'Bearer ' + token },
+      });
+      if (!res.ok) return;
+      var data = await res.json();
+      // Mostrar sugestao
+      var perfilNome = data.perfil_sugerido === 'MISTO' ? 'Misto (' + data.percentual_b2b_estimado + '% B2B)'
+        : data.perfil_sugerido === 'B2B_CONTRIBUINTE' ? 'B2B (' + data.percentual_b2b_estimado + '%)'
+        : 'B2C (' + (100 - data.percentual_b2b_estimado) + '%)';
+      sug.textContent = 'Sugestao: Anexo ' + data.anexo_sugerido + ' (' + data.anexo_fonte.toLowerCase() + ') | Perfil ' + perfilNome;
+      sug.classList.remove('hidden');
+      // Auto-preencher perfil se usuario ainda nao escolheu
+      if (!tipoCompradorSelecionado) {
+        setTipoComprador(data.perfil_sugerido);
+        if (data.perfil_sugerido === 'MISTO') {
+          document.getElementById('percentual_b2b').value = data.percentual_b2b_estimado;
+          updateMistoLabels(data.percentual_b2b_estimado);
+        }
+      }
+    } catch (e) { /* silencioso */ }
   }
 
   function updateMistoLabels(val) {

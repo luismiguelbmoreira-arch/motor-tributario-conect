@@ -35,6 +35,7 @@ from tabelas_simples import (
     CNAE_PREFIXO_PARA_ANEXO,
     determinar_anexo_por_cnae,
     determinar_anexo_por_cnae_com_fonte,
+    estimar_perfil_b2b,
     TETO_SIMPLES_NACIONAL,
     SUBLIMITE_ICMS_ISS,
     ALERTA_90_PERCENT_TETO,
