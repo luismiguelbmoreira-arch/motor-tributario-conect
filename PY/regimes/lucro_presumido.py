@@ -49,9 +49,14 @@ PRESUNCAO_IRPJ_CSLL: Dict[str, tuple] = {
     # Lei 9.249/1995, Art. 15, III: presunção IRPJ = 8% para serviços hospitalares
     # (tratamento igual ao comércio; exceção ao 32% geral para serviços de saúde)
     "86": (Decimal("0.08"), Decimal("0.12")),  # Atividades de atenção à saúde humana
-    # Transporte de cargas (CNAE 49xx — somente cargas, não passageiros)
-    # Lei 9.249/1995, Art. 15, II: presunção IRPJ = 8%; passageiros = 16% (não implementado)
-    "49": (Decimal("0.08"), Decimal("0.12")),  # Transporte terrestre (carga)
+    # Transporte de PASSAGEIROS — presunção 16% (Lei 9.249/1995, Art. 15, §1º, III, "a")
+    # RIR/2018, Art. 592, III — serviços de transporte que NÃO sejam de carga
+    "4921": (Decimal("0.16"), Decimal("0.12")),  # Transporte municipal passageiros
+    "4922": (Decimal("0.16"), Decimal("0.12")),  # Transporte intermunicipal passageiros
+    "4929": (Decimal("0.16"), Decimal("0.12")),  # Transporte outros passageiros
+    "4930": (Decimal("0.16"), Decimal("0.12")),  # Transporte rodoviário passageiros
+    # Transporte de CARGAS — presunção 8% (Lei 9.249/1995, Art. 15, §1º, III)
+    "49": (Decimal("0.08"), Decimal("0.12")),    # Transporte terrestre (carga — fallback)
     # Demais serviços — regra geral residual
     # Lei 9.249/1995, Art. 15, caput + §1º: presunção IRPJ = 32%; CSLL = 32%
     # Inclui: consultoria, TI, serviços profissionais, publicidade, educação privada, etc.
@@ -82,8 +87,11 @@ class LucroPresumidoEngine(BaseRegimeEngine):
         Lei 9.249/1995, Art. 15.
         """
         cnae = getattr(self.fornecedora, "cnae_principal", "") or ""
+        prefixo4 = cnae[:4]  # Busca 4 dígitos primeiro (ex: 4921 = passageiros 16%)
         prefixo = cnae[:2]
 
+        if prefixo4 in PRESUNCAO_IRPJ_CSLL:
+            return PRESUNCAO_IRPJ_CSLL[prefixo4]
         if prefixo in PRESUNCAO_IRPJ_CSLL:
             return PRESUNCAO_IRPJ_CSLL[prefixo]
 
