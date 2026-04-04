@@ -368,17 +368,26 @@ def determinar_anexo_por_cnae(cnae_7_digitos: str) -> str:
     Motor de Busca Inteligente de Anexo por CNAE.
     Prioridade: 1. Mapa de 7 dígitos | 2. Prefixo de 2 dígitos | 3. Fallback Anexo III
     """
+    anexo, _ = determinar_anexo_por_cnae_com_fonte(cnae_7_digitos)
+    return anexo
+
+
+def determinar_anexo_por_cnae_com_fonte(cnae_7_digitos: str) -> tuple:
+    """
+    Retorna (anexo, fonte) onde fonte é "EXPLICITO", "PREFIXO" ou "FALLBACK".
+    Usado pela trilha de auditoria para transparência ERR-005.
+    """
     # 1. Busca exata (7 dígitos)
     if cnae_7_digitos in CNAE_PARA_ANEXO:
-        return CNAE_PARA_ANEXO[cnae_7_digitos]
-    
+        return CNAE_PARA_ANEXO[cnae_7_digitos], "EXPLICITO"
+
     # 2. Busca por prefixo (Primeiros 2 dígitos)
     prefixo = cnae_7_digitos[:2]
     if prefixo in CNAE_PREFIXO_PARA_ANEXO:
-        return CNAE_PREFIXO_PARA_ANEXO[prefixo]
-    
+        return CNAE_PREFIXO_PARA_ANEXO[prefixo], "PREFIXO"
+
     # 3. Fallback (Serviços gerais conforme LC 123/2006)
-    return "III"
+    return "III", "FALLBACK"
 
 
 def obter_faixa_numero(rbt12: Decimal, anexo: str) -> int:

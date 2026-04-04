@@ -34,6 +34,7 @@ from tabelas_simples import (
     CNAE_PARA_ANEXO,
     CNAE_PREFIXO_PARA_ANEXO,
     determinar_anexo_por_cnae,
+    determinar_anexo_por_cnae_com_fonte,
     TETO_SIMPLES_NACIONAL,
     SUBLIMITE_ICMS_ISS,
     ALERTA_90_PERCENT_TETO,
@@ -216,6 +217,21 @@ class OperacaoFiscal(BaseModel):
             "Quando informado, usado como base do DAS em vez de RBT12/12. "
             "Obrigatório para auditoria e-CAC com precisão ≤ R$5,00. "
             "LC 123/2006, Art. 18, §1º — DAS calculado sobre RPA do mês."
+        )
+    )
+    lucro_real_mensal: Optional[Decimal] = Field(
+        default=None, ge=Decimal("0"),
+        description=(
+            "Lucro Real apurado no mês (R$). Usado pelo LucroRealEngine. "
+            "Se None, usa receita mensal como proxy conservador. "
+            "RIR/2018, Art. 228."
+        )
+    )
+    creditos_pis_cofins: Decimal = Field(
+        default=Decimal("0"), ge=Decimal("0"),
+        description=(
+            "Créditos PIS/COFINS não-cumulativo (R$). "
+            "Lei 10.637/2002 (PIS) + Lei 10.833/2003 (COFINS)."
         )
     )
 
@@ -424,18 +440,28 @@ class MotorReformaTributaria:
             return "III"
 
         cnae = self.fornecedora.cnae_principal
-        anexo = determinar_anexo_por_cnae(cnae)
+        anexo, fonte_cnae = determinar_anexo_por_cnae_com_fonte(cnae)
+        detalhe_fonte = {
+            "EXPLICITO": f"CNAE {cnae} mapeado para Anexo {anexo} (correspondência exata na tabela CGSN).",
+            "PREFIXO": f"CNAE {cnae} mapeado por prefixo '{cnae[:2]}' para Anexo {anexo}. Verifique se a atividade confere.",
+            "FALLBACK": (
+                f"CNAE {cnae} não encontrado na tabela — Anexo III assumido como fallback seguro. "
+                f"ERR-005: mapeamento CNAE incompleto. Confirme o Anexo correto com o contador."
+            ),
+        }
         self._registrar_passo(
             id="DECISAO_ANEXO",
-            titulo=f"Anexo Simples Nacional: {anexo} (por CNAE {cnae})",
+            titulo=f"Anexo Simples Nacional: {anexo} (por CNAE {cnae} — fonte: {fonte_cnae})",
             base=f"CNAE {cnae}",
             deducoes="N/A",
             aliquota="N/A",
             valor=anexo,
             lei="LC 123/2006, Art. 18, §§ 1º e 24 | Res. CGSN 140/2018",
-            detalhe=f"CNAE {cnae} mapeado para Anexo {anexo} conforme tabela CGSN.",
+            detalhe=detalhe_fonte[fonte_cnae],
             vigente_desde="01/01/2018 (Res. CGSN 140/2018)",
         )
+        # Guardar fonte para uso em alertas
+        self._cnae_fonte = fonte_cnae
         return anexo
 
     def _buscar_faixa(self, rbt12: Decimal, anexo: str):
@@ -963,14 +989,123 @@ class MotorReformaTributaria:
                 ),
             })
 
+        # MEDIO: CNAE mapeado por fallback (ERR-005)
+        cnae_fonte = getattr(self, "_cnae_fonte", None)
+        if cnae_fonte == "FALLBACK":
+            alertas.append({
+                "nivel": "MEDIO",
+                "codigo": "CNAE_FALLBACK_ERR005",
+                "mensagem": (
+                    f"CNAE {self.fornecedora.cnae_principal} não encontrado na tabela de mapeamento. "
+                    f"Anexo III foi assumido como fallback seguro. "
+                    f"Confirme o Anexo correto com o contador responsável antes de tomar decisões."
+                ),
+            })
+        elif cnae_fonte == "PREFIXO":
+            alertas.append({
+                "nivel": "INFO",
+                "codigo": "CNAE_PREFIXO",
+                "mensagem": (
+                    f"CNAE {self.fornecedora.cnae_principal} mapeado por prefixo (grupo '{self.fornecedora.cnae_principal[:2]}'). "
+                    f"Verifique se o Anexo corresponde à atividade principal da empresa."
+                ),
+            })
+
         return alertas
+
+    def _diagnostico_lucro_real(self) -> Dict[str, Any]:
+        """Diagnóstico para regime Lucro Real via LucroRealEngine."""
+        engine = self._engine_regime
+        receita_mensal = self.operacao.rpa_mensal or (self.fornecedora.faturamento_12m / 12)
+        lucro = self.operacao.lucro_real_mensal or receita_mensal
+        creditos = self.operacao.creditos_pis_cofins
+
+        resultado = engine.calcular_carga_total_mensal(
+            receita_mensal=receita_mensal,
+            lucro_real_mensal=lucro,
+            creditos_pis_cofins=creditos,
+        )
+
+        # Registrar na trilha se usou proxy
+        if self.operacao.lucro_real_mensal is None:
+            self.trilha_auditoria.append({
+                "tipo": "ALERTA_PROXY",
+                "id": "PROXY_LUCRO_REAL",
+                "titulo": "Lucro Real não informado — usando receita mensal como proxy",
+                "amparo_legal": "RIR/2018, Art. 228",
+                "detalhe": f"lucro_real_mensal=None → proxy={receita_mensal}. Resultado conservador.",
+                "timestamp": str(datetime.now()),
+            })
+
+        aliquotas_iva = self.get_aliquotas_iva_por_ano()
+        cronograma_iva_lista = [
+            {"ano": ano, "cbs": str(vals["CBS"]), "ibs": str(vals["IBS"]),
+             "total": str(vals["CBS"] + vals["IBS"])}
+            for ano, vals in sorted(CRONOGRAMA_IVA.items())
+        ]
+
+        return {
+            "versao_schema": "1.0",
+            "versao_lei": "RIR_2018_LC214_2025",
+            "data_analise": str(date.today()),
+            "ano_operacao": self.operacao.data_emissao.year,
+            "empresa": {
+                "regime": "REAL",
+                "cnae": self.fornecedora.cnae_principal,
+                "uf": self.fornecedora.uf_origem,
+                "anexo_simples": None,
+                "rbt12": str(self.fornecedora.faturamento_12m),
+                "fator_r": None,
+                "razao_social": self.fornecedora.razao_social,
+            },
+            "comprador": {
+                "tipo": self.compradora.tipo,
+                "uf_destino": self.compradora.uf_destino,
+                "exige_credito_iva": self.compradora.tipo == "B2B_CONTRIBUINTE",
+            },
+            "operacao": {
+                "valor": str(self.operacao.valor_operacao),
+                "ncm": self.operacao.ncm_nbs,
+                "forma_recebimento": self.operacao.forma_recebimento,
+            },
+            "aliquotas": {
+                "efetiva_das_total": str(resultado["aliquota_efetiva"]),
+                "efetiva_percentual": f"{resultado['aliquota_efetiva'] * 100:.4f}%",
+                "total_mensal": str(resultado["total_mensal"]),
+                "cbs_vigente_ano": str(aliquotas_iva["CBS"]),
+                "ibs_vigente_ano": str(aliquotas_iva["IBS"]),
+            },
+            "breakdown_regime": {k: str(v) for k, v in resultado["breakdown"].items()},
+            "cenarios": {},
+            "split_payment": self.calcular_split_payment_impacto(),
+            "cronograma_iva": cronograma_iva_lista,
+            "alertas": self._gerar_alertas(),
+            "trilha_auditoria": self.trilha_auditoria,
+            "meta": {
+                "elaborado_por": "Escritório Conect — Motor Tributário v1.0",
+                "legislacao_base": ["RIR/2018", "Lei 7.689/1988", "Lei 10.637/2002", "Lei 10.833/2003", "LC 214/2025"],
+                "validar_com_profissional": True,
+                "aviso": (
+                    "Este diagnóstico é de natureza informativa. "
+                    "Decisões tributárias devem ser validadas por contador responsável (CRC-SP)."
+                ),
+            },
+        }
 
     def gerar_diagnostico(self) -> Dict[str, Any]:
         """
         Diagnóstico completo em JSON estruturado.
         Integra Fases 2, 3, 4 e 5 num único payload tipificado.
+        Condiciona output por regime: Simples usa cálculos internos, Lucro Real usa engine.
         LGPD: purge() é chamado automaticamente após geração.
         """
+        # Lucro Real: delega ao engine dedicado
+        if self.fornecedora.regime == "REAL":
+            diagnostico = self._diagnostico_lucro_real()
+            self._diagnostico_gerado = True
+            self.purge()
+            return diagnostico
+
         rbt12 = self.calcular_rbt12()
         anexo = self.determinar_anexo()
         aliquota_efetiva = self.calcular_aliquota_efetiva()

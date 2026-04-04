@@ -188,7 +188,31 @@
       </section>
 
       <!-- SEÇÃO 4: CENÁRIOS COMPARATIVOS -->
-      <section aria-labelledby="sec-cenarios-titulo" class="fade-in">
+      <!-- SEÇÃO: BREAKDOWN REGIME (Lucro Real / Presumido) -->
+      <section id="sec-breakdown" aria-labelledby="sec-breakdown-titulo" class="fade-in hidden">
+        <h2 id="sec-breakdown-titulo" class="text-xl font-semibold text-slate-900 mb-4">Composição Tributária</h2>
+        <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm" aria-label="Breakdown de tributos por regime">
+              <thead>
+                <tr class="border-b border-slate-200">
+                  <th scope="col" class="text-left py-2 pr-4 font-semibold text-slate-700">Tributo</th>
+                  <th scope="col" class="text-right py-2 pl-4 font-semibold text-slate-700">Valor Mensal</th>
+                </tr>
+              </thead>
+              <tbody id="breakdown-body" class="divide-y divide-slate-100"></tbody>
+              <tfoot>
+                <tr class="border-t-2 border-slate-300">
+                  <td class="py-2 pr-4 font-bold text-slate-900">Total Mensal</td>
+                  <td class="py-2 pl-4 text-right font-bold text-slate-900" id="breakdown-total">--</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="sec-cenarios" aria-labelledby="sec-cenarios-titulo" class="fade-in">
         <h2 id="sec-cenarios-titulo" class="text-xl font-semibold text-slate-900 mb-4">Comparativo de Cenários</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
@@ -400,6 +424,7 @@
       // Seções
       renderAlertas(d.alertas || []);
       renderCronogramaIVA(d.cronograma_iva || []);
+      renderBreakdownRegime(d.breakdown_regime, d.aliquotas);
       renderCenarios(d.cenarios || {});
       renderServicos(d.alertas || [], d.cenarios || {});
       renderTrilhaAuditoria(d.trilha_auditoria || []);
@@ -586,15 +611,55 @@
     // ─────────────────────────────────────────────
     // CENÁRIOS
     // ─────────────────────────────────────────────
+    // ─────────────────────────────────────────────
+    // BREAKDOWN REGIME (Lucro Real / Presumido)
+    // ─────────────────────────────────────────────
+    function renderBreakdownRegime(breakdown, aliquotas) {
+      if (!breakdown || Object.keys(breakdown).length === 0) return;
+
+      showElement('sec-breakdown');
+      const tbody = document.getElementById('breakdown-body');
+      tbody.innerHTML = '';
+
+      const labels = {
+        'IRPJ': 'IRPJ (15%)', 'IRPJ_ADICIONAL': 'IRPJ Adicional (10%)',
+        'CSLL': 'CSLL (9%)', 'PIS': 'PIS (1,65%)', 'COFINS': 'COFINS (7,60%)',
+        'PIS_LIQUIDO': 'PIS Líquido', 'COFINS_LIQUIDO': 'COFINS Líquido',
+        'PIS_BRUTO': 'PIS Bruto', 'COFINS_BRUTO': 'COFINS Bruto',
+        'CREDITOS': 'Créditos PIS/COFINS',
+      };
+
+      Object.entries(breakdown).forEach(function (entry) {
+        var key = entry[0], val = entry[1];
+        var label = labels[key] || key;
+        var isCredit = key === 'CREDITOS';
+        var tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition-colors';
+        tr.innerHTML =
+          '<td class="py-2.5 pr-4 text-slate-700">' + sanitize(label) + '</td>' +
+          '<td class="py-2.5 pl-4 text-right font-medium ' +
+          (isCredit ? 'text-emerald-700' : 'text-slate-900') + '">' +
+          (isCredit ? '- ' : '') + formatBRL(val) + '</td>';
+        tbody.appendChild(tr);
+      });
+
+      var total = aliquotas && aliquotas.total_mensal ? aliquotas.total_mensal : null;
+      document.getElementById('breakdown-total').textContent = total ? formatBRL(total) : '--';
+    }
+
     function renderCenarios(cenarios) {
+      // Lucro Real e outros regimes sem cenários Simples: esconder seção
+      if (!cenarios || !cenarios.simples_puro) {
+        hideElement('sec-cenarios');
+        return;
+      }
+
       const simples = cenarios.simples_puro || {};
       const optout = cenarios.opt_out || {};
 
-      // custo_das_por_operacao é por operação; custo_total inclui IVA por fora
       document.getElementById('cen-simples-carga').textContent = formatBRL(simples.custo_das_por_operacao);
       document.getElementById('cen-optout-carga').textContent = formatBRL(optout.custo_total);
 
-      // disparidade_anual_estimada: positivo = opt-out custa mais (IVA por fora)
       const disparidade = parseFloat(cenarios.disparidade_anual_estimada || 0);
       if (disparidade !== 0) {
         showElement('cen-economia-badge');

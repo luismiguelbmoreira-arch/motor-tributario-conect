@@ -123,7 +123,7 @@
         <label class="block text-sm font-medium text-slate-700 mb-1">
           CNPJ <span class="text-red-500">*</span>
         </label>
-        <span class="tip">14 dígitos (validação Módulo 11 obrigatória). Informe somente números ou com pontuação.</span>
+        <span class="tip">14 dígitos (validação Módulo 11). Onde encontrar: Cartão CNPJ em consulta.receita.fazenda.gov.br ou no Certificado Digital.</span>
         <input id="cnpj" type="text" maxlength="18" placeholder="00.000.000/0000-00"
           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
           oninput="maskCNPJ(this)" onblur="validateCNPJ()">
@@ -147,7 +147,7 @@
           Regime Tributário <span class="text-red-500">*</span>
         </label>
         <span class="tip">Simples Nacional: faturamento anual ≤ R$4,8M. Lucro Presumido: presunção de lucro por setor. MEI: faturamento ≤ R$81k/ano.</span>
-        <select id="regime" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" onchange="checkStep1()">
+        <select id="regime" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" onchange="adaptFormToRegime(); checkStep1()">
           <option value="">Selecione o regime</option>
           <option value="SIMPLES">Simples Nacional</option>
           <option value="PRESUMIDO">Lucro Presumido</option>
@@ -161,7 +161,7 @@
         <label class="block text-sm font-medium text-slate-700 mb-1">
           CNAE Principal <span class="text-red-500">*</span>
         </label>
-        <span class="tip">Código de 7 dígitos da atividade principal (ex: 6201-5/01). Usado para determinar o Anexo do Simples e o Fator R.</span>
+        <span class="tip">Código de 7 dígitos da atividade principal. Onde encontrar: Cartão CNPJ ou PGDAS-D pág. 1, campo "CNAE Principal".</span>
         <input id="cnae" type="text" maxlength="9" placeholder="0000-0/00"
           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
           oninput="maskCNAE(this); checkStep1()">
@@ -185,6 +185,23 @@
         </select>
       </div>
 
+      <!-- Categoria MEI (visível apenas quando regime == MEI) -->
+      <div id="mei-categoria-section" class="hidden">
+        <div class="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
+          <p class="text-xs text-amber-800">MEI tem DAS fixo por categoria. Teto anual: R$ 81.000 (LC 123/2006, Art. 18-A).</p>
+        </div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          Categoria MEI <span class="text-red-500">*</span>
+        </label>
+        <select id="categoria_mei" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" onchange="checkStep1()">
+          <option value="">Selecione a categoria</option>
+          <option value="COMERCIO">Comércio</option>
+          <option value="INDUSTRIA">Indústria</option>
+          <option value="SERVICOS">Serviços</option>
+          <option value="COMERCIO_SERVICOS">Comércio e Serviços</option>
+        </select>
+      </div>
+
       <div class="flex justify-end pt-2">
         <button id="btn-next-1" class="btn-primary" onclick="goStep(2)" disabled>
           Próximo — Faturamento →
@@ -201,7 +218,7 @@
         <label class="block text-sm font-medium text-slate-700 mb-1">
           Receita Bruta 12 meses (RBT12) <span class="text-red-500">*</span>
         </label>
-        <span class="tip">RBT12: soma das receitas brutas dos últimos 12 meses. Máximo R$4.800.000 para o Simples Nacional (LC 123/2006, Art. 3º, II).</span>
+        <span class="tip">RBT12: soma das receitas brutas dos últimos 12 meses. Onde encontrar: PGDAS-D Extrato → campo "Receita Bruta Acumulada nos 12 meses anteriores". Máximo R$4.800.000 (LC 123/2006, Art. 3º, II).</span>
         <div class="relative">
           <span class="absolute left-3 top-2.5 text-slate-400 text-sm">R$</span>
           <input id="rbt12" type="text" placeholder="0,00"
@@ -217,7 +234,7 @@
           Folha de Salários 12 meses
           <span class="text-xs text-slate-400 font-normal ml-1">(opcional)</span>
         </label>
-        <span class="tip">Fator R = Folha 12m ÷ RBT12. Se ≥ 28%, empresa do Anexo III pode migrar para Anexo V com alíquota menor (LC 123/2006, Art. 18, §24). Informe para cálculo preciso.</span>
+        <span class="tip">Fator R = Folha 12m ÷ RBT12. Se ≥ 28%, pode migrar Anexo. Onde encontrar: PGDAS-D pág. 2, "Folha de Salários do Período" — some os 12 meses. Inclui pró-labore, CLT e encargos.</span>
         <div class="relative">
           <span class="absolute left-3 top-2.5 text-slate-400 text-sm">R$</span>
           <input id="folha12m" type="text" placeholder="0,00 (deixe vazio se não souber)"
@@ -232,7 +249,7 @@
           Receita do mês de referência (RPA)
           <span class="text-xs text-slate-400 font-normal ml-1">(opcional)</span>
         </label>
-        <span class="tip">Receita do mês específico da operação. Se não informado, o motor usará RBT12 ÷ 12 como aproximação (pode variar ±30% em atividades sazonais).</span>
+        <span class="tip">Receita do mês da operação. Onde encontrar: PGDAS-D Extrato do mês, campo "Receita Bruta do Período de Apuração". Se não informado, usa RBT12÷12 (impreciso para sazonais).</span>
         <div class="relative">
           <span class="absolute left-3 top-2.5 text-slate-400 text-sm">R$</span>
           <input id="rpa_mensal" type="text" placeholder="0,00 (deixe vazio para usar média)"
@@ -253,6 +270,39 @@
           <input id="receita_st" type="text" placeholder="0,00 (deixe vazio se não houver)"
             class="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm"
             oninput="maskMoeda(this,'receita_st')">
+        </div>
+      </div>
+
+      <!-- Campos Lucro Real (visíveis apenas quando regime == REAL) -->
+      <div id="real-fields-section" class="hidden space-y-5">
+        <div class="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3">
+          <p class="text-xs text-indigo-800">Lucro Real: tributos calculados sobre o lucro apurado (IRPJ 15%+10%, CSLL 9%, PIS 1,65%, COFINS 7,6%).</p>
+        </div>
+        <div class="field-tooltip">
+          <label class="block text-sm font-medium text-slate-700 mb-1">
+            Lucro Real Mensal Apurado
+            <span class="text-xs text-slate-400 font-normal ml-1">(opcional — se vazio, usa receita mensal)</span>
+          </label>
+          <span class="tip">Lucro Real do mês após ajustes (adições e exclusões). Onde encontrar: LALUR Parte A ou balancete contábil do mês. Se não informado, usa receita mensal como proxy conservador.</span>
+          <div class="relative">
+            <span class="absolute left-3 top-2.5 text-slate-400 text-sm">R$</span>
+            <input id="lucro_real_mensal" type="text" placeholder="0,00 (deixe vazio para proxy)"
+              class="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm"
+              oninput="maskMoeda(this,'lucro_real_mensal')">
+          </div>
+        </div>
+        <div class="field-tooltip">
+          <label class="block text-sm font-medium text-slate-700 mb-1">
+            Créditos PIS/COFINS
+            <span class="text-xs text-slate-400 font-normal ml-1">(opcional)</span>
+          </label>
+          <span class="tip">Créditos de PIS/COFINS não-cumulativo apurados no mês. Onde encontrar: EFD-Contribuições ou apuração mensal. Reduzem o PIS/COFINS a pagar.</span>
+          <div class="relative">
+            <span class="absolute left-3 top-2.5 text-slate-400 text-sm">R$</span>
+            <input id="creditos_pis_cofins" type="text" placeholder="0,00"
+              class="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm"
+              oninput="maskMoeda(this,'creditos_pis_cofins')">
+          </div>
         </div>
       </div>
 
@@ -315,6 +365,23 @@
           <option value="PIX_BOLETO">Pix / Boleto</option>
           <option value="CARTAO">Cartão (débito/crédito)</option>
           <option value="DINHEIRO">Dinheiro / Cheque</option>
+        </select>
+      </div>
+
+      <!-- UF Destino -->
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          UF do Comprador / Destino <span class="text-red-500">*</span>
+        </label>
+        <select id="uf_destino" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" onchange="checkStep3()">
+          <option value="">Mesmo estado (intra-estadual)</option>
+          <option>AC</option><option>AL</option><option>AP</option><option>AM</option>
+          <option>BA</option><option>CE</option><option>DF</option><option>ES</option>
+          <option>GO</option><option>MA</option><option>MT</option><option>MS</option>
+          <option>MG</option><option>PA</option><option>PB</option><option>PR</option>
+          <option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
+          <option>RS</option><option>RO</option><option>RR</option><option>SC</option>
+          <option selected>SP</option><option>SE</option><option>TO</option>
         </select>
       </div>
 
@@ -393,6 +460,37 @@
   // ── Auth guard ──
   const token = sessionStorage.getItem('token');
   if (!token) { window.location.href = 'login.html'; }
+
+  // ── Adaptação por regime ──
+  function adaptFormToRegime() {
+    const regime = document.getElementById('regime').value;
+    const meiSection = document.getElementById('mei-categoria-section');
+    const realSection = document.getElementById('real-fields-section');
+    const step2 = document.getElementById('step-2');
+    const step2Title = step2.querySelector('h2');
+
+    // Reset: mostrar tudo
+    meiSection.classList.add('hidden');
+    realSection.classList.add('hidden');
+    step2Title.textContent = 'Faturamento e Folha';
+
+    // Mostrar/esconder campos dos steps 1-2 baseado no regime
+    const folhaFields = document.querySelectorAll('#folha12m, #rpa_mensal, #receita_st');
+    folhaFields.forEach(f => f.closest('.field-tooltip').classList.remove('hidden'));
+
+    if (regime === 'MEI') {
+      meiSection.classList.remove('hidden');
+      // MEI: esconder folha, RPA, ST (irrelevantes)
+      folhaFields.forEach(f => {
+        f.value = '';
+        f.closest('.field-tooltip').classList.add('hidden');
+      });
+      step2Title.textContent = 'Faturamento MEI';
+    } else if (regime === 'REAL') {
+      realSection.classList.remove('hidden');
+      step2Title.textContent = 'Faturamento e Lucro Real';
+    }
+  }
 
   // ── Máscaras ──
   function maskCNPJ(el) {
@@ -484,10 +582,13 @@
     const cnpjRaw = document.getElementById('cnpj').value.replace(/\D/g, '');
     const cnpjOk = cnpjRaw.length === 14 && !/^(\d)\1+$/.test(cnpjRaw) && calcCNPJDig(cnpjRaw);
     const rsOk   = document.getElementById('razao_social').value.trim().length >= 3;
-    const regOk  = document.getElementById('regime').value !== '';
+    const regime = document.getElementById('regime').value;
+    const regOk  = regime !== '';
     const cnaeOk = getCNAEDigits().length === 7;
     const ufOk   = document.getElementById('uf').value !== '';
-    document.getElementById('btn-next-1').disabled = !(cnpjOk && rsOk && regOk && cnaeOk && ufOk);
+    // MEI exige categoria
+    const meiOk  = regime !== 'MEI' || document.getElementById('categoria_mei').value !== '';
+    document.getElementById('btn-next-1').disabled = !(cnpjOk && rsOk && regOk && cnaeOk && ufOk && meiOk);
   }
 
   function checkStep2() {
@@ -584,6 +685,10 @@
     const st         = parseMoneyField('receita_st');
     const valor      = parseMoneyField('valor_operacao');
 
+    const lucroReal  = parseMoneyField('lucro_real_mensal');
+    const creditosPc = parseMoneyField('creditos_pis_cofins');
+    const ufDest     = document.getElementById('uf_destino').value || document.getElementById('uf').value;
+
     // Payload flat — espelha AnaliseManualRequest do backend
     const payload = {
       // EmpresaFornecedora
@@ -592,7 +697,7 @@
       regime:            document.getElementById('regime').value,
       cnae_principal:    cnaeDigits,
       uf_origem:         document.getElementById('uf').value,
-      uf_destino:        document.getElementById('uf').value,
+      uf_destino:        ufDest,
       faturamento_12m:   rbt12,
       folha_salarios_12m: folha12m,
       // EmpresaCompradora
@@ -603,6 +708,11 @@
       rpa_mensal:        rpa,
       tinha_st_icms:     st !== null && st > 0,
       forma_recebimento: document.getElementById('forma_recebimento').value,
+      // MEI
+      categoria_mei:     document.getElementById('categoria_mei').value || null,
+      // Lucro Real
+      lucro_real_mensal: lucroReal,
+      creditos_pis_cofins: creditosPc || 0,
     };
 
     try {

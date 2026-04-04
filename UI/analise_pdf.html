@@ -117,28 +117,34 @@
     <!-- INFORMAÇÃO CONTEXTUAL -->
     <div class="fade-in bg-white border border-slate-200 rounded-2xl shadow-lg px-5 py-4">
       <p class="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Documentos aceitos</p>
-      <ul class="text-sm text-slate-600 space-y-1" aria-label="Lista de documentos aceitos">
-        <li class="flex items-center gap-2">
-          <span class="w-1.5 h-1.5 rounded-full bg-slate-400 flex-shrink-0" aria-hidden="true"></span>
-          Declaração SIMEI
+      <ul class="text-sm text-slate-600 space-y-2" aria-label="Lista de documentos aceitos">
+        <li class="flex items-start gap-2">
+          <span class="w-5 h-5 rounded bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+          <div><strong>PGDAS-D Extrato</strong> <span class="text-xs text-emerald-600 font-semibold">(obrigatório)</span><br>
+          <span class="text-xs text-slate-500">e-CAC → Simples Nacional → PGDAS-D → Extrato. Contém RBT12, CNAE, receitas.</span></div>
         </li>
-        <li class="flex items-center gap-2">
-          <span class="w-1.5 h-1.5 rounded-full bg-slate-400 flex-shrink-0" aria-hidden="true"></span>
-          DAS e-CAC (guias mensais)
+        <li class="flex items-start gap-2">
+          <span class="w-5 h-5 rounded bg-slate-100 text-slate-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+          <div><strong>Cartão CNPJ</strong> <span class="text-xs text-slate-400">(recomendado)</span><br>
+          <span class="text-xs text-slate-500">Consulta CNPJ em servicos.receita.fazenda.gov.br. Valida razão social e CNAE principal.</span></div>
         </li>
-        <li class="flex items-center gap-2">
-          <span class="w-1.5 h-1.5 rounded-full bg-slate-400 flex-shrink-0" aria-hidden="true"></span>
-          PGDAS-D (Declaração Anual)
+        <li class="flex items-start gap-2">
+          <span class="w-5 h-5 rounded bg-slate-100 text-slate-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+          <div><strong>DAS — Documento de Arrecadação</strong> <span class="text-xs text-slate-400">(para comparação)</span><br>
+          <span class="text-xs text-slate-500">Comprovante do DAS pago no mês. Permite comparar valor calculado vs valor pago.</span></div>
         </li>
-        <li class="flex items-center gap-2">
-          <span class="w-1.5 h-1.5 rounded-full bg-slate-400 flex-shrink-0" aria-hidden="true"></span>
-          Comprovantes mensais de receita
+        <li class="flex items-start gap-2">
+          <span class="w-5 h-5 rounded bg-slate-100 text-slate-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
+          <div><strong>Declaração Mensal PGDAS-D</strong> <span class="text-xs text-slate-400">(se disponível)</span><br>
+          <span class="text-xs text-slate-500">Declaração completa com breakdown por tributo (IRPJ, CSLL, PIS, COFINS, CPP, ICMS, ISS).</span></div>
         </li>
       </ul>
-      <p class="text-xs text-slate-500 mt-3 pt-3 border-t border-slate-200">
-        Os dados são processados via Claude Vision API e não são armazenados permanentemente.
-        Máximo de 10 arquivos por envio, 50 MB por arquivo.
-      </p>
+      <div class="mt-3 pt-3 border-t border-slate-200 flex items-center gap-3">
+        <div class="bg-slate-100 rounded px-2 py-1 text-xs font-mono text-slate-600">.PDF</div>
+        <p class="text-xs text-slate-500">
+          Formato: apenas PDF. Máximo 10 arquivos, 50 MB cada. Dados processados via IA, sem armazenamento permanente.
+        </p>
+      </div>
     </div>
 
     <!-- ÁREA DE DRAG AND DROP -->

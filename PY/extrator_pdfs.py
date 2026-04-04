@@ -653,6 +653,58 @@ def processar_pdfs_bytes(conteudos: list[bytes]) -> dict:
     )
     diagnostico = motor.gerar_diagnostico()
 
+    # ── Validação cruzada: DAS calculado vs DAS e-CAC ──────────────────────
+    validacao_cruzada = []
+    das_ecac = auditoria_params.get("das_ecac")
+    das_calculado_str = diagnostico.get("aliquotas", {}).get("efetiva_das_total")
+
+    if das_ecac and das_calculado_str:
+        rpa_val = auditoria_params.get("rpa") or fornecedora.faturamento_12m / 12
+        das_calculado = Decimal(das_calculado_str) * rpa_val
+        delta = abs(das_calculado - das_ecac)
+        pct_delta = (delta / das_ecac * 100) if das_ecac > 0 else Decimal("0")
+
+        validacao_cruzada.append({
+            "tipo": "DAS_CALCULADO_VS_ECAC",
+            "das_calculado": str(das_calculado.quantize(Decimal("0.01"), ROUND_HALF_UP)),
+            "das_ecac": str(das_ecac),
+            "delta": str(delta.quantize(Decimal("0.01"), ROUND_HALF_UP)),
+            "delta_pct": str(pct_delta.quantize(Decimal("0.01"), ROUND_HALF_UP)),
+            "status": "OK" if pct_delta < 5 else "DIVERGENTE",
+        })
+
+        if pct_delta >= 5:
+            diagnostico.setdefault("alertas", []).append({
+                "nivel": "ALTO",
+                "codigo": "DELTA_DAS_DIVERGENTE",
+                "mensagem": (
+                    f"DAS calculado (R$ {das_calculado:,.2f}) difere do DAS pago no e-CAC "
+                    f"(R$ {das_ecac:,.2f}) em {pct_delta:.1f}%. "
+                    f"Possíveis causas: CNAE incorreto, Anexo divergente, ou erro na extração."
+                ),
+            })
+            logger.warning(
+                "DELTA_DAS | calculado=%s | ecac=%s | delta_pct=%s%%",
+                das_calculado, das_ecac, pct_delta,
+            )
+
+    # Validação cruzada: breakdown deve somar = DAS total
+    breakdown = auditoria_params.get("breakdown", {})
+    if breakdown and das_ecac:
+        soma_breakdown = sum(
+            Decimal(str(v)).quantize(Decimal("0.01"), ROUND_HALF_UP)
+            for v in breakdown.values() if v and str(v) not in ("0", "0.00", "")
+        )
+        if soma_breakdown > 0:
+            delta_bd = abs(soma_breakdown - das_ecac)
+            validacao_cruzada.append({
+                "tipo": "BREAKDOWN_VS_DAS_TOTAL",
+                "soma_breakdown": str(soma_breakdown),
+                "das_ecac": str(das_ecac),
+                "delta": str(delta_bd.quantize(Decimal("0.01"), ROUND_HALF_UP)),
+                "status": "OK" if delta_bd < Decimal("1.00") else "DIVERGENTE",
+            })
+
     # Injeta metadados da extração no diagnóstico
     diagnostico["_extracao"] = {
         "confianca": dados.confianca_extracao,
@@ -660,8 +712,9 @@ def processar_pdfs_bytes(conteudos: list[bytes]) -> dict:
         "observacoes": dados.observacoes,
         "prompt_version": PROMPT_VERSION,
         "layout_ecac": VERSAO_LAYOUT_ECAC,
-        "das_ecac_referencia": str(auditoria_params.get("das_ecac") or ""),
+        "das_ecac_referencia": str(das_ecac or ""),
         "competencia": competencia,
+        "validacao_cruzada": validacao_cruzada,
     }
 
     # LGPD: purge após uso
