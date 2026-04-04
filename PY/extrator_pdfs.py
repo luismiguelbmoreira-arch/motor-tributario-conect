@@ -656,11 +656,12 @@ def processar_pdfs_bytes(conteudos: list[bytes]) -> dict:
     # ── Validação cruzada: DAS calculado vs DAS e-CAC ──────────────────────
     validacao_cruzada = []
     das_ecac = auditoria_params.get("das_ecac")
-    das_calculado_str = diagnostico.get("aliquotas", {}).get("efetiva_das_total")
+    aliquota_efetiva_str = diagnostico.get("aliquotas", {}).get("efetiva_das_total")
 
-    if das_ecac and das_calculado_str:
+    if das_ecac and aliquota_efetiva_str:
         rpa_val = auditoria_params.get("rpa") or fornecedora.faturamento_12m / 12
-        das_calculado = Decimal(das_calculado_str) * rpa_val
+        # DAS = alíquota efetiva × receita mensal (LC 123/2006, Art. 18)
+        das_calculado = Decimal(aliquota_efetiva_str) * rpa_val
         delta = abs(das_calculado - das_ecac)
         pct_delta = (delta / das_ecac * 100) if das_ecac > 0 else Decimal("0")
 

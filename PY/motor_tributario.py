@@ -128,6 +128,14 @@ class EmpresaFornecedora(BaseModel):
             "LC 123/2006, Art. 13, § 1º, VII."
         )
     )
+    categoria_mei: Optional[Literal["COMERCIO", "INDUSTRIA", "SERVICOS", "COMERCIO_SERVICOS"]] = Field(
+        default=None,
+        description=(
+            "Categoria MEI — determina DAS fixo. "
+            "Obrigatório quando regime='MEI'. Default: SERVICOS. "
+            "LC 123/2006, Art. 18-A."
+        )
+    )
 
     @field_validator("cnpj")
     @classmethod
@@ -1015,10 +1023,25 @@ class MotorReformaTributaria:
 
     def _diagnostico_lucro_real(self) -> Dict[str, Any]:
         """Diagnóstico para regime Lucro Real via LucroRealEngine."""
+        if self._engine_regime is None:
+            raise RuntimeError(
+                "LucroRealEngine não instanciado. Verifique se regime='REAL' "
+                "foi configurado corretamente em EmpresaFornecedora."
+            )
         engine = self._engine_regime
+
         receita_mensal = self.operacao.rpa_mensal or (self.fornecedora.faturamento_12m / 12)
+        if receita_mensal <= Decimal("0"):
+            raise ValueError(
+                "Lucro Real: receita mensal é zero. Informe faturamento_12m > 0 "
+                "ou rpa_mensal > 0 para calcular."
+            )
         lucro = self.operacao.lucro_real_mensal or receita_mensal
         creditos = self.operacao.creditos_pis_cofins
+
+        # CNAE fonte para alertas (Lucro Real também pode ter CNAE em fallback)
+        _, cnae_fonte = determinar_anexo_por_cnae_com_fonte(self.fornecedora.cnae_principal)
+        self._cnae_fonte = cnae_fonte
 
         resultado = engine.calcular_carga_total_mensal(
             receita_mensal=receita_mensal,

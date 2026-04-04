@@ -750,6 +750,7 @@ def analise_manual(
             faturamento_12m=req.faturamento_12m,
             folha_salarios_12m=req.folha_salarios_12m,
             anexo_simples=req.anexo_simples,
+            categoria_mei=req.categoria_mei or ("SERVICOS" if req.regime == "MEI" else None),
         )
 
         # Monta EmpresaCompradora

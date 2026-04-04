@@ -461,7 +461,8 @@
   const token = sessionStorage.getItem('token');
   if (!token) { window.location.href = 'login.html'; }
 
-  // ── Adaptação por regime ──
+  // ── Adaptação por regime (preserva valores ao trocar) ──
+  const _fieldBackup = {};
   function adaptFormToRegime() {
     const regime = document.getElementById('regime').value;
     const meiSection = document.getElementById('mei-categoria-section');
@@ -474,15 +475,18 @@
     realSection.classList.add('hidden');
     step2Title.textContent = 'Faturamento e Folha';
 
-    // Mostrar/esconder campos dos steps 1-2 baseado no regime
     const folhaFields = document.querySelectorAll('#folha12m, #rpa_mensal, #receita_st');
-    folhaFields.forEach(f => f.closest('.field-tooltip').classList.remove('hidden'));
+    folhaFields.forEach(f => {
+      f.closest('.field-tooltip').classList.remove('hidden');
+      // Restaurar backup se existir
+      if (_fieldBackup[f.id]) { f.value = _fieldBackup[f.id]; }
+    });
 
     if (regime === 'MEI') {
       meiSection.classList.remove('hidden');
-      // MEI: esconder folha, RPA, ST (irrelevantes)
+      // MEI: backup e esconder folha, RPA, ST (irrelevantes para DAS fixo)
       folhaFields.forEach(f => {
-        f.value = '';
+        _fieldBackup[f.id] = f.value;  // Preservar antes de esconder
         f.closest('.field-tooltip').classList.add('hidden');
       });
       step2Title.textContent = 'Faturamento MEI';
@@ -602,7 +606,8 @@
     const valorOk = validateValor();
     const tipoOk  = tipoCompradorSelecionado !== '';
     const formaOk = document.getElementById('forma_recebimento').value !== '';
-    const ok = dataOk && valorOk && tipoOk && formaOk;
+    const ufDestOk = document.getElementById('uf_destino').value !== '';
+    const ok = dataOk && valorOk && tipoOk && formaOk && ufDestOk;
     document.getElementById('btn-analisar').disabled = !ok;
     if (ok) buildResumo();
     return ok;
