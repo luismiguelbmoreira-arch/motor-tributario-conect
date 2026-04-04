@@ -23,6 +23,9 @@ python-jose[cryptography]>=3.3.0    # JWT tokens
 # ── Geração de PDF ─────────────────────────────────────────────────────────────
 weasyprint>=61.0                    # HTML → PDF (relatórios tributários)
 
+# ── Migrations ────────────────────────────────────────────────────────────────
+alembic>=1.13.0                     # Versionamento de schema (database migrations)
+
 # ── Testes ────────────────────────────────────────────────────────────────────
 pytest>=8.0.0
 pytest-cov>=5.0.0       # Cobertura de código — CI falha abaixo de 80%
