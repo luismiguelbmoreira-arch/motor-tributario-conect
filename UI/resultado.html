@@ -801,7 +801,7 @@
       `;
 
       try {
-        const response = await fetch('http://localhost:8000/relatorio/pdf', {
+        const response = await fetch(window.location.origin + '/relatorio/pdf', {
           method: 'POST',
           headers: {
             'Authorization': 'Bearer ' + token,

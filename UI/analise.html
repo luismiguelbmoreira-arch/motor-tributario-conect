@@ -358,7 +358,7 @@
 
 <script>
   // ── Constantes ──
-  const API_BASE = 'http://localhost:8000';
+  const API_BASE = window.location.origin;
   let tipoCompradorSelecionado = '';
   let currentStep = 1;
 
@@ -608,7 +608,7 @@
 
     } catch (e) {
       document.getElementById('loading').style.display = 'none';
-      alert('Erro de conexão com o servidor. Verifique se a API está rodando em localhost:8000.');
+      alert('Erro de conexão com o servidor. Verifique se a API está rodando.');
     }
   }
 

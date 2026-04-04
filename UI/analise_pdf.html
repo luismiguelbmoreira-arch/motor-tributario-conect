@@ -532,7 +532,7 @@
       });
 
       try {
-        var response = await fetch('http://localhost:8000/analise/pdf', {
+        var response = await fetch(window.location.origin + '/analise/pdf', {
           method: 'POST',
           headers: {
             'Authorization': 'Bearer ' + token,
