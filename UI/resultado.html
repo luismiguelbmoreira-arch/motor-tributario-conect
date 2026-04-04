@@ -229,8 +229,9 @@
                 <h3 class="text-base font-semibold text-slate-900">Simples Nacional Puro</h3>
               </div>
             </div>
-            <p class="text-xs text-slate-500 mb-1">Carga tributária anual estimada</p>
+            <p class="text-xs text-slate-500 mb-1">Custo tributário por operação</p>
             <p class="text-2xl font-bold text-slate-800" id="cen-simples-carga">--</p>
+            <p class="text-xs text-slate-400 mt-1">DAS sobre o valor da NF informada</p>
           </div>
 
           <!-- Opt-Out -->
@@ -246,11 +247,11 @@
                 <h3 class="text-base font-semibold text-slate-900">Opt-Out IVA</h3>
               </div>
             </div>
-            <p class="text-xs text-slate-500 mb-1">Carga tributária anual estimada</p>
+            <p class="text-xs text-slate-500 mb-1">Custo tributário por operação (DAS + IVA por fora)</p>
             <p class="text-2xl font-bold text-slate-800" id="cen-optout-carga">--</p>
             <div id="cen-economia-badge" class="hidden mt-3">
-              <span class="inline-block px-3 py-1 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800">
-                Economia de <span id="cen-economia-valor">--</span> por ano
+              <span id="cen-economia-pill" class="inline-block px-3 py-1 text-xs font-bold rounded-full">
+                <span id="cen-economia-label">--</span> <span id="cen-economia-valor">--</span> por ano (estimativa)
               </span>
             </div>
           </div>
@@ -660,10 +661,22 @@
       document.getElementById('cen-simples-carga').textContent = formatBRL(simples.custo_das_por_operacao);
       document.getElementById('cen-optout-carga').textContent = formatBRL(optout.custo_total);
 
+      // disparidade: positivo = opt-out MAIS CARO, negativo = opt-out MAIS BARATO
       const disparidade = parseFloat(cenarios.disparidade_anual_estimada || 0);
       if (disparidade !== 0) {
         showElement('cen-economia-badge');
+        var pill = document.getElementById('cen-economia-pill');
+        var label = document.getElementById('cen-economia-label');
         document.getElementById('cen-economia-valor').textContent = formatBRL(Math.abs(disparidade).toFixed(2));
+        if (disparidade > 0) {
+          // Opt-out custa MAIS — alerta vermelho
+          pill.className = 'inline-block px-3 py-1 text-xs font-bold rounded-full bg-red-100 text-red-800';
+          label.textContent = 'Custo adicional Opt-Out:';
+        } else {
+          // Opt-out custa MENOS — economia verde
+          pill.className = 'inline-block px-3 py-1 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800';
+          label.textContent = 'Economia com Opt-Out:';
+        }
       }
     }
 

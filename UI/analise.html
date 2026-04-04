@@ -185,6 +185,17 @@
         </select>
       </div>
 
+      <!-- Data de início de atividade (opcional — para empresas novas < 12 meses) -->
+      <div class="field-tooltip">
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          Data de Início de Atividade
+          <span class="text-xs text-slate-400 font-normal ml-1">(opcional — empresas novas)</span>
+        </label>
+        <span class="tip">Se a empresa tem menos de 12 meses, o RBT12 será proporcionalizado automaticamente. Onde encontrar: Cartão CNPJ, campo "Data de Abertura". LC 123/2006, Art. 3º, §2º.</span>
+        <input id="data_inicio_atividade" type="date" max="2033-12-31"
+          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+
       <!-- Categoria MEI (visível apenas quando regime == MEI) -->
       <div id="mei-categoria-section" class="hidden">
         <div class="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
@@ -365,6 +376,20 @@
           <option value="PIX_BOLETO">Pix / Boleto</option>
           <option value="CARTAO">Cartão (débito/crédito)</option>
           <option value="DINHEIRO">Dinheiro / Cheque</option>
+        </select>
+      </div>
+
+      <!-- Redução CBS/IBS -->
+      <div class="field-tooltip">
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          Redução de Alíquota CBS/IBS
+        </label>
+        <span class="tip">LC 214/2025: alguns produtos/serviços têm alíquota reduzida. Integral = sem redução. 60% = saúde, educação, cesta ampliada (Art. 258). 30% = profissionais liberais regulamentados (Art. 262). Isento = cesta básica nacional (Art. 264).</span>
+        <select id="reducao_cbs_ibs" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+          <option value="INTEGRAL" selected>Integral (sem redução)</option>
+          <option value="REDUCAO_60">Redução 60% — saúde, educação, cesta ampliada</option>
+          <option value="REDUCAO_30">Redução 30% — profissionais liberais</option>
+          <option value="ISENTO">Isento — cesta básica nacional</option>
         </select>
       </div>
 
@@ -713,6 +738,9 @@
       rpa_mensal:        rpa,
       tinha_st_icms:     st !== null && st > 0,
       forma_recebimento: document.getElementById('forma_recebimento').value,
+      reducao_cbs_ibs:   document.getElementById('reducao_cbs_ibs').value,
+      // Empresa nova
+      data_inicio_atividade: document.getElementById('data_inicio_atividade').value || null,
       // MEI
       categoria_mei:     document.getElementById('categoria_mei').value || null,
       // Lucro Real
