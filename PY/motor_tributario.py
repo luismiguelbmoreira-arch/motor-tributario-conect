@@ -183,11 +183,21 @@ class EmpresaFornecedora(BaseModel):
 
 class EmpresaCompradora(BaseModel):
     """
-    Dados do destinatário (comprador — pode ser B2B ou B2C).
+    Dados do destinatário (comprador — pode ser B2B, B2C ou mix dos dois).
     Fase 1: Define se crédito IBS/CBS é exigido.
+    Empresas que vendem para ambos (ex: loja de materiais, escritório contábil)
+    usam percentual_b2b para ponderar cenários.
     """
-    tipo: Literal["B2B_CONTRIBUINTE", "B2C_CONSUMIDOR_FINAL"] = Field(
-        ..., description="Tipo do comprador"
+    tipo: Literal["B2B_CONTRIBUINTE", "B2C_CONSUMIDOR_FINAL", "MISTO"] = Field(
+        ..., description="Tipo do comprador (MISTO = atende B2B e B2C)"
+    )
+    percentual_b2b: Decimal = Field(
+        default=Decimal("100"),
+        ge=Decimal("0"), le=Decimal("100"),
+        description=(
+            "Percentual da receita que vem de clientes B2B (0-100). "
+            "Usado quando tipo='MISTO'. Ex: 70 = 70% B2B, 30% B2C."
+        )
     )
     regime: str = Field(default="NAO_INFORMADO", description="Regime tributário do comprador")
     uf_destino: str = Field(..., description="UF de destino (2 letras)")
