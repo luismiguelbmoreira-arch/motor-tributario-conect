@@ -254,6 +254,22 @@ class AnaliseManualRequest(BaseModel):
         description="Isenção/benefício ICMS eliminado até 2032"
     )
 
+    # ── MEI (visível apenas quando regime == "MEI") ──────────────────────────
+    categoria_mei: Optional[Literal["COMERCIO", "INDUSTRIA", "SERVICOS", "COMERCIO_SERVICOS"]] = Field(
+        default=None,
+        description="Categoria MEI (obrigatório se regime=MEI). Default backend: SERVICOS"
+    )
+
+    # ── Lucro Real (visível apenas quando regime == "REAL") ──────────────────
+    lucro_real_mensal: Optional[Decimal] = Field(
+        default=None, ge=Decimal("0"),
+        description="Lucro Real apurado no mês (R$). Se None, usa receita mensal como proxy."
+    )
+    creditos_pis_cofins: Decimal = Field(
+        default=Decimal("0"), ge=Decimal("0"),
+        description="Créditos PIS/COFINS não-cumulativo (R$). Padrão: 0"
+    )
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MODELOS DE RESPONSE — Auditoria (existentes)
@@ -762,6 +778,8 @@ def analise_manual(
             tinha_st_icms=req.tinha_st_icms,
             possui_reducao_cbs_ibs=req.possui_reducao_cbs_ibs,
             beneficio_fiscal_antigo=req.beneficio_fiscal_antigo,
+            lucro_real_mensal=req.lucro_real_mensal,
+            creditos_pis_cofins=req.creditos_pis_cofins,
         )
 
     except PydanticValidationError as exc:
