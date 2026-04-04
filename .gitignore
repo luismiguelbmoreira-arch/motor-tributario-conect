@@ -23,3 +23,14 @@ venv/
 .DS_Store
 Thumbs.db
 *.db
+
+# Coverage
+.coverage
+coverage.xml
+htmlcov/
+
+# Docker
+data/*.db
+
+# Logs
+*.log

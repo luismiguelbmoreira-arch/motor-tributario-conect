@@ -81,6 +81,7 @@ class UserDB(SQLModel, table=True):
     hashed_password: str = Field(max_length=200)
     role: str = Field(default="usuario", max_length=20)  # "admin" | "usuario"
     ativo: bool = Field(default=True)
+    must_change_password: bool = Field(default=False)  # True = força troca no próximo login
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     ultimo_acesso: Optional[str] = Field(default=None)
 
@@ -148,6 +149,7 @@ def criar_usuario(
     email: str,
     senha_plain: str,
     role: Literal["admin", "usuario"] = "usuario",
+    must_change_password: bool = True,
 ) -> UserDB:
     """
     Cria novo usuário com senha bcrypt.
@@ -188,6 +190,7 @@ def criar_usuario(
             hashed_password=_hash_senha(senha_plain),
             role=role,
             ativo=True,
+            must_change_password=must_change_password,
             created_at=datetime.now(timezone.utc).isoformat(),
         )
         session.add(novo)
@@ -303,6 +306,38 @@ def resetar_senha(user_id: int, nova_senha: str) -> bool:
         session.add(user)
         session.commit()
         logger.info("Senha redefinida | id=%s", user_id)
+        return True
+
+
+def trocar_senha_proprio(user_id: int, senha_atual: str, nova_senha: str) -> bool:
+    """
+    Permite que o próprio usuário altere sua senha, verificando a senha atual.
+    Limpa o flag must_change_password após sucesso.
+
+    Args:
+        user_id: ID do usuário autenticado (vem do token JWT).
+        senha_atual: Senha atual em plaintext para verificação.
+        nova_senha: Nova senha em plaintext (será hasheada).
+
+    Returns:
+        True se alterada, False se usuário não encontrado.
+
+    Raises:
+        ValueError: senha_atual incorreta ou nova_senha < 8 caracteres.
+    """
+    if len(nova_senha) < 8:
+        raise ValueError("A nova senha deve ter no mínimo 8 caracteres.")
+    with Session(_auth_engine) as session:
+        user = session.get(UserDB, user_id)
+        if not user:
+            return False
+        if not verificar_senha(senha_atual, user.hashed_password):
+            raise ValueError("Senha atual incorreta.")
+        user.hashed_password = _hash_senha(nova_senha)
+        user.must_change_password = False
+        session.add(user)
+        session.commit()
+        logger.info("Senha alterada pelo próprio usuário | id=%s", user_id)
         return True
 
 

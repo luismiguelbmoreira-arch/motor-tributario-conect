@@ -1,0 +1,42 @@
+version: "3.9"
+
+# Motor Tributário Conect — Docker Compose
+# Dev:  docker compose up --build
+# Prod: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: motor-tributario-api
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    volumes:
+      # Banco SQLite persistido fora do container
+      - motor_db:/app/PY
+    env_file:
+      - PY/.env
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "traefik.enable=false"
+
+volumes:
+  motor_db:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      # Muda para caminho real do host se necessário
+      device: ./data
