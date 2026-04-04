@@ -23,6 +23,9 @@ venv/
 .DS_Store
 Thumbs.db
 *.db
+*.db-shm
+*.db-wal
+*.db-journal
 
 # Coverage
 .coverage
