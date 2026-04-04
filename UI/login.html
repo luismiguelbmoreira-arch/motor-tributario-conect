@@ -530,6 +530,10 @@
           sessionStorage.setItem('token', data.access_token);
           sessionStorage.setItem('username', data.username);
           sessionStorage.setItem('role', data.role);
+          // Força troca de senha no primeiro acesso (admin padrão ou novo usuário)
+          if (data.must_change_password) {
+            sessionStorage.setItem('must_change_password', '1');
+          }
           window.location.href = 'dashboard.html';
         } else if (res.status === 401) {
           generalError.textContent = 'Usuário ou senha incorretos. Verifique e tente novamente.';
