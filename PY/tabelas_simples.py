@@ -391,9 +391,11 @@ def determinar_anexo_por_cnae_com_fonte(cnae_7_digitos: str) -> tuple:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ESTIMATIVA B2B/B2C POR CNAE — inferência de perfil de clientes
-# Percentual estimado de receita B2B baseado no segmento de atividade.
-# Usado como SUGESTÃO quando o contador não informa — nunca substitui dado real.
+# SUGESTÃO B2B/B2C POR CNAE — PRÉ-SELEÇÃO VISUAL APENAS
+# ⚠️ SEM BASE LEGAL — estimativa de mercado para pré-preencher formulário.
+# NUNCA usar como dado de cálculo automático (ERR-017).
+# A lei opera NF-e por NF-e (Art. 47-48, LC 214/2025), não por média de CNAE.
+# O percentual real DEVE ser informado pelo contribuinte/contador.
 # ─────────────────────────────────────────────────────────────────────────────
 PERFIL_B2B_POR_CNAE: dict = {
     # INDÚSTRIA (prefixos 05-33): vende majoritariamente para empresas
@@ -432,8 +434,10 @@ PERFIL_B2B_POR_CNAE: dict = {
 
 def estimar_perfil_b2b(cnae: str) -> int:
     """
-    Retorna percentual estimado B2B (0-100) baseado no CNAE.
-    Usado como sugestão — contador deve confirmar.
+    Retorna percentual ESTIMADO B2B (0-100) baseado no CNAE.
+    ⚠️ SEM BASE LEGAL — apenas sugestão visual para pré-preencher o formulário.
+    O contribuinte/contador DEVE confirmar ou ajustar.
+    Art. 47-48, LC 214/2025: crédito verificado operação a operação, não por média.
     """
     prefixo = cnae[:2] if cnae else ""
     return PERFIL_B2B_POR_CNAE.get(prefixo, 50)  # default 50/50

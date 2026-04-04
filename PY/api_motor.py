@@ -447,6 +447,11 @@ def perfil_cnae(
         "anexo_fonte": fonte,
         "percentual_b2b_estimado": pct_b2b,
         "perfil_sugerido": "B2B_CONTRIBUINTE" if pct_b2b >= 80 else "B2C_CONSUMIDOR_FINAL" if pct_b2b <= 20 else "MISTO",
+        "disclaimer": (
+            "Estimativa sem base legal — baseada em perfil tipico do segmento. "
+            "O percentual real deve ser informado pelo contribuinte. "
+            "Art. 47-48 LC 214/2025: credito verificado NF-e a NF-e."
+        ),
     }
 
 

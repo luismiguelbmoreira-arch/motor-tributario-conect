@@ -24,6 +24,129 @@
 
 ---
 
+### ERR-013 — Falta campo "Data de Inicio de Atividade" para RBT12 proporcional
+**Data:** 03/04/2026
+**Severidade:** 🔴 Critico
+**Arquivo:** `PY/motor_tributario.py` — `EmpresaFornecedora` + formulario `analise.html`
+**Descoberto em:** 🔬 Auditoria de suficiencia de campos (Luiz Moreira)
+
+**Descricao:**
+Empresas com menos de 12 meses de atividade devem ter RBT12 proporcionalizada:
+`RBT12_prop = (receita_acumulada / meses_atividade) * 12`
+Sem o campo `data_inicio_atividade`, o motor aceita RBT12 bruta e pode enquadrar
+a empresa na faixa errada (para cima ou para baixo).
+
+**Evidencia:**
+Art. 3o, par. 2o, LC 123/2006 — "No caso de inicio de atividade no proprio
+ano-calendario, os limites [...] serao proporcionais ao numero de meses [...]"
+
+**Solucao necessaria:**
+1. Adicionar `data_inicio_atividade: Optional[date]` em `EmpresaFornecedora`
+2. Se `data_inicio < 12 meses atras`: motor proporcionaliza automaticamente
+3. Adicionar campo no formulario `analise.html` (Step 1)
+
+**Status:** ⏳ Pendente
+
+---
+
+### ERR-014 — Salario Minimo MEI hardcoded apenas para 2026
+**Data:** 03/04/2026
+**Severidade:** 🟡 Atencao
+**Arquivo:** `PY/regimes/mei.py` — `SALARIO_MINIMO_2026`
+**Descoberto em:** 🔬 Auditoria de suficiencia de campos (Luiz Moreira)
+
+**Descricao:**
+DAS MEI = 5% do salario minimo + ICMS/ISS fixos. O SM esta hardcoded como
+R$ 1.622,00 (2026). Para simulacoes 2027-2033, o DAS sera calculado com SM
+desatualizado. Erro cresce a cada ano (~7% ao ano de reajuste medio).
+
+**Evidencia:**
+LC 123/2006, Art. 18-A, par. 3o, I — INSS = 5% do salario minimo vigente.
+
+**Solucao necessaria:**
+Criar tabela `SM_POR_ANO` em `tabelas_simples.py` com estimativas conservadoras.
+Atualizar anualmente com decreto presidencial.
+
+**Status:** ⏳ Pendente
+
+---
+
+### ERR-015 — Lucro Presumido: transporte passageiros com presuncao 8% (deveria ser 16%)
+**Data:** 03/04/2026
+**Severidade:** 🔴 Critico
+**Arquivo:** `PY/regimes/lucro_presumido.py` — `PRESUNCAO_IRPJ_CSLL`
+**Descoberto em:** 🔬 Auditoria de suficiencia de campos (Luiz Moreira)
+
+**Descricao:**
+CNAEs 4921 (transporte passageiros municipal), 4922 (intermunicipal),
+4929 (outros passageiros) e 4930 (transporte rodoviario passageiros)
+tem presuncao IRPJ de 16%, nao 8%.
+Motor atual mapeia todo prefixo "49" como 8% (presuncao de carga).
+
+**Evidencia:**
+Lei 9.249/1995, Art. 15, par. 1o, III, "a" — presuncao 16% para
+servicos de transporte que nao sejam de carga.
+RIR/2018, Art. 592.
+
+**Solucao necessaria:**
+Separar no dicionario `PRESUNCAO_IRPJ_CSLL`:
+- "4921", "4922", "4929", "4930" → (0.16, 0.12)
+- "49" default → (0.08, 0.12)  # carga
+
+**Status:** ⏳ Pendente
+
+---
+
+### ERR-016 — Flag boolean `possui_reducao_cbs_ibs` insuficiente para calculo IVA
+**Data:** 03/04/2026
+**Severidade:** 🟡 Atencao
+**Arquivo:** `PY/motor_tributario.py` — `OperacaoFiscal.possui_reducao_cbs_ibs`
+**Descoberto em:** 🔬 Auditoria de suficiencia de campos (Luiz Moreira)
+
+**Descricao:**
+LC 214/2025, Arts. 258-270, preve reducoes de 30%, 60% e 100% (isencao)
+conforme tipo de bem/servico. O campo boolean True/False nao permite
+distinguir o percentual. Motor nao pode calcular aliquota efetiva reduzida.
+
+**Evidencia:**
+Art. 258 — reducao 60% (cesta basica, saude, educacao)
+Art. 262 — reducao 30% (profissionais liberais regulamentados)
+Art. 264 — isencao 100% (cesta basica nacional)
+
+**Solucao necessaria:**
+Substituir `possui_reducao_cbs_ibs: bool` por
+`reducao_cbs_ibs: Literal["INTEGRAL", "REDUCAO_30", "REDUCAO_60", "ISENTO"]`
+com default "INTEGRAL".
+
+**Status:** ⏳ Pendente
+
+---
+
+### ERR-017 — Tabela PERFIL_B2B_POR_CNAE sem base legal
+**Data:** 04/04/2026
+**Severidade:** 🟡 Atencao
+**Arquivo:** `PY/tabelas_simples.py` — `PERFIL_B2B_POR_CNAE`
+**Descoberto em:** 🔬 Validacao legal (Luiz Moreira)
+
+**Descricao:**
+A tabela PERFIL_B2B_POR_CNAE estima percentual B2B/B2C por segmento CNAE
+(ex: industria 90%, varejo 30%). NAO EXISTE base legal para isso — a LC 214/2025
+opera NF-e por NF-e (Art. 47-48), nao por media estatistica do CNAE.
+
+**Risco:** Se usada como dado de calculo automatico, pode gerar passivo tributario.
+Art. 124, I, CTN: responsabilidade solidaria do escritorio.
+
+**Solucao implementada:**
+- Tabela rebaixada de "dado de calculo" para "sugestao de pre-selecao visual"
+- Disclaimer explicito no endpoint /cnae/{cnae}/perfil
+- Frontend mostra "Ajuste conforme sua realidade — sem base legal"
+- Percentual real DEVE ser informado pelo contribuinte/contador
+- Registrado na trilha de auditoria como "INFORMADO PELO USUARIO"
+
+**Status:** ✅ Corrigido — tabela e sugestao visual, nao dado de calculo
+
+---
+
 ### ERR-005 — CNAE_PARA_ANEXO incompleto (fallback errado)
 **Data:** 27/03/2026
 **Severidade:** 🔴 Crítico
