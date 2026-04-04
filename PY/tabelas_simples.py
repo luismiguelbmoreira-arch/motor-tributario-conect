@@ -390,6 +390,55 @@ def determinar_anexo_por_cnae_com_fonte(cnae_7_digitos: str) -> tuple:
     return "III", "FALLBACK"
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# ESTIMATIVA B2B/B2C POR CNAE — inferência de perfil de clientes
+# Percentual estimado de receita B2B baseado no segmento de atividade.
+# Usado como SUGESTÃO quando o contador não informa — nunca substitui dado real.
+# ─────────────────────────────────────────────────────────────────────────────
+PERFIL_B2B_POR_CNAE: dict = {
+    # INDÚSTRIA (prefixos 05-33): vende majoritariamente para empresas
+    **{str(i).zfill(2): 90 for i in range(5, 34)},
+    # CONSTRUÇÃO (41-43): projetos B2B (construtoras), reformas B2C
+    "41": 80, "42": 85, "43": 70,
+    # COMÉRCIO VEÍCULOS (45): mix — concessionárias atendem ambos
+    "45": 50,
+    # COMÉRCIO ATACADO (46): quase todo B2B
+    "46": 95,
+    # COMÉRCIO VAREJO (47): quase todo B2C
+    "47": 30,
+    # TRANSPORTE (49-53): majoritariamente B2B
+    "49": 80, "50": 85, "51": 90, "52": 90, "53": 70,
+    # ALOJAMENTO/ALIMENTAÇÃO (55-56): mix — hotéis corporate + turismo
+    "55": 40, "56": 25,
+    # TI/TELECOM (61-63): B2B dominante
+    "61": 80, "62": 85, "63": 80,
+    # SERVIÇOS FINANCEIROS (64-66): B2B
+    "64": 90, "65": 85, "66": 80,
+    # SERVIÇOS PROFISSIONAIS (69-75): B2B dominante
+    "69": 85,  # Contabilidade, advocacia
+    "70": 90, "71": 85, "72": 95, "73": 70, "74": 75, "75": 95,
+    # LIMPEZA/SEGURANÇA (80-82): B2B dominante
+    "80": 90, "81": 85, "82": 80,
+    # EDUCAÇÃO (85): mix — escolas B2C, treinamento corporativo B2B
+    "85": 35,
+    # SAÚDE (86-88): B2C dominante (pacientes PF)
+    "86": 20, "87": 15, "88": 10,
+    # ARTES/LAZER (90-93): B2C dominante
+    "90": 25, "91": 15, "92": 10, "93": 20,
+    # OUTROS SERVIÇOS (95-96): B2C dominante (reparos, beleza)
+    "95": 30, "96": 10,
+}
+
+
+def estimar_perfil_b2b(cnae: str) -> int:
+    """
+    Retorna percentual estimado B2B (0-100) baseado no CNAE.
+    Usado como sugestão — contador deve confirmar.
+    """
+    prefixo = cnae[:2] if cnae else ""
+    return PERFIL_B2B_POR_CNAE.get(prefixo, 50)  # default 50/50
+
+
 def obter_faixa_numero(rbt12: Decimal, anexo: str) -> int:
     """
     Retorna o número da faixa (1-6) em que o RBT12 se enquadra para o anexo dado.
