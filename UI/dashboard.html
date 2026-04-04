@@ -218,10 +218,59 @@
 
 </div>
 
+<!-- Modal: Troca de senha obrigatória (primeiro acesso) -->
+<div id="modal-change-pw" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/70 backdrop-blur-sm">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6 space-y-4">
+    <div class="flex items-center gap-3 mb-1">
+      <div class="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+        <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+        </svg>
+      </div>
+      <div>
+        <h3 class="text-base font-bold text-slate-800">Altere sua senha agora</h3>
+        <p class="text-xs text-slate-500">Por segurança, troque a senha padrão antes de continuar.</p>
+      </div>
+    </div>
+    <div class="space-y-3">
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Senha atual</label>
+        <input id="cpw-atual" type="password" placeholder="Senha atual"
+          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          oninput="checkChangePw()">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Nova senha (mín. 8 caracteres)</label>
+        <input id="cpw-nova" type="password" placeholder="Nova senha"
+          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          oninput="checkChangePw()">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">Confirmar nova senha</label>
+        <input id="cpw-conf" type="password" placeholder="Confirmar senha"
+          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          oninput="checkChangePw()">
+      </div>
+      <p id="cpw-err" class="text-xs text-red-600 hidden"></p>
+    </div>
+    <button id="btn-change-pw" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      onclick="submitChangePw()" disabled>
+      Alterar senha e continuar
+    </button>
+  </div>
+</div>
+
 <script>
   (function() {
     const token = sessionStorage.getItem('token');
     if (!token) { window.location.href = 'login.html'; return; }
+
+    // Primeiro acesso — forçar troca de senha
+    if (sessionStorage.getItem('must_change_password') === '1') {
+      const modal = document.getElementById('modal-change-pw');
+      modal.classList.remove('hidden');
+      modal.style.display = 'flex';
+    }
 
     const username = sessionStorage.getItem('username') || '—';
     const role     = sessionStorage.getItem('role') || '';
@@ -289,6 +338,64 @@
       // diagnostico corrompido — ignora
     }
   })();
+
+  // ── Troca de senha obrigatória ──
+  function checkChangePw() {
+    const atual = document.getElementById('cpw-atual').value;
+    const nova  = document.getElementById('cpw-nova').value;
+    const conf  = document.getElementById('cpw-conf').value;
+    const err   = document.getElementById('cpw-err');
+    const btn   = document.getElementById('btn-change-pw');
+    err.classList.add('hidden');
+    if (nova.length > 0 && nova.length < 8) {
+      err.textContent = 'A nova senha deve ter no mínimo 8 caracteres.';
+      err.classList.remove('hidden');
+      btn.disabled = true; return;
+    }
+    if (nova && conf && nova !== conf) {
+      err.textContent = 'As senhas não coincidem.';
+      err.classList.remove('hidden');
+      btn.disabled = true; return;
+    }
+    btn.disabled = !(atual && nova.length >= 8 && nova === conf);
+  }
+
+  async function submitChangePw() {
+    const btn  = document.getElementById('btn-change-pw');
+    const err  = document.getElementById('cpw-err');
+    const atual = document.getElementById('cpw-atual').value;
+    const nova  = document.getElementById('cpw-nova').value;
+    btn.disabled = true;
+    btn.textContent = 'Alterando…';
+    err.classList.add('hidden');
+    try {
+      const res = await fetch(window.location.origin + '/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + sessionStorage.getItem('token'),
+        },
+        body: JSON.stringify({ senha_atual: atual, nova_senha: nova }),
+      });
+      if (res.ok) {
+        sessionStorage.removeItem('must_change_password');
+        const modal = document.getElementById('modal-change-pw');
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+      } else {
+        const data = await res.json().catch(() => ({}));
+        err.textContent = data.detail || 'Erro ao alterar senha.';
+        err.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = 'Alterar senha e continuar';
+      }
+    } catch (e) {
+      err.textContent = 'Falha de conexão. Tente novamente.';
+      err.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = 'Alterar senha e continuar';
+    }
+  }
 
   function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('open');

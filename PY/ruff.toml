@@ -1,0 +1,19 @@
+# Motor Tributário Conect — Configuração ruff (linter + formatter)
+# Rodar: ruff check .
+
+target-version = "py311"
+line-length = 120
+
+[lint]
+select = ["E", "W", "F", "I"]
+ignore = [
+    "E501",   # linha longa — controlado por line-length acima
+    "F401",   # imported but unused — alguns imports são necessários para SQLModel
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["F811"]   # redefinição em fixtures
+
+[format]
+quote-style = "double"
+indent-style = "space"
