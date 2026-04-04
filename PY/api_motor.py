@@ -29,9 +29,11 @@ DÉCIMAL:
   Serializados como strings no JSON (json_encoders) — sem perda de precisão.
 """
 
+import json
 import logging
 import os
 import sys
+import time
 from contextlib import asynccontextmanager
 from decimal import Decimal
 from pathlib import Path
@@ -58,6 +60,7 @@ from auth import (
     gerar_token_jwt,
     listar_usuarios,
     resetar_senha,
+    trocar_senha_proprio,
     verificar_token,
 )
 from motor_tributario import (
@@ -74,8 +77,41 @@ except Exception:
     _gerar_pdf = None  # type: ignore
     _RELATORIO_DISPONIVEL = False
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LOGGING ESTRUTURADO — JSON em produção, texto em dev
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _JSONFormatter(logging.Formatter):
+    """Formatter que emite cada log como uma linha JSON — adequado para ingestão por Datadog, Loki, etc."""
+    def format(self, record: logging.LogRecord) -> str:
+        log_obj = {
+            "ts": self.formatTime(record, "%Y-%m-%dT%H:%M:%S"),
+            "level": record.levelname,
+            "logger": record.name,
+            "msg": record.getMessage(),
+        }
+        if record.exc_info:
+            log_obj["exc"] = self.formatException(record.exc_info)
+        return json.dumps(log_obj, ensure_ascii=False)
+
+
+def _setup_logging() -> None:
+    log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+    log_format = os.environ.get("LOG_FORMAT", "text")
+    handler = logging.StreamHandler(sys.stdout)
+    if log_format == "json":
+        handler.setFormatter(_JSONFormatter())
+    else:
+        handler.setFormatter(logging.Formatter("%(levelname)s %(name)s: %(message)s"))
+    root = logging.getLogger()
+    root.setLevel(log_level)
+    root.handlers.clear()
+    root.addHandler(handler)
+
+
+_setup_logging()
 logger = logging.getLogger("motor_conect.api")
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 TOTAL_TESTES = 245  # atualizar após cada fase de testes
 
@@ -262,6 +298,7 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
     username: str
     role: str
+    must_change_password: bool = False  # True = redirecionar para troca de senha
 
 
 class UsuarioResponse(BaseModel):
@@ -458,6 +495,7 @@ def login(req: LoginRequest):
         token_type="bearer",
         username=user.username,
         role=user.role,
+        must_change_password=user.must_change_password,
     )
 
 
@@ -472,6 +510,36 @@ def me(current_user: dict = Depends(get_current_user)):
         "username": current_user.get("username"),
         "role": current_user.get("role"),
     }
+
+
+class TrocarSenhaRequest(BaseModel):
+    senha_atual: str = Field(..., min_length=1)
+    nova_senha: str = Field(..., min_length=8)
+
+
+@app.post("/auth/change-password", tags=["auth"])
+def change_password(
+    req: TrocarSenhaRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Permite que o usuário autenticado altere sua própria senha.
+    Verifica a senha atual antes de aceitar a nova.
+    Limpa o flag must_change_password após sucesso.
+
+    Erros HTTP:
+      400 — senha atual incorreta ou nova senha muito curta
+      404 — usuário não encontrado (inconsistência de banco)
+    """
+    user_id = int(current_user["sub"])
+    try:
+        sucesso = trocar_senha_proprio(user_id, req.senha_atual, req.nova_senha)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not sucesso:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+    logger.info("Troca de senha confirmada | user_id=%s", user_id)
+    return {"detail": "Senha alterada com sucesso."}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

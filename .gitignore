@@ -23,3 +23,18 @@ venv/
 .DS_Store
 Thumbs.db
 *.db
+*.db-shm
+*.db-wal
+*.db-journal
+
+# Coverage
+.coverage
+coverage.xml
+htmlcov/
+
+# Docker
+data/*.db
+
+# Logs
+*.log
+.lixeira/
