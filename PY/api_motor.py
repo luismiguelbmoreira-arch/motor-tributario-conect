@@ -57,6 +57,7 @@ from auth import (
     desativar_usuario,
     gerar_token_jwt,
     listar_usuarios,
+    resetar_senha,
     verificar_token,
 )
 from motor_tributario import (
@@ -562,6 +563,34 @@ def desativar_usuario_endpoint(
             detail=f"Usuário id={user_id} não encontrado.",
         )
     return {"detail": f"Usuário id={user_id} desativado com sucesso."}
+
+
+class ResetSenhaRequest(BaseModel):
+    nova_senha: str = Field(..., min_length=8, description="Nova senha (mínimo 8 caracteres)")
+
+
+@app.post("/admin/usuarios/{user_id}/reset-senha", tags=["admin"])
+def reset_senha_endpoint(
+    user_id: int,
+    req: ResetSenhaRequest,
+    _admin: dict = Depends(require_admin),
+):
+    """
+    Redefine a senha de um usuário. Apenas admins.
+    A nova senha deve ter no mínimo 8 caracteres.
+
+    Erros HTTP:
+      400 — senha muito curta
+      404 — usuário não encontrado
+      403 — usuário não é admin
+    """
+    try:
+        sucesso = resetar_senha(user_id, req.nova_senha)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not sucesso:
+        raise HTTPException(status_code=404, detail=f"Usuário id={user_id} não encontrado.")
+    return {"detail": f"Senha do usuário id={user_id} redefinida com sucesso."}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -20,8 +20,8 @@
     .badge-usuario { background:#f1f5f9;color:#475569;font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:999px; }
     .badge-ativo { background:#dcfce7;color:#166534;font-size:.7rem;font-weight:600;padding:2px 8px;border-radius:999px; }
     .badge-inativo { background:#fee2e2;color:#991b1b;font-size:.7rem;font-weight:600;padding:2px 8px;border-radius:999px; }
-    #modal-criar, #modal-confirm { display:none; }
-    #modal-criar.open, #modal-confirm.open { display:flex; }
+    #modal-criar, #modal-confirm, #modal-reset { display:none; }
+    #modal-criar.open, #modal-confirm.open, #modal-reset.open { display:flex; }
     .msg-error { color:#ef4444;font-size:.72rem;margin-top:2px; }
     .toast {
       position:fixed;bottom:24px;right:24px;z-index:9999;
@@ -174,6 +174,25 @@
     </div>
   </div>
 
+  <!-- Modal: Reset de senha -->
+  <div id="modal-reset" class="fixed inset-0 z-50 items-center justify-center bg-slate-900/60 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6 space-y-4">
+      <h3 class="text-base font-bold text-slate-800">Redefinir senha</h3>
+      <p id="reset-msg" class="text-sm text-slate-600"></p>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Nova senha <span class="text-red-500">*</span></label>
+        <input id="reset-nova-senha" type="password" placeholder="Mínimo 8 caracteres"
+          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" oninput="checkReset()">
+        <p class="text-xs text-slate-400 mt-1">O usuário deverá usar esta senha no próximo login.</p>
+      </div>
+      <p id="reset-api-err" class="msg-error hidden"></p>
+      <div class="flex gap-3 justify-end pt-2">
+        <button class="btn-ghost text-sm" onclick="closeReset()">Cancelar</button>
+        <button id="btn-confirmar-reset" class="btn-primary text-sm" onclick="confirmarReset()" disabled>Redefinir senha</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast -->
   <div id="toast" class="toast"></div>
 
@@ -232,7 +251,9 @@
           <td class="px-5 py-3"><span class="badge-${u.role}">${u.role === 'admin' ? 'Admin' : 'Usuário'}</span></td>
           <td class="px-5 py-3"><span class="badge-${u.ativo ? 'ativo' : 'inativo'}">${u.ativo ? 'Ativo' : 'Inativo'}</span></td>
           <td class="px-5 py-3 text-slate-400 text-xs">${formatDate(u.ultimo_acesso)}</td>
-          <td class="px-5 py-3 text-right">
+          <td class="px-5 py-3 text-right flex gap-3 justify-end">
+            <button onclick="abrirResetSenha(${u.id}, '${escHtml(u.username)}')"
+              class="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors">Resetar Senha</button>
             ${u.ativo && !isMe
               ? `<button onclick="abrirConfirmDesat(${u.id}, '${escHtml(u.username)}')"
                    class="text-xs text-red-600 hover:text-red-800 font-medium transition-colors">Desativar</button>`
@@ -264,6 +285,9 @@
     ['new-username','new-email','new-password'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('new-role').value = '';
     document.getElementById('criar-api-err').classList.add('hidden');
+    const btn = document.getElementById('btn-criar-usuario');
+    btn.textContent = 'Criar usuário';
+    btn.disabled = true;
     checkNewUser();
     document.getElementById('modal-criar').classList.add('open');
   }
@@ -320,6 +344,62 @@
       document.getElementById('criar-api-err').textContent = 'Erro de conexão.';
       document.getElementById('criar-api-err').classList.remove('hidden');
       btn.disabled = false; btn.textContent = 'Criar usuário';
+    }
+  }
+
+  // ── Reset de senha ──
+  let pendingReset = null;
+
+  function abrirResetSenha(id, nome) {
+    pendingReset = id;
+    document.getElementById('reset-msg').textContent = `Definir nova senha para o usuário "${nome}".`;
+    document.getElementById('reset-nova-senha').value = '';
+    document.getElementById('reset-api-err').classList.add('hidden');
+    document.getElementById('btn-confirmar-reset').disabled = true;
+    document.getElementById('btn-confirmar-reset').textContent = 'Redefinir senha';
+    document.getElementById('modal-reset').classList.add('open');
+    document.getElementById('reset-nova-senha').focus();
+  }
+
+  function closeReset() {
+    document.getElementById('modal-reset').classList.remove('open');
+    pendingReset = null;
+  }
+
+  function checkReset() {
+    const p = document.getElementById('reset-nova-senha').value;
+    document.getElementById('btn-confirmar-reset').disabled = p.length < 8;
+  }
+
+  async function confirmarReset() {
+    if (!pendingReset) return;
+    const nova_senha = document.getElementById('reset-nova-senha').value;
+    if (nova_senha.length < 8) return;
+
+    const btn = document.getElementById('btn-confirmar-reset');
+    btn.disabled = true; btn.textContent = 'Salvando…';
+    document.getElementById('reset-api-err').classList.add('hidden');
+
+    try {
+      const res = await fetch(`${API_BASE}/admin/usuarios/${pendingReset}/reset-senha`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ nova_senha }),
+      });
+      if (res.status === 401) { sessionStorage.clear(); window.location.href = 'login.html'; return; }
+      const data = await res.json();
+      if (!res.ok) {
+        document.getElementById('reset-api-err').textContent = data.detail || 'Erro ao redefinir.';
+        document.getElementById('reset-api-err').classList.remove('hidden');
+        btn.disabled = false; btn.textContent = 'Redefinir senha';
+        return;
+      }
+      closeReset();
+      showToast('Senha redefinida com sucesso. Informe a nova senha ao usuário.', 'success');
+    } catch {
+      document.getElementById('reset-api-err').textContent = 'Erro de conexão.';
+      document.getElementById('reset-api-err').classList.remove('hidden');
+      btn.disabled = false; btn.textContent = 'Redefinir senha';
     }
   }
 
