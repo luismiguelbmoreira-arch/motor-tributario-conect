@@ -330,11 +330,10 @@
                      class="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
                 Senha
               </label>
-              <a href="#"
-                 class="text-xs text-blue-500 hover:text-blue-700 transition-colors font-medium"
-                 aria-label="Recuperar senha por e-mail">
+              <button type="button" onclick="document.getElementById('modal-senha').classList.remove('hidden')"
+                 class="text-xs text-blue-500 hover:text-blue-700 transition-colors font-medium">
                 Esqueci a senha
-              </a>
+              </button>
             </div>
             <div class="relative">
               <input
@@ -487,8 +486,7 @@
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
     }
 
-    // URL da API — ajustar em produção via meta tag ou config
-    const API_BASE = 'http://localhost:8000';
+    const API_BASE = window.location.origin;
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -562,6 +560,31 @@
       generalError.classList.add('hidden');
     });
   </script>
+
+<!-- Modal: Esqueci a senha -->
+<div id="modal-senha" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+  <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+        </svg>
+      </div>
+      <h3 class="text-base font-bold text-slate-800">Recuperação de acesso</h3>
+    </div>
+    <p class="text-sm text-slate-600 leading-relaxed">
+      O reset de senha é feito pelo <strong>administrador do sistema</strong>.<br><br>
+      Entre em contato com o responsável pelo escritório para que ele acesse o painel de administração e redefina sua senha.
+    </p>
+    <div class="bg-slate-50 rounded-lg px-4 py-3 text-xs text-slate-500">
+      <strong>Admin:</strong> acesse <code class="bg-white px-1 rounded border border-slate-200">admin.html</code> → coluna do usuário → <em>Resetar Senha</em>
+    </div>
+    <button onclick="document.getElementById('modal-senha').classList.add('hidden')"
+      class="w-full bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium py-2.5 rounded-xl transition-colors">
+      Entendido
+    </button>
+  </div>
+</div>
 
 </body>
 </html>

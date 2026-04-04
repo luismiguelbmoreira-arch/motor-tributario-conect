@@ -278,6 +278,34 @@ def desativar_usuario(user_id: int) -> bool:
         return True
 
 
+def resetar_senha(user_id: int, nova_senha: str) -> bool:
+    """
+    Redefine a senha de um usuário via hash bcrypt.
+    Apenas admins devem chamar este endpoint (validação no api_motor.py).
+
+    Args:
+        user_id: ID do usuário.
+        nova_senha: Nova senha em plaintext (será hasheada aqui).
+
+    Returns:
+        True se redefinida, False se usuário não encontrado.
+
+    Raises:
+        ValueError: se nova_senha tiver menos de 8 caracteres.
+    """
+    if len(nova_senha) < 8:
+        raise ValueError("A nova senha deve ter no mínimo 8 caracteres.")
+    with Session(_auth_engine) as session:
+        user = session.get(UserDB, user_id)
+        if not user:
+            return False
+        user.hashed_password = _hash_senha(nova_senha)
+        session.add(user)
+        session.commit()
+        logger.info("Senha redefinida | id=%s", user_id)
+        return True
+
+
 def criar_admin_default() -> None:
     """
     Cria usuário admin padrão se a tabela estiver vazia.
