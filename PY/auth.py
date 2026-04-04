@@ -22,7 +22,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import HTTPException
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError as JWTError  # Drop-in para python-jose
 from passlib.context import CryptContext
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from typing import Literal

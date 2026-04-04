@@ -136,6 +136,14 @@ class EmpresaFornecedora(BaseModel):
             "LC 123/2006, Art. 18-A."
         )
     )
+    data_inicio_atividade: Optional[date] = Field(
+        default=None,
+        description=(
+            "Data de início de atividade da empresa. "
+            "Se empresa tem menos de 12 meses, RBT12 deve ser proporcionalizada. "
+            "LC 123/2006, Art. 3º, §2º."
+        )
+    )
 
     @field_validator("cnpj")
     @classmethod
@@ -207,9 +215,14 @@ class OperacaoFiscal(BaseModel):
     tinha_st_icms: bool = Field(
         default=False, description="Empresa possuía Substituição Tributária de ICMS"
     )
-    possui_reducao_cbs_ibs: bool = Field(
-        default=False,
-        description="Produto com redução de alíquota CBS/IBS (medicamentos, agro, educação)"
+    reducao_cbs_ibs: Literal["INTEGRAL", "REDUCAO_30", "REDUCAO_60", "ISENTO"] = Field(
+        default="INTEGRAL",
+        description=(
+            "Nível de redução CBS/IBS conforme LC 214/2025: "
+            "INTEGRAL (sem redução), REDUCAO_30 (Art. 262 — profissionais liberais), "
+            "REDUCAO_60 (Art. 258 — saúde, educação, cesta básica ampliada), "
+            "ISENTO (Art. 264 — cesta básica nacional). "
+        )
     )
     beneficio_fiscal_antigo: Decimal = Field(
         default=Decimal("0"), ge=Decimal("0"),
@@ -381,9 +394,38 @@ class MotorReformaTributaria:
     def calcular_rbt12(self) -> Decimal:
         """
         Receita Bruta Acumulada 12 meses.
-        LC 123/2006, Art. 12, § 1º.
+        Se empresa tem menos de 12 meses, proporcionaliza automaticamente.
+        LC 123/2006, Art. 3º, §2º — limites proporcionais ao nº de meses.
         """
-        return self.fornecedora.faturamento_12m.quantize(Decimal("0.01"), ROUND_HALF_UP)
+        rbt12 = self.fornecedora.faturamento_12m.quantize(Decimal("0.01"), ROUND_HALF_UP)
+
+        if self.fornecedora.data_inicio_atividade is not None:
+            hoje = self.operacao.data_emissao
+            delta = (hoje.year - self.fornecedora.data_inicio_atividade.year) * 12 + \
+                    (hoje.month - self.fornecedora.data_inicio_atividade.month)
+            meses_atividade = max(1, min(delta, 12))
+
+            if meses_atividade < 12:
+                rbt12_proporcional = (rbt12 / meses_atividade * 12).quantize(
+                    Decimal("0.01"), ROUND_HALF_UP
+                )
+                self._registrar_passo(
+                    id="RBT12_PROPORCIONAL",
+                    titulo=f"RBT12 proporcionalizada ({meses_atividade} meses de atividade)",
+                    base=str(rbt12),
+                    deducoes="N/A",
+                    aliquota=f"{meses_atividade}/12",
+                    valor=str(rbt12_proporcional),
+                    lei="LC 123/2006, Art. 3º, §2º",
+                    detalhe=(
+                        f"Empresa iniciou em {self.fornecedora.data_inicio_atividade}. "
+                        f"RBT12 informada R$ {rbt12:,.2f} ÷ {meses_atividade} meses × 12 = "
+                        f"R$ {rbt12_proporcional:,.2f} (proporcionalizada)."
+                    ),
+                )
+                return rbt12_proporcional
+
+        return rbt12
 
     def calcular_fator_r(self) -> Optional[Decimal]:
         """

@@ -245,13 +245,19 @@ class AnaliseManualRequest(BaseModel):
     tinha_st_icms: bool = Field(
         default=False, description="Empresa possuía Substituição Tributária de ICMS"
     )
-    possui_reducao_cbs_ibs: bool = Field(
-        default=False,
-        description="Produto com redução de alíquota CBS/IBS"
+    reducao_cbs_ibs: Literal["INTEGRAL", "REDUCAO_30", "REDUCAO_60", "ISENTO"] = Field(
+        default="INTEGRAL",
+        description="Nível de redução CBS/IBS (LC 214/2025, Arts. 258-270)"
     )
     beneficio_fiscal_antigo: Decimal = Field(
         default=Decimal("0"), ge=Decimal("0"),
         description="Isenção/benefício ICMS eliminado até 2032"
+    )
+
+    # ── Empresa nova (< 12 meses) ──────────────────────────────────────────
+    data_inicio_atividade: Optional[str] = Field(
+        default=None,
+        description="Data de início de atividade (YYYY-MM-DD). Se < 12 meses, RBT12 proporcionalizada."
     )
 
     # ── MEI (visível apenas quando regime == "MEI") ──────────────────────────
@@ -751,6 +757,10 @@ def analise_manual(
             folha_salarios_12m=req.folha_salarios_12m,
             anexo_simples=req.anexo_simples,
             categoria_mei=req.categoria_mei or ("SERVICOS" if req.regime == "MEI" else None),
+            data_inicio_atividade=(
+                date_type.fromisoformat(req.data_inicio_atividade)
+                if req.data_inicio_atividade else None
+            ),
         )
 
         # Monta EmpresaCompradora
@@ -777,7 +787,7 @@ def analise_manual(
             forma_recebimento=req.forma_recebimento,
             rpa_mensal=req.rpa_mensal,
             tinha_st_icms=req.tinha_st_icms,
-            possui_reducao_cbs_ibs=req.possui_reducao_cbs_ibs,
+            reducao_cbs_ibs=req.reducao_cbs_ibs,
             beneficio_fiscal_antigo=req.beneficio_fiscal_antigo,
             lucro_real_mensal=req.lucro_real_mensal,
             creditos_pis_cofins=req.creditos_pis_cofins,

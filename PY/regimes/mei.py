@@ -28,8 +28,20 @@ from regimes.base import BaseRegimeEngine
 # CONSTANTES LEGAIS — FROZEN 2026 (LC 123/2006, Art. 18-A + Resolução CGSN)
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Salário mínimo 2026 — base de cálculo do INSS MEI (Decreto 12.302/2024 + reajuste 2026)
-SALARIO_MINIMO_2026 = Decimal("1622.00")
+# Salário mínimo por ano — base de cálculo do INSS MEI (LC 123/2006, Art. 18-A, §3º, I)
+# 2026: Decreto confirmado. 2027-2033: estimativas conservadoras (~7% a.a.)
+# ATUALIZAR anualmente com decreto presidencial.
+SM_POR_ANO: Dict[int, Decimal] = {
+    2026: Decimal("1621.00"),   # Confirmado — R$ 1.621,00 (SM 2026)
+    2027: Decimal("1734.00"),   # Estimativa (+7%)
+    2028: Decimal("1855.00"),   # Estimativa (+7%)
+    2029: Decimal("1985.00"),   # Estimativa (+7%)
+    2030: Decimal("2124.00"),   # Estimativa (+7%)
+    2031: Decimal("2273.00"),   # Estimativa (+7%)
+    2032: Decimal("2432.00"),   # Estimativa (+7%)
+    2033: Decimal("2602.00"),   # Estimativa (+7%)
+}
+SALARIO_MINIMO_2026 = SM_POR_ANO[2026]  # Compatibilidade
 
 # INSS MEI: 5% do salário mínimo (LC 123/2006, Art. 18-A, § 3º, I)
 ALIQUOTA_INSS_MEI = Decimal("0.05")

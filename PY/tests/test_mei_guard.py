@@ -137,40 +137,40 @@ class TestMEIDASCalculo:
         engine = MEIEngine(empresa_mei, trilha)
         result = engine.calcular_das_mensal("COMERCIO")
 
-        assert result["INSS"] == Decimal("81.10")
+        assert result["INSS"] == Decimal("81.05")
         assert result["ICMS"] == Decimal("5.00")
         assert result["ISS"] == Decimal("0.00")
-        assert result["DAS_TOTAL"] == Decimal("86.10")
+        assert result["DAS_TOTAL"] == Decimal("86.05")
 
     def test_das_industria_2026(self, empresa_mei, trilha):
         """INDUSTRIA: INSS R$ 81,10 + ICMS R$ 5,00 = R$ 86,10."""
         engine = MEIEngine(empresa_mei, trilha)
         result = engine.calcular_das_mensal("INDUSTRIA")
 
-        assert result["INSS"] == Decimal("81.10")
+        assert result["INSS"] == Decimal("81.05")
         assert result["ICMS"] == Decimal("5.00")
         assert result["ISS"] == Decimal("0.00")
-        assert result["DAS_TOTAL"] == Decimal("86.10")
+        assert result["DAS_TOTAL"] == Decimal("86.05")
 
     def test_das_servicos_2026(self, empresa_mei, trilha):
         """SERVICOS: INSS R$ 81,10 + ISS R$ 5,00 = R$ 86,10."""
         engine = MEIEngine(empresa_mei, trilha)
         result = engine.calcular_das_mensal("SERVICOS")
 
-        assert result["INSS"] == Decimal("81.10")
+        assert result["INSS"] == Decimal("81.05")
         assert result["ICMS"] == Decimal("0.00")
         assert result["ISS"] == Decimal("5.00")
-        assert result["DAS_TOTAL"] == Decimal("86.10")
+        assert result["DAS_TOTAL"] == Decimal("86.05")
 
     def test_das_comercio_servicos_2026(self, empresa_mei, trilha):
         """COMERCIO_SERVICOS: INSS R$ 81,10 + ICMS R$ 5,00 + ISS R$ 5,00 = R$ 91,10."""
         engine = MEIEngine(empresa_mei, trilha)
         result = engine.calcular_das_mensal("COMERCIO_SERVICOS")
 
-        assert result["INSS"] == Decimal("81.10")
+        assert result["INSS"] == Decimal("81.05")
         assert result["ICMS"] == Decimal("5.00")
         assert result["ISS"] == Decimal("5.00")
-        assert result["DAS_TOTAL"] == Decimal("91.10")
+        assert result["DAS_TOTAL"] == Decimal("91.05")
 
     def test_categoria_invalida_levanta_erro(self, empresa_mei, trilha):
         """Categoria desconhecida deve levantar ValueError com mensagem clara."""
@@ -247,7 +247,7 @@ class TestMEITetoEIVA:
         )
 
         # DAS COMERCIO = R$ 86,10 / R$ 5.000,00 = 0,01722 = 1,722%
-        esperado = (Decimal("86.10") / Decimal("5000.00")).quantize(Decimal("0.000001"))
+        esperado = (Decimal("86.05") / Decimal("5000.00")).quantize(Decimal("0.000001"))
         assert result["aliquota_efetiva"] == esperado
 
     def test_max_fiscal_02_lei_em_todos_passos(self, empresa_mei, trilha):
