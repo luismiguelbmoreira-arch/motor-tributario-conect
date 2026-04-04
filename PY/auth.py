@@ -397,6 +397,36 @@ def gerar_token_jwt(user_id: int, username: str, role: str) -> str:
     return token
 
 
+def renovar_token_jwt(token: str) -> Optional[str]:
+    """
+    Renova JWT se restam menos de 2h para expirar.
+    Retorna novo token ou None se não precisa renovar ainda.
+    Lança HTTPException 401 se token inválido.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(
+            status_code=401,
+            detail="Token inválido ou expirado.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    exp = payload.get("exp")
+    if exp is None:
+        return None
+    restante = datetime.fromtimestamp(exp, tz=timezone.utc) - datetime.now(timezone.utc)
+    if restante.total_seconds() > 2 * 3600:
+        return None  # Mais de 2h restantes — não precisa renovar
+    # Renova com novo exp
+    novo = gerar_token_jwt(
+        user_id=int(payload["sub"]),
+        username=payload["username"],
+        role=payload["role"],
+    )
+    logger.info("Token renovado | user_id=%s", payload["sub"])
+    return novo
+
+
 def verificar_token(token: str) -> dict:
     """
     Decodifica e valida token JWT.

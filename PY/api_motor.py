@@ -39,13 +39,16 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal, Optional
 
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic import ValidationError as PydanticValidationError
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 # Adiciona PY/ ao path para imports relativos
 sys.path.insert(0, str(Path(__file__).parent))
@@ -59,6 +62,7 @@ from auth import (
     desativar_usuario,
     gerar_token_jwt,
     listar_usuarios,
+    renovar_token_jwt,
     resetar_senha,
     trocar_senha_proprio,
     verificar_token,
@@ -345,6 +349,11 @@ async def lifespan(app: FastAPI):
     logger.info("Motor Tributário API encerrada")
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# RATE LIMITING — protege login contra brute force e API contra abuso
+# ─────────────────────────────────────────────────────────────────────────────
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(
     title="Motor Tributário Conect 2026-2033",
     description=(
@@ -354,6 +363,8 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan,
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS — origens permitidas via CORS_ORIGINS (separadas por vírgula).
 # Padrão: apenas localhost. NUNCA usar "*" com autenticação JWT em produção.
@@ -470,12 +481,15 @@ def auditar_batch(req: AuditarBatchRequest):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.post("/auth/login", response_model=LoginResponse, tags=["auth"])
-def login(req: LoginRequest):
+@limiter.limit("5/minute")
+def login(request: Request, req: LoginRequest):
     """
     Autentica usuário e retorna JWT Bearer token (exp 8h).
+    Rate limit: 5 tentativas por minuto por IP.
 
     Erros HTTP:
       401 — credenciais inválidas ou usuário inativo
+      429 — muitas tentativas (rate limit)
     """
     user = autenticar_usuario(req.username, req.password)
     if user is None:
@@ -510,6 +524,24 @@ def me(current_user: dict = Depends(get_current_user)):
         "username": current_user.get("username"),
         "role": current_user.get("role"),
     }
+
+
+@app.post("/auth/refresh", tags=["auth"])
+def refresh_token(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """
+    Renova JWT se restam menos de 2h para expirar.
+    Retorna novo token ou 304 se ainda não precisa renovar.
+    O frontend chama periodicamente (ex: a cada 30min).
+    """
+    novo = renovar_token_jwt(credentials.credentials)
+    if novo is None:
+        return JSONResponse(
+            status_code=304,
+            content={"detail": "Token ainda válido, renovação não necessária."},
+        )
+    return {"access_token": novo, "token_type": "bearer"}
 
 
 class TrocarSenhaRequest(BaseModel):
@@ -547,7 +579,9 @@ def change_password(
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.post("/admin/usuarios", response_model=UsuarioResponse, tags=["admin"])
+@limiter.limit("10/minute")
 def criar_usuario_endpoint(
+    request: Request,
     req: CriarUsuarioRequest,
     _admin: dict = Depends(require_admin),
 ):
