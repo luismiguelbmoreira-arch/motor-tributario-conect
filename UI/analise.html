@@ -448,7 +448,7 @@
           </div>
           <input id="percentual_b2b" type="range" min="0" max="100" value="70" step="5"
             class="w-full accent-blue-600" oninput="updateMistoLabels(this.value)">
-          <p class="text-xs text-slate-400 mt-1">Arraste para ajustar o mix de clientes da empresa.</p>
+          <p class="text-xs text-slate-400 mt-1">Ajuste conforme a realidade da empresa. Estimativa inicial baseada no CNAE — sem base legal.</p>
         </div>
       </div>
 
@@ -685,7 +685,7 @@
       var perfilNome = data.perfil_sugerido === 'MISTO' ? 'Misto (' + data.percentual_b2b_estimado + '% B2B)'
         : data.perfil_sugerido === 'B2B_CONTRIBUINTE' ? 'B2B (' + data.percentual_b2b_estimado + '%)'
         : 'B2C (' + (100 - data.percentual_b2b_estimado) + '%)';
-      sug.textContent = 'Sugestao: Anexo ' + data.anexo_sugerido + ' (' + data.anexo_fonte.toLowerCase() + ') | Perfil ' + perfilNome;
+      sug.textContent = 'Sugestao (ajuste conforme sua realidade): Anexo ' + data.anexo_sugerido + ' | Perfil ' + perfilNome;
       sug.classList.remove('hidden');
       // Auto-preencher perfil se usuario ainda nao escolheu
       if (!tipoCompradorSelecionado) {
