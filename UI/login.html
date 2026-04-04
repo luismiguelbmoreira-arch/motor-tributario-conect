@@ -487,8 +487,7 @@
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
     }
 
-    // URL da API — ajustar em produção via meta tag ou config
-    const API_BASE = 'http://localhost:8000';
+    const API_BASE = window.location.origin;
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
