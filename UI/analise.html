@@ -413,24 +413,41 @@
       <!-- Tipo do comprador -->
       <div class="field-tooltip">
         <label class="block text-sm font-medium text-slate-700 mb-1">
-          Tipo do Comprador <span class="text-red-500">*</span>
+          Perfil de Clientes <span class="text-red-500">*</span>
         </label>
-        <span class="tip">B2B (empresa para empresa): o comprador pode aproveitar créditos de IVA. B2C (para consumidor final): sem crédito — impacto maior na cadeia.</span>
-        <div class="grid grid-cols-2 gap-3">
+        <span class="tip">Quem compra de voce? B2B = empresas (CNPJ, usam credito IVA). B2C = consumidor final (CPF). Misto = atende ambos (ex: loja de materiais, escritorio contabil).</span>
+        <div class="grid grid-cols-3 gap-3">
           <label id="lbl-b2b" class="flex items-start gap-2 border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-blue-400 transition-colors" onclick="setTipoComprador('B2B_CONTRIBUINTE')">
             <input type="radio" name="tipo_comprador" value="B2B_CONTRIBUINTE" class="mt-0.5 accent-blue-600">
             <div>
-              <p class="text-sm font-semibold text-slate-800">B2B — Empresa</p>
-              <p class="text-xs text-slate-500">CNPJ contribuinte, pode usar crédito IVA</p>
+              <p class="text-sm font-semibold text-slate-800">B2B</p>
+              <p class="text-xs text-slate-500">So empresas</p>
+            </div>
+          </label>
+          <label id="lbl-misto" class="flex items-start gap-2 border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-blue-400 transition-colors" onclick="setTipoComprador('MISTO')">
+            <input type="radio" name="tipo_comprador" value="MISTO" class="mt-0.5 accent-blue-600">
+            <div>
+              <p class="text-sm font-semibold text-slate-800">Misto</p>
+              <p class="text-xs text-slate-500">Empresas + consumidores</p>
             </div>
           </label>
           <label id="lbl-b2c" class="flex items-start gap-2 border border-slate-200 rounded-lg p-3 cursor-pointer hover:border-blue-400 transition-colors" onclick="setTipoComprador('B2C_CONSUMIDOR_FINAL')">
             <input type="radio" name="tipo_comprador" value="B2C_CONSUMIDOR_FINAL" class="mt-0.5 accent-blue-600">
             <div>
-              <p class="text-sm font-semibold text-slate-800">B2C — Consumidor</p>
-              <p class="text-xs text-slate-500">CPF, sem crédito IVA</p>
+              <p class="text-sm font-semibold text-slate-800">B2C</p>
+              <p class="text-xs text-slate-500">So consumidores</p>
             </div>
           </label>
+        </div>
+        <!-- Slider B2B% visivel apenas quando MISTO -->
+        <div id="misto-slider" class="hidden mt-3 bg-slate-50 border border-slate-200 rounded-lg p-3">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-xs font-medium text-blue-700">B2B <span id="pct-b2b-label">70</span>%</span>
+            <span class="text-xs font-medium text-amber-700">B2C <span id="pct-b2c-label">30</span>%</span>
+          </div>
+          <input id="percentual_b2b" type="range" min="0" max="100" value="70" step="5"
+            class="w-full accent-blue-600" oninput="updateMistoLabels(this.value)">
+          <p class="text-xs text-slate-400 mt-1">Arraste para ajustar o mix de clientes da empresa.</p>
         </div>
       </div>
 
@@ -641,9 +658,21 @@
   function setTipoComprador(tipo) {
     tipoCompradorSelecionado = tipo;
     document.querySelectorAll('label[id^="lbl-"]').forEach(l => l.classList.remove('border-blue-400', 'bg-blue-50'));
-    document.getElementById(tipo === 'B2B_CONTRIBUINTE' ? 'lbl-b2b' : 'lbl-b2c')
-      .classList.add('border-blue-400', 'bg-blue-50');
+    var lblId = tipo === 'B2B_CONTRIBUINTE' ? 'lbl-b2b' : tipo === 'MISTO' ? 'lbl-misto' : 'lbl-b2c';
+    document.getElementById(lblId).classList.add('border-blue-400', 'bg-blue-50');
+    // Mostrar slider apenas para MISTO
+    var slider = document.getElementById('misto-slider');
+    if (tipo === 'MISTO') {
+      slider.classList.remove('hidden');
+    } else {
+      slider.classList.add('hidden');
+    }
     checkStep3();
+  }
+
+  function updateMistoLabels(val) {
+    document.getElementById('pct-b2b-label').textContent = val;
+    document.getElementById('pct-b2c-label').textContent = 100 - parseInt(val);
   }
 
   function buildResumo() {
@@ -732,6 +761,9 @@
       folha_salarios_12m: folha12m,
       // EmpresaCompradora
       tipo_comprador:    tipoCompradorSelecionado,
+      percentual_b2b:    tipoCompradorSelecionado === 'MISTO'
+        ? parseInt(document.getElementById('percentual_b2b').value)
+        : (tipoCompradorSelecionado === 'B2B_CONTRIBUINTE' ? 100 : 0),
       // OperacaoFiscal
       data_emissao:      document.getElementById('data_emissao').value,
       valor_operacao:    valor,

@@ -218,8 +218,12 @@ class AnaliseManualRequest(BaseModel):
     )
 
     # ── EmpresaCompradora ─────────────────────────────────────────────────────
-    tipo_comprador: Literal["B2B_CONTRIBUINTE", "B2C_CONSUMIDOR_FINAL"] = Field(
-        ..., description="Tipo do comprador"
+    tipo_comprador: Literal["B2B_CONTRIBUINTE", "B2C_CONSUMIDOR_FINAL", "MISTO"] = Field(
+        ..., description="Tipo do comprador (MISTO = atende B2B e B2C)"
+    )
+    percentual_b2b: Decimal = Field(
+        default=Decimal("100"), ge=Decimal("0"), le=Decimal("100"),
+        description="% da receita B2B (0-100). Usado quando tipo=MISTO."
     )
     regime_comprador: str = Field(
         default="NAO_INFORMADO", description="Regime tributário do comprador"
@@ -766,6 +770,7 @@ def analise_manual(
         # Monta EmpresaCompradora
         compradora = EmpresaCompradora(
             tipo=req.tipo_comprador,
+            percentual_b2b=req.percentual_b2b,
             regime=req.regime_comprador,
             uf_destino=req.uf_destino,
         )
