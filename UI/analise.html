@@ -290,6 +290,20 @@
         <p id="valor-err" class="msg-error hidden">Valor deve ser maior que R$ 0,00.</p>
       </div>
 
+      <!-- Forma de recebimento -->
+      <div class="field-tooltip">
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          Forma de Recebimento <span class="text-red-500">*</span>
+        </label>
+        <span class="tip">Determina se haverá retenção de Split Payment (IBS/CBS) a partir de 2027. Pagamentos eletrônicos (Pix/Cartão) estão sujeitos à retenção automática na fonte pela instituição financeira (LC 214/2025, Art. 28).</span>
+        <select id="forma_recebimento" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" onchange="checkStep3()">
+          <option value="">Selecione…</option>
+          <option value="PIX_BOLETO">Pix / Boleto</option>
+          <option value="CARTAO">Cartão (débito/crédito)</option>
+          <option value="DINHEIRO">Dinheiro / Cheque</option>
+        </select>
+      </div>
+
       <!-- Tipo do comprador -->
       <div class="field-tooltip">
         <label class="block text-sm font-medium text-slate-700 mb-1">
@@ -472,7 +486,8 @@
     const dataOk  = dataVal >= '2026-01-01' && dataVal <= '2033-12-31';
     const valorOk = validateValor();
     const tipoOk  = tipoCompradorSelecionado !== '';
-    const ok = dataOk && valorOk && tipoOk;
+    const formaOk = document.getElementById('forma_recebimento').value !== '';
+    const ok = dataOk && valorOk && tipoOk && formaOk;
     document.getElementById('btn-analisar').disabled = !ok;
     if (ok) buildResumo();
     return ok;
@@ -498,6 +513,7 @@
       `RBT12: R$ ${rbt12 ? rbt12.toLocaleString('pt-BR', {minimumFractionDigits:2}) : '—'}`,
       `Data operação: ${document.getElementById('data_emissao').value}`,
       `Comprador: ${tipoCompradorSelecionado === 'B2B_CONTRIBUINTE' ? 'B2B (Empresa)' : 'B2C (Consumidor)'}`,
+      `Recebimento: ${{ PIX_BOLETO: 'Pix / Boleto', CARTAO: 'Cartão', DINHEIRO: 'Dinheiro / Cheque' }[document.getElementById('forma_recebimento').value] || '—'}`,
     ];
     list.innerHTML = items.map(i => `<li>${i}</li>`).join('');
     box.classList.remove('hidden');
@@ -572,6 +588,7 @@
       valor_operacao:    valor,
       rpa_mensal:        rpa,
       tinha_st_icms:     st !== null && st > 0,
+      forma_recebimento: document.getElementById('forma_recebimento').value,
     };
 
     try {
