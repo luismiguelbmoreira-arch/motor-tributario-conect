@@ -19,17 +19,16 @@ GUARD CLAUSE (Camada 2):
   2. atividades ausentes  → ValueError com instrução clara
 """
 
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Dict, List
 
 from regimes.base import BaseRegimeEngine
 from tabelas_simples import (
-    TABELAS_ANEXOS,
     DISTRIBUICAO_DAS,
+    TABELAS_ANEXOS,
     TETO_SIMPLES_NACIONAL,
     obter_faixa_numero,
 )
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ENGINE — SIMPLES NACIONAL MULTI-ATIVIDADE

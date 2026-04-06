@@ -14,7 +14,6 @@ que grava na mesma trilha de auditoria — conforme MAX_FISCAL_01/02.
 
 import logging
 from datetime import datetime
-from decimal import Decimal
 from typing import Any, Dict, List, Literal
 
 logger = logging.getLogger("motor_conect.regimes")

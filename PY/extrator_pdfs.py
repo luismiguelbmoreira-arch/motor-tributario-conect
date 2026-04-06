@@ -28,7 +28,7 @@ import gc
 import json
 import logging
 import os
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Literal, Optional
 
@@ -610,13 +610,14 @@ def processar_pdfs_bytes(conteudos: list[bytes]) -> dict:
     empresa_params = params["empresa"]
     auditoria_params = params["auditoria"]
 
+    from datetime import date
+
     from motor_tributario import (
         EmpresaCompradora,
         EmpresaFornecedora,
         MotorReformaTributaria,
         OperacaoFiscal,
     )
-    from datetime import date
 
     fornecedora = EmpresaFornecedora(
         cnpj=empresa_params["cnpj"],
