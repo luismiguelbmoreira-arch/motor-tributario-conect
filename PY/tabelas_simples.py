@@ -325,21 +325,21 @@ ALIQUOTA_RETENCAO_SPLIT_PAYMENT = Decimal("0.009")  # ~0.9% sobre valor da NF (2
 CNAE_PREFIXO_PARA_ANEXO: dict = {
     # INDÚSTRIA (Seções B e C) -> Anexo II
     **{str(i).zfill(2): "II" for i in range(5, 34)},
-    
+
     # CONSTRUÇÃO (Seção F) -> Anexo IV
     "41": "IV", "42": "IV", "43": "IV",
-    
+
     # COMÉRCIO (Seção G) -> Anexo I
     "45": "I", "46": "I", "47": "I",
-    
+
     # SERVIÇOS (Transporte, Alojamento, Alimentação) -> Anexo III
     "49": "III", "50": "III", "51": "III", "52": "III", "53": "III",
     "55": "III", "56": "III",
-    
+
     # SERVIÇOS DE TI, COMUNICAÇÃO E INTELECTUAIS -> Geralmente Anexo V (Fator R)
     "62": "V", "63": "V", "69": "V", "70": "V", "71": "V", "72": "V", "73": "V", "74": "V", "75": "V",
     "78": "V", "82": "V", "85": "V",
-    
+
     # SERVIÇOS DE MANUTENÇÃO, LIMPEZA, REPAROS -> Anexo III
     "80": "III", "81": "III", "95": "III", "96": "III",
 }
@@ -350,14 +350,14 @@ CNAE_PARA_ANEXO: dict = {
     "6201501": "V", "6202300": "V", "6203100": "V", "6209100": "V",
     "6911701": "V", "6920601": "V", "7111100": "V", "7112000": "V",
     "7119703": "V", "7490101": "V", "8599603": "V",
-    
+
     # Serviços Especializados Anexo IV (Sem CPP no DAS)
     "8011101": "IV", "8121400": "IV", "8129000": "IV",
-    
+
     # Casos de Indústria que podem ser confundidos com Comércio
     "4721101": "II", # Panificação (Fabricação)
     "1091102": "II", # Fabricação de biscoitos
-    
+
     # Saúde (Anexo III se Fator R >= 0.28, senão V)
     "8610101": "V", "8630501": "V", "8630502": "V", "8630503": "V",
     "8640202": "V", "8650001": "V",
