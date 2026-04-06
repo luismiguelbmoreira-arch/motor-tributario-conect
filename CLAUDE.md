@@ -184,7 +184,7 @@ Todo evento gravado em `trilha_auditoria[]` segue este formato:
 | DIFAL Interestadual | 🟡 Pendente | — |
 | Fase 4 (relatórios PDF clientes) | 🟡 Bloqueado | Documentos reais do escritório |
 
-**ERR ativos críticos:** ERR-005 (CNAE incompleto), ERR-012 (purge vs anonimizar LGPD). Ver `docs/LOG_ERROS.md`.
+**ERR ativos críticos:** ERR-005 (CNAE incompleto), ERR-012 (purge vs anonimizar LGPD). Ver `docs/roadmap/LOG_ERROS.md`.
 
 ---
 

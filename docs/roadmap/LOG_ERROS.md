@@ -369,8 +369,8 @@ Implementação da classe `Atividade` e suporte a loop em `calcular_das_mensal()
 
 | Empresa | Arquivos | Status |
 |---------|----------|--------|
-| CONFI-AR | `docs/doc calculo/CONFI_AR/` | ✅ Delta R$14,45 com cálculo manual multi-atividade — APROVADO (ERR-008 identificado, aguarda impl.) |
-| ITANGUA  | `docs/doc calculo/ITANGUA/`  | ✅ Delta R$74,36 com RPA real — APROVADO (ERR-007 documentado) |
+| CONFI-AR | `samples/doc_calculo/CONFI_AR/` | ✅ Delta R$14,45 com cálculo manual multi-atividade — APROVADO (ERR-008 identificado, aguarda impl.) |
+| ITANGUA  | `samples/doc_calculo/ITANGUA/`  | ✅ Delta R$74,36 com RPA real — APROVADO (ERR-007 documentado) |
 
 ---
 
