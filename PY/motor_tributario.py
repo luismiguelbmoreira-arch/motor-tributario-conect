@@ -760,6 +760,35 @@ class MotorReformaTributaria:
 
     # ── FASE 3: DISSECAÇÃO IBS/CBS ────────────────────────────────────────────
 
+    def _fator_reducao_cbs_ibs(self) -> Decimal:
+        """
+        ERR-016: Fator multiplicador conforme nível de redução CBS/IBS.
+        LC 214/2025:
+          - INTEGRAL   → 1.00 (sem redução)
+          - REDUCAO_30 → 0.70 (Art. 262 — profissionais liberais)
+          - REDUCAO_60 → 0.40 (Art. 258 — saúde, educação, cesta básica ampliada)
+          - ISENTO     → 0.00 (Art. 264 — cesta básica nacional)
+        """
+        _FATORES: Dict[str, Decimal] = {
+            "INTEGRAL":    Decimal("1.00"),
+            "REDUCAO_30":  Decimal("0.70"),
+            "REDUCAO_60":  Decimal("0.40"),
+            "ISENTO":      Decimal("0.00"),
+        }
+        nivel = self.operacao.reducao_cbs_ibs
+        fator = _FATORES[nivel]
+        if nivel != "INTEGRAL":
+            self._registrar_passo(
+                id="REDUCAO_CBS_IBS",
+                titulo=f"Redução CBS/IBS — {nivel}",
+                base="Alíquotas CBS/IBS do período",
+                deducoes="N/A",
+                aliquota=f"Fator {fator}",
+                valor=f"Alíquotas multiplicadas por {fator}",
+                lei="LC 214/2025, Arts. 258, 262, 264",
+            )
+        return fator
+
     def get_aliquotas_iva_por_ano(self) -> Dict[str, Decimal]:
         """
         Alíquotas CBS e IBS vigentes no ano da operação.
@@ -803,13 +832,15 @@ class MotorReformaTributaria:
         """
         Crédito IBS+CBS que o comprador B2B pode apropriar quando fornecedor está no Simples.
         No Simples puro: crédito limitado ao cobrado na guia (fração mínima do DAS).
+        ERR-016: Aplica fator de redução conforme reducao_cbs_ibs.
         LC 214/2025, Art. X (regra de creditamento para Simples Nacional).
         """
         aliquotas_iva = self.get_aliquotas_iva_por_ano()
-        # Crédito = valor_operacao × (CBS + IBS vigentes no ano)
+        fator = self._fator_reducao_cbs_ibs()
+        # Crédito = valor_operacao × (CBS + IBS) × fator_reducao
         credito = self.operacao.valor_operacao * (
             aliquotas_iva["CBS"] + aliquotas_iva["IBS"]
-        )
+        ) * fator
         return credito.quantize(Decimal("0.01"), ROUND_HALF_UP)
 
     # ── FASE 4: SIMULAÇÃO OPT-OUT ─────────────────────────────────────────────
