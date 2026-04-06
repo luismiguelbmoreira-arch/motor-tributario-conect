@@ -97,5 +97,5 @@ Antes de parametrizar, confirmar que recebeu:
 - [ ] **Presumido:** DCTF + DARFs + faturamento trimestral
 - [ ] **Anexo III/V:** Folha de salários 12 meses (Fator R)
 
-Arquivo recebido → salvar em `docs/doc calculo/[NOME_EMPRESA]/`  
-Pipeline de extração → `python PY/audit_universal.py "docs/doc calculo/[NOME_EMPRESA]"`
+Arquivo recebido → salvar em `samples/doc_calculo/[NOME_EMPRESA]/`  
+Pipeline de extração → `python PY/audit_universal.py "samples/doc_calculo/[NOME_EMPRESA]"`
