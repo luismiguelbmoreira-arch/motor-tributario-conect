@@ -158,7 +158,7 @@ class AuditarRequest(BaseModel):
     pasta_empresa: str = Field(
         ...,
         description="Caminho para pasta com PDFs da empresa",
-        examples=["../docs/doc calculo/CANAVEZI"],
+        examples=["../samples/doc_calculo/CANAVEZI"],
     )
 
 
@@ -166,7 +166,7 @@ class AuditarBatchRequest(BaseModel):
     pasta_base: str = Field(
         ...,
         description="Pasta base contendo subpastas de empresas",
-        examples=["../docs/doc calculo"],
+        examples=["../samples/doc_calculo"],
     )
 
 

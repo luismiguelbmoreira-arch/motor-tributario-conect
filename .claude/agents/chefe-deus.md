@@ -89,7 +89,7 @@ Ao fim de TODA sessão de decisão ou revisão arquitetural, antes de encerrar:
 
 1. Verificar se algum erro crítico, decisão reversa ou limitação de escopo foi identificada
 2. Avaliar se algum agente subordinado (Viciado, Luiz, Zen) sinalizou erro não registrado
-3. Atualizar `docs/LOG_ERROS.md` com entradas no formato:
+3. Atualizar `docs/roadmap/LOG_ERROS.md` com entradas no formato:
 
 ```
 ### ERR-XXX — [Título curto]

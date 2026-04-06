@@ -132,7 +132,7 @@ Ao fim de TODA sessão de design, implementação de componente ou revisão de U
 
 1. Verificar se algum componente viola WCAG 2.1 AA, Mobile-First, ou semântica de cores
 2. Registrar qualquer divergência entre JS mirror e Python (valores, estados, formatação)
-3. Atualizar `docs/LOG_ERROS.md` com entradas no formato:
+3. Atualizar `docs/roadmap/LOG_ERROS.md` com entradas no formato:
 
 ```
 ### ERR-XXX — [Título curto]
