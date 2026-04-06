@@ -45,7 +45,7 @@ ano-calendario, os limites [...] serao proporcionais ao numero de meses [...]"
 2. Se `data_inicio < 12 meses atras`: motor proporcionaliza automaticamente
 3. Adicionar campo no formulario `analise.html` (Step 1)
 
-**Status:** ⏳ Pendente
+**Status:** ✅ Corrigido — campo `data_inicio_atividade` adicionado + lógica de proporcionalização implementada em `calcular_rbt12()`. Testes em `test_err_fixes.py`.
 
 ---
 
@@ -67,7 +67,7 @@ LC 123/2006, Art. 18-A, par. 3o, I — INSS = 5% do salario minimo vigente.
 Criar tabela `SM_POR_ANO` em `tabelas_simples.py` com estimativas conservadoras.
 Atualizar anualmente com decreto presidencial.
 
-**Status:** ⏳ Pendente
+**Status:** ✅ Corrigido — `calcular_das_mensal(categoria, ano)` agora consulta `SM_POR_ANO[ano]` dinamicamente. Fallback com alerta para anos fora da tabela. Testes em `test_err_fixes.py`.
 
 ---
 
@@ -93,7 +93,7 @@ Separar no dicionario `PRESUNCAO_IRPJ_CSLL`:
 - "4921", "4922", "4929", "4930" → (0.16, 0.12)
 - "49" default → (0.08, 0.12)  # carga
 
-**Status:** ⏳ Pendente
+**Status:** ✅ Corrigido — `PRESUNCAO_IRPJ_CSLL` já mapeia CNAEs 4921/4922/4929/4930 com 16%. Método `_obter_percentual_presuncao()` busca 4 dígitos antes do fallback 2 dígitos. Testes em `test_err_fixes.py`.
 
 ---
 
@@ -118,7 +118,7 @@ Substituir `possui_reducao_cbs_ibs: bool` por
 `reducao_cbs_ibs: Literal["INTEGRAL", "REDUCAO_30", "REDUCAO_60", "ISENTO"]`
 com default "INTEGRAL".
 
-**Status:** ⏳ Pendente
+**Status:** ✅ Corrigido — campo renomeado para `reducao_cbs_ibs: Literal["INTEGRAL", "REDUCAO_30", "REDUCAO_60", "ISENTO"]`. Método `_fator_reducao_cbs_ibs()` aplica fator nos cálculos IVA. Testes em `test_err_fixes.py`.
 
 ---
 

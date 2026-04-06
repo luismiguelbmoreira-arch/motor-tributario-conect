@@ -74,10 +74,36 @@ class MEIEngine(BaseRegimeEngine):
     def __init__(self, fornecedora: Any, trilha: List[Dict[str, Any]]) -> None:
         super().__init__(fornecedora, trilha)  # Ativa Camada 2 automaticamente
 
-    def calcular_das_mensal(self, categoria: str) -> Dict[str, Decimal]:
+    def _obter_salario_minimo(self, ano: int) -> Decimal:
+        """
+        Retorna o salário mínimo para o ano informado.
+        ERR-014: SM dinâmico por ano para simulações 2026-2033.
+        LC 123/2006, Art. 18-A, §3º, I — INSS = 5% do salário mínimo vigente.
+        """
+        if ano in SM_POR_ANO:
+            return SM_POR_ANO[ano]
+        # Ano fora da tabela: usa o último disponível com alerta
+        ultimo_ano = max(SM_POR_ANO.keys())
+        self.trilha.append({
+            "tipo": "ALERTA_SM_EXTRAPOLADO",
+            "id": "ALERTA_SM_FORA_TABELA",
+            "titulo": f"Salário Mínimo {ano} não disponível",
+            "detalhe": (
+                f"Ano {ano} fora da tabela SM_POR_ANO (2026-{ultimo_ano}). "
+                f"Usando SM de {ultimo_ano} (R$ {SM_POR_ANO[ultimo_ano]:,.2f}) como fallback."
+            ),
+            "amparo_legal": "LC 123/2006, Art. 18-A, §3º, I",
+        })
+        return SM_POR_ANO[ultimo_ano]
+
+    def calcular_das_mensal(self, categoria: str, ano: int = 2026) -> Dict[str, Decimal]:
         """
         Calcula o DAS MEI mensal por categoria de atividade.
         LC 123/2006, Art. 18-A, § 3º | Resolução CGSN nº 140/2018.
+
+        Parâmetros:
+          categoria — COMERCIO | INDUSTRIA | SERVICOS | COMERCIO_SERVICOS
+          ano       — ano fiscal para lookup do salário mínimo (default 2026)
 
         Categorias aceitas:
           - COMERCIO          → INSS + ICMS
@@ -91,7 +117,8 @@ class MEIEngine(BaseRegimeEngine):
                 f"Categorias aceitas: {sorted(CATEGORIAS_MEI)}"
             )
 
-        inss = (SALARIO_MINIMO_2026 * ALIQUOTA_INSS_MEI).quantize(
+        salario_minimo = self._obter_salario_minimo(ano)
+        inss = (salario_minimo * ALIQUOTA_INSS_MEI).quantize(
             Decimal("0.01"), ROUND_HALF_UP
         )
 
@@ -102,8 +129,8 @@ class MEIEngine(BaseRegimeEngine):
 
         self._registrar_passo(
             id="DAS_MEI",
-            titulo=f"DAS MEI — Categoria {categoria}",
-            base=f"Salário Mínimo 2026 R$ {SALARIO_MINIMO_2026:,.2f}",
+            titulo=f"DAS MEI — Categoria {categoria} ({ano})",
+            base=f"Salário Mínimo {ano} R$ {salario_minimo:,.2f}",
             deducoes="Regime Unificado (sem PIS/COFINS/CSLL/IRPJ separados)",
             aliquota=(
                 f"INSS {ALIQUOTA_INSS_MEI*100:.0f}% s/ SM"
@@ -152,6 +179,7 @@ class MEIEngine(BaseRegimeEngine):
         receita_mensal: Decimal,
         categoria: str,
         receita_acumulada_ano: Decimal = Decimal("0.00"),
+        ano: int = 2026,
     ) -> Dict[str, Any]:
         """
         Carga tributária total mensal MEI.
@@ -166,7 +194,7 @@ class MEIEngine(BaseRegimeEngine):
         self._verificar_teto(receita_acumulada_ano)
 
         # Calcular DAS
-        das = self.calcular_das_mensal(categoria)
+        das = self.calcular_das_mensal(categoria, ano=ano)
 
         # Alíquota efetiva = DAS / receita mensal
         aliquota_efetiva = (
