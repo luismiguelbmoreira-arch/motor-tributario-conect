@@ -21,16 +21,15 @@ import json
 import logging
 import os
 import re
-from datetime import date, datetime
-from decimal import Decimal, ROUND_HALF_UP
+from datetime import datetime
+from decimal import Decimal
 from enum import Enum
 from typing import Any, Dict, List, Optional
-from uuid import uuid4
 
-from sqlmodel import Field, Session, SQLModel, create_engine, Column, TEXT
-from sqlalchemy import event, text
+from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlmodel import TEXT, Column, Field, Session, SQLModel, create_engine
 
 logger = logging.getLogger("motor_conect.database")
 

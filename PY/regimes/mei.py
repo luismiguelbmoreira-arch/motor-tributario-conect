@@ -19,7 +19,7 @@ CARACTERÍSTICAS MEI:
   - Sem PIS/COFINS, CSLL, IRPJ — substituídos pelo DAS unificado
 """
 
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Dict, List
 
 from regimes.base import BaseRegimeEngine

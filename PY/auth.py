@@ -19,14 +19,13 @@ LGPD:
 import logging
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Literal, Optional
 
-from fastapi import HTTPException
 import jwt
+from fastapi import HTTPException
 from jwt.exceptions import PyJWTError as JWTError  # Drop-in para python-jose
 from passlib.context import CryptContext
 from sqlmodel import Field, Session, SQLModel, create_engine, select
-from typing import Literal
 
 logger = logging.getLogger("motor_conect.auth")
 
@@ -177,13 +176,13 @@ def criar_usuario(
             select(UserDB).where(UserDB.username == username)
         ).first()
         if existente_username:
-            raise ValueError(f"Username já cadastrado.")
+            raise ValueError("Username já cadastrado.")
 
         existente_email = session.exec(
             select(UserDB).where(UserDB.email == email)
         ).first()
         if existente_email:
-            raise ValueError(f"E-mail já cadastrado.")
+            raise ValueError("E-mail já cadastrado.")
 
         novo = UserDB(
             username=username,

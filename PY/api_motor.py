@@ -33,7 +33,6 @@ import json
 import logging
 import os
 import sys
-import time
 from contextlib import asynccontextmanager
 from decimal import Decimal
 from pathlib import Path
@@ -73,6 +72,7 @@ from motor_tributario import (
     MotorReformaTributaria,
     OperacaoFiscal,
 )
+
 # relatorio_pdf importado lazy no endpoint — evita crash de startup se GTK ausente (Windows)
 try:
     from relatorio_pdf import gerar_pdf as _gerar_pdf
@@ -962,7 +962,9 @@ async def analise_pdf(
 
     # Pipeline de extração
     try:
-        from extrator_pdfs import processar_pdfs_bytes  # importação lazy — evita falha no startup se ANTHROPIC_API_KEY ausente
+        from extrator_pdfs import (
+            processar_pdfs_bytes,  # importação lazy — evita falha no startup se ANTHROPIC_API_KEY ausente
+        )
 
         diagnostico = processar_pdfs_bytes(conteudos)
         return JSONResponse(content=_serializar_decimal(diagnostico))

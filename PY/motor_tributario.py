@@ -21,33 +21,28 @@ Fases implementadas:
 import gc
 import logging
 from datetime import date, datetime
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Dict, List, Literal, Optional, Any
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 
-from validadores import validar_cnpj, validar_ncm, validar_uf, validar_cnae, ValidationResult
-from tabelas_simples import (
-    TABELAS_ANEXOS,
-    DISTRIBUICAO_DAS,
-    CRONOGRAMA_IVA,
-    CNAE_PARA_ANEXO,
-    CNAE_PREFIXO_PARA_ANEXO,
-    determinar_anexo_por_cnae,
-    determinar_anexo_por_cnae_com_fonte,
-    estimar_perfil_b2b,
-    TETO_SIMPLES_NACIONAL,
-    SUBLIMITE_ICMS_ISS,
-    ALERTA_90_PERCENT_TETO,
-    ANO_INICIO_SPLIT_PAYMENT,
-    ALIQUOTA_RETENCAO_SPLIT_PAYMENT,
-    obter_faixa_numero,
-)
-from regimes.base import BaseRegimeEngine, registrar_violacao, RegimeMismatchError
+from regimes.base import BaseRegimeEngine
 from regimes.lucro_presumido import LucroPresumidoEngine
 from regimes.lucro_real import LucroRealEngine
 from regimes.mei import MEIEngine
 from regimes.simples_multi import SimplesMultiAtividadeEngine
+from tabelas_simples import (
+    ALERTA_90_PERCENT_TETO,
+    ANO_INICIO_SPLIT_PAYMENT,
+    CRONOGRAMA_IVA,
+    DISTRIBUICAO_DAS,
+    SUBLIMITE_ICMS_ISS,
+    TABELAS_ANEXOS,
+    TETO_SIMPLES_NACIONAL,
+    determinar_anexo_por_cnae_com_fonte,
+    obter_faixa_numero,
+)
+from validadores import validar_cnae, validar_cnpj, validar_ncm, validar_uf
 
 logger = logging.getLogger("motor_conect.motor")
 
@@ -550,7 +545,7 @@ class MotorReformaTributaria:
         """
         rbt12 = self.calcular_rbt12()
         aliq_nominal, parcela_deduzir = self._buscar_faixa(rbt12, anexo)
-        
+
         # Fórmula SRF: ((RBT12 × Aliq_nominal) - Parcela_Deduzir) / RBT12
         aliquota_efetiva = ((rbt12 * aliq_nominal) - parcela_deduzir) / rbt12
         return aliquota_efetiva.quantize(Decimal("0.000001"), ROUND_HALF_UP)
@@ -564,11 +559,11 @@ class MotorReformaTributaria:
         anexo = self.determinar_anexo()
         rbt12 = self.calcular_rbt12()
         aliq_nominal, parcela_deduzir = self._buscar_faixa(rbt12, anexo)
-        
+
         # Fórmula SRF: ((RBT12 × Aliq_nominal) - Parcela_Deduzir) / RBT12
         ae = ((rbt12 * aliq_nominal) - parcela_deduzir) / rbt12
         ae_final = ae.quantize(Decimal("0.000001"), ROUND_HALF_UP)
-        
+
         self._registrar_passo(
             id="AE_SIMPLES",
             titulo=f"Alíquota Efetiva (Anexo {anexo})",
@@ -577,7 +572,7 @@ class MotorReformaTributaria:
             aliquota=f"Nominal {(aliq_nominal*100):.2f}%",
             valor=f"{(ae_final*100):.4f}%",
             lei="LC 123/2006, Art. 18, § 1º",
-            detalhe=f"Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12"
+            detalhe="Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12"
         )
         return ae_final
 
@@ -585,10 +580,10 @@ class MotorReformaTributaria:
         """
         DAS mensal.
         Suporta multi-atividade (ERR-008) quando self.fornecedora.atividades está presente.
-        
+
         LC 123/2006, Art. 18, § 3º:
-        "No caso de a ME ou a EPP exercer mais de uma atividade [...] a alíquota 
-        nominal [...] será a correspondente à respectiva atividade [...] aplicada 
+        "No caso de a ME ou a EPP exercer mais de uma atividade [...] a alíquota
+        nominal [...] será a correspondente à respectiva atividade [...] aplicada
         sobre a base de cálculo da mesma."
         """
         rbt12 = self.calcular_rbt12()
@@ -599,7 +594,7 @@ class MotorReformaTributaria:
             for item in self.fornecedora.atividades:
                 ae = self.calcular_ae_por_anexo(item.anexo)
                 faixa_num = obter_faixa_numero(rbt12, item.anexo)
-                
+
                 # Ajuste de segregação (ST/ISS Retido)
                 dist = DISTRIBUICAO_DAS.get(item.anexo, {}).get(faixa_num, {})
                 pct_abatimento = Decimal("0")
@@ -607,11 +602,11 @@ class MotorReformaTributaria:
                     pct_abatimento += dist.get("ICMS", Decimal("0"))
                 if item.iss_retido:
                     pct_abatimento += dist.get("ISS", Decimal("0"))
-                
+
                 ae_liquida = (ae * (Decimal("1") - pct_abatimento)).quantize(
                     Decimal("0.000001"), ROUND_HALF_UP
                 )
-                
+
                 das_item = (item.receita * ae_liquida).quantize(Decimal("0.01"), ROUND_HALF_UP)
                 das_total += das_item
             return das_total
@@ -687,7 +682,7 @@ class MotorReformaTributaria:
                 ae = self.calcular_ae_por_anexo(item.anexo)
                 faixa_num = obter_faixa_numero(rbt12, item.anexo)
                 dist = DISTRIBUICAO_DAS.get(item.anexo, {}).get(faixa_num, {})
-                
+
                 if not dist:
                     total_detalhado += (item.receita * ae).quantize(Decimal("0.01"), ROUND_HALF_UP)
                     continue
@@ -695,13 +690,13 @@ class MotorReformaTributaria:
                 for tributo, p_dist in dist.items():
                     if p_dist == Decimal("0"):
                         continue
-                        
+
                     # Zerar se for ST de ICMS ou Retenção de ISS
                     if tributo == "ICMS" and item.icms_st:
                         continue
                     if tributo == "ISS" and item.iss_retido:
                         continue
-                        
+
                     # Arredondamento individual per-tributo per-item
                     componente = (item.receita * ae * p_dist).quantize(Decimal("0.01"), ROUND_HALF_UP)
                     total_detalhado += componente
@@ -731,7 +726,7 @@ class MotorReformaTributaria:
                 comp = (r_sem_st * aliquota * percentual_dist).quantize(Decimal("0.01"), ROUND_HALF_UP)
             else:
                 comp = (base * aliquota * percentual_dist).quantize(Decimal("0.01"), ROUND_HALF_UP)
-            
+
             das_total += comp
 
         return das_total
@@ -865,7 +860,7 @@ class MotorReformaTributaria:
         ibs_no_das = self._calcular_fracao_componente("IBS")
         cbs_no_das = self._calcular_fracao_componente("CBS")
         das_mensal = self.calcular_das_mensal()
-        das_sem_iva = das_mensal - ibs_no_das - cbs_no_das
+        _ = das_mensal - ibs_no_das - cbs_no_das  # das_sem_iva: reservado para uso futuro
 
         # IVA recolhido separadamente (por operação)
         iva_por_fora = (
@@ -911,7 +906,7 @@ class MotorReformaTributaria:
             retencao = (
                 self.operacao.valor_operacao * taxa_retencao
             ).quantize(Decimal("0.01"), ROUND_HALF_UP)
-            
+
             self._registrar_passo(
                 id="SPLIT_PAYMENT",
                 titulo="Retenção Split Payment (IBS/CBS)",
@@ -922,7 +917,7 @@ class MotorReformaTributaria:
                 lei="LC 214/2025, Art. 344 e Art. X",
                 detalhe=f"Forma de recebimento {forma} identificada como elegível."
             )
-            
+
             return {
                 "ativo": True,
                 "ano_ativacao": ANO_INICIO_SPLIT_PAYMENT,
@@ -967,8 +962,6 @@ class MotorReformaTributaria:
         """
         alertas = []
         rbt12 = self.calcular_rbt12()
-        ano = self.operacao.data_emissao.year
-        fator_r = self.calcular_fator_r()
 
         # CRÍTICO: RBT12 > 90% do teto
         if rbt12 > ALERTA_90_PERCENT_TETO:
@@ -1187,8 +1180,6 @@ class MotorReformaTributaria:
         aliquota_efetiva = self.calcular_aliquota_efetiva()
         fator_r = self.calcular_fator_r()
         aliquotas_iva = self.get_aliquotas_iva_por_ano()
-
-        das_mensal = self.calcular_das_mensal()
 
         # Serializa cronograma IVA 2026-2033 como lista ordenada
         cronograma_iva_lista = [

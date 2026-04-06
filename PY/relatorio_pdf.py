@@ -75,11 +75,17 @@ def _gerar_html(diagnostico: dict) -> str:
         detalhe = _esc(alerta.get("mensagem") or "")
         lei    = ""
         if "CRITICO" in nivel:
-            cor = "#fef2f2"; borda = "#ef4444"; titulo_cor = "#991b1b"
+            cor = "#fef2f2"
+            borda = "#ef4444"
+            titulo_cor = "#991b1b"
         elif "ALTO" in nivel:
-            cor = "#fffbeb"; borda = "#f59e0b"; titulo_cor = "#92400e"
+            cor = "#fffbeb"
+            borda = "#f59e0b"
+            titulo_cor = "#92400e"
         else:
-            cor = "#fefce8"; borda = "#eab308"; titulo_cor = "#713f12"
+            cor = "#fefce8"
+            borda = "#eab308"
+            titulo_cor = "#713f12"
         alertas_html += f"""
         <div style="background:{cor};border-left:4px solid {borda};padding:10px 14px;border-radius:4px;margin-bottom:8px;">
           <div style="font-weight:700;color:{titulo_cor};font-size:10px;text-transform:uppercase;margin-bottom:4px;">{_esc(codigo)}</div>

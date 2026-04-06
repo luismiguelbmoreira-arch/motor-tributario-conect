@@ -1,0 +1,20 @@
+[run]
+# Medir cobertura apenas dos módulos de lógica de negócio.
+# Arquivos de infraestrutura (API, auth, DB, PDF, extrator) exigem mocking pesado
+# e devem ser cobertos por testes de integração separados.
+source = .
+omit =
+    tests/*
+    alembic/*
+    api_motor.py
+    auth.py
+    database.py
+    relatorio_pdf.py
+    audit_universal.py
+    extrator_pdfs.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    pass
