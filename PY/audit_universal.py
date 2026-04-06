@@ -5,9 +5,9 @@ Projeto: Motor Tributário Conect 2026-2033
 Escritório Contábil Conect — Sorocaba, SP
 
 USO:
-  python audit_universal.py "docs/doc calculo/CANAVEZI"
-  python audit_universal.py "docs/doc calculo/CONFI_AR"
-  python audit_universal.py "docs/doc calculo/ITANGUA"
+  python audit_universal.py "samples/doc_calculo/CANAVEZI"
+  python audit_universal.py "samples/doc_calculo/CONFI_AR"
+  python audit_universal.py "samples/doc_calculo/ITANGUA"
 
 PIPELINE:
   1. Lê todos os PDFs da pasta da empresa
@@ -187,9 +187,9 @@ def auditar_empresa(pasta_empresa: str | Path) -> dict:
 def main():
     if len(sys.argv) < 2:
         print("USO: python audit_universal.py <pasta_empresa>")
-        print("     python audit_universal.py docs/doc\\ calculo/CANAVEZI")
-        print("     python audit_universal.py docs/doc\\ calculo/CONFI_AR")
-        print("     python audit_universal.py docs/doc\\ calculo/ITANGUA")
+        print("     python audit_universal.py samples/doc_calculo/CANAVEZI")
+        print("     python audit_universal.py samples/doc_calculo/CONFI_AR")
+        print("     python audit_universal.py samples/doc_calculo/ITANGUA")
         sys.exit(1)
 
     pasta = sys.argv[1]

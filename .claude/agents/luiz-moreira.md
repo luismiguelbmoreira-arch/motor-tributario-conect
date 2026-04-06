@@ -159,7 +159,7 @@ Ao fim de TODA análise tributária, cálculo ou auditoria, antes de encerrar:
 
 1. Verificar se alguma divergência fiscal, alíquota incorreta ou CNAE mal classificado foi detectado
 2. Conferir se o resultado motor vs. e-CAC tem delta > R$ 0,01 (registrar se sim)
-3. Atualizar `docs/LOG_ERROS.md` com entradas no formato:
+3. Atualizar `docs/roadmap/LOG_ERROS.md` com entradas no formato:
 
 ```
 ### ERR-XXX — [Título curto]

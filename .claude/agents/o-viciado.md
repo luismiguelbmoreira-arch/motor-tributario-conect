@@ -129,7 +129,7 @@ Ao fim de TODA sessão de desenvolvimento, revisão ou execução de testes, ant
 
 1. Verificar se algum `float` escapou, validação falhou silenciosamente, ou teste apontou divergência
 2. Registrar qualquer limitação arquitetural descoberta durante o sprint
-3. Atualizar `docs/LOG_ERROS.md` com entradas no formato:
+3. Atualizar `docs/roadmap/LOG_ERROS.md` com entradas no formato:
 
 ```
 ### ERR-XXX — [Título curto]

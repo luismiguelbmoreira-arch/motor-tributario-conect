@@ -305,8 +305,8 @@ def extrair_dados_pdfs(caminhos_pdf: list[str | Path]) -> DadosExtraidosPDF:
 
     Exemplo:
         dados = extrair_dados_pdfs([
-            "docs/doc calculo/CANAVEZI/PGDAS-D extrato.pdf",
-            "docs/doc calculo/CANAVEZI/CNPJ_CANAVEZI.pdf",
+            "samples/doc_calculo/CANAVEZI/PGDAS-D extrato.pdf",
+            "samples/doc_calculo/CANAVEZI/CNPJ_CANAVEZI.pdf",
         ])
         print(dados.das_ecac_referencia)  # "16428.83"
     """
