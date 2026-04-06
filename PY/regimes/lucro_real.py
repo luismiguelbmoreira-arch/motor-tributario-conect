@@ -20,7 +20,7 @@ GUARD CLAUSE (Camada 2):
   resulta em RegimeMismatchError com log na trilha de auditoria.
 """
 
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Dict, List
 
 from regimes.base import BaseRegimeEngine
@@ -81,7 +81,7 @@ class LucroRealEngine(BaseRegimeEngine):
             base=f"Lucro Real Mensal R$ {lucro_real_mensal:,.2f}",
             deducoes=f"Teto adicional R$ {TETO_IRPJ_SEM_ADICIONAL_MENSAL:,.2f}/mês",
             aliquota=(
-                f"IRPJ 15%"
+                "IRPJ 15%"
                 + (f" + Adicional 10% s/ excedente R$ {excedente:,.2f}" if excedente else "")
             ),
             valor=(

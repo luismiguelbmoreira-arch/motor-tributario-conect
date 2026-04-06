@@ -23,18 +23,18 @@ CONFIGURAÇÃO:
 import logging
 import sys
 from datetime import date
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 from pathlib import Path
 
 # Adiciona PY/ ao path para imports relativos
 sys.path.insert(0, str(Path(__file__).parent))
 
-from extrator_pdfs import extrair_dados_pdfs, dados_para_motor
+from extrator_pdfs import dados_para_motor, extrair_dados_pdfs
 from motor_tributario import (
-    EmpresaFornecedora,
     EmpresaCompradora,
-    OperacaoFiscal,
+    EmpresaFornecedora,
     MotorReformaTributaria,
+    OperacaoFiscal,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -156,7 +156,7 @@ def auditar_empresa(pasta_empresa: str | Path) -> dict:
     print(f"  Status:      [{icone}] {status}")
 
     if auditoria_params.get("breakdown"):
-        print(f"\nComposicao do DAS (e-CAC):")
+        print("\nComposicao do DAS (e-CAC):")
         for tributo, valor in auditoria_params["breakdown"].items():
             if valor and float(str(valor).replace(",", ".")) > 0:
                 print(f"  {tributo:<8}: R$ {float(str(valor).replace(',', '.')):>10,.2f}")

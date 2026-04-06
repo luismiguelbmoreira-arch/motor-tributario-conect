@@ -11,7 +11,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import pytest
-from validadores import validar_cnpj, validar_ncm, validar_uf, validar_cnae, ValidationResult
+from validadores import validar_cnpj, validar_ncm, validar_uf, validar_cnae, normalizar_cnpj, ValidationResult
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -73,10 +73,38 @@ class TestValidarCNPJ:
         resultado = validar_cnpj("11222333000199")  # Dígitos finais trocados
         assert resultado.ok is False
 
+    def test_cnpj_segundo_digito_verificador_incorreto(self):
+        """CNPJ com segundo dígito verificador incorreto — REJEITAR (linha 129-130)."""
+        # 11222333000181 é válido; trocamos apenas o último dígito
+        resultado = validar_cnpj("11222333000182")
+        assert resultado.ok is False
+        assert any("segundo dígito verificador" in e for e in resultado.errors)
+
     def test_cnpj_retorna_validation_result(self):
         """Deve sempre retornar ValidationResult (nunca raise direto)."""
         resultado = validar_cnpj("invalido")
         assert isinstance(resultado, ValidationResult)
+
+
+class TestNormalizarCNPJ:
+
+    def test_normalizar_cnpj_com_pontuacao(self):
+        """normalizar_cnpj remove pontuação — linha 137."""
+        assert normalizar_cnpj("11.222.333/0001-81") == "11222333000181"
+
+    def test_normalizar_cnpj_somente_digitos(self):
+        """normalizar_cnpj com entrada limpa retorna igual."""
+        assert normalizar_cnpj("11222333000181") == "11222333000181"
+
+    def test_normalizar_cnpj_com_espacos(self):
+        """normalizar_cnpj remove espaços extras."""
+        assert normalizar_cnpj("  11.222.333/0001-81  ") == "11222333000181"
+
+    def test_normalizar_cnpj_resultado_14_digitos(self):
+        """Resultado deve ter exatamente 14 caracteres."""
+        resultado = normalizar_cnpj("11.222.333/0001-81")
+        assert len(resultado) == 14
+        assert resultado.isdigit()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

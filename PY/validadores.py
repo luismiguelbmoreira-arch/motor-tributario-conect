@@ -4,8 +4,8 @@ Projeto: Motor Tributário Conect 2026-2033
 Padrão: NUNCA lança exceção pura. Retorna ValidationResult estruturado.
 """
 
-import re
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import List
 
