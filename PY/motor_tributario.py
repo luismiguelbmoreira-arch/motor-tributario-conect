@@ -26,6 +26,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from difal import calcular_difal
 from regimes.base import BaseRegimeEngine
 from regimes.lucro_presumido import LucroPresumidoEngine
 from regimes.lucro_real import LucroRealEngine
@@ -275,6 +276,13 @@ class OperacaoFiscal(BaseModel):
     estorno_realizado: bool = Field(
         default=False,
         description="Sinaliza se a operação sofreu devolução de mercadoria após liquidação."
+    )
+    produto_importado: bool = Field(
+        default=False,
+        description=(
+            "True se conteúdo de importação > 40% (Res. SF 13/2012). "
+            "Afeta alíquota interestadual ICMS (4%) e cálculo do DIFAL."
+        )
     )
 
     @model_validator(mode="after")
@@ -1037,6 +1045,28 @@ class MotorReformaTributaria:
 
     # ── FASE 5: DIAGNÓSTICO + ALERTAS + LGPD ─────────────────────────────────
 
+    def _calcular_difal_diagnostico(self) -> Dict[str, Any]:
+        """
+        Calcula DIFAL interestadual se UF origem != UF destino.
+        EC 87/2015 | LC 190/2022 | LC 87/1996, Art. 13.
+
+        Retorna dict com Decimals convertidos para str (JSON-safe).
+        Se operação interna, retorna dict com aplicavel=False.
+        """
+        resultado = calcular_difal(
+            valor_operacao=self.operacao.valor_operacao,
+            uf_origem=self.fornecedora.uf_origem,
+            uf_destino=self.compradora.uf_destino,
+            tipo_destinatario=self.compradora.tipo,
+            produto_importado=self.operacao.produto_importado,
+            trilha=self.trilha_auditoria,
+        )
+        # Decimal → str para serialização JSON
+        return {
+            k: (str(v) if isinstance(v, Decimal) else v)
+            for k, v in resultado.items()
+        }
+
     def _gerar_alertas(self) -> List[Dict[str, str]]:
         """
         Sistema de alertas baseado em gatilhos matemáticos.
@@ -1308,6 +1338,7 @@ class MotorReformaTributaria:
             },
             "breakdown_regime": {k: str(v) for k, v in resultado["breakdown"].items()},
             "cenarios": {},
+            "difal": self._calcular_difal_diagnostico(),
             "split_payment": self.calcular_split_payment_impacto(),
             "cronograma_iva": cronograma_iva_lista,
             "alertas": self._gerar_alertas(),
@@ -1401,6 +1432,9 @@ class MotorReformaTributaria:
                     else "SIMPLES_PURO adequado para B2C. Sem impacto de crédito."
                 ),
             },
+
+            # DIFAL Interestadual (EC 87/2015 | LC 190/2022)
+            "difal": self._calcular_difal_diagnostico(),
 
             "split_payment": self.calcular_split_payment_impacto(),
 
