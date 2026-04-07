@@ -212,6 +212,44 @@
         </div>
       </section>
 
+      <!-- DIFAL Interestadual -->
+      <section id="sec-difal" aria-labelledby="sec-difal-titulo" class="fade-in hidden">
+        <h2 id="sec-difal-titulo" class="text-xl font-semibold text-slate-900 mb-4">DIFAL Interestadual</h2>
+        <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+              <svg class="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="font-semibold text-slate-800" id="difal-rota">—</h3>
+              <p class="text-sm text-slate-500" id="difal-metodo">—</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <div class="bg-slate-50 rounded-lg px-3 py-2">
+              <div class="text-xs text-slate-500 uppercase font-semibold">Aliq. Interestadual</div>
+              <div class="text-lg font-bold text-slate-800" id="difal-aliq-inter">—</div>
+            </div>
+            <div class="bg-slate-50 rounded-lg px-3 py-2">
+              <div class="text-xs text-slate-500 uppercase font-semibold">Aliq. Interna Destino</div>
+              <div class="text-lg font-bold text-slate-800" id="difal-aliq-dest">—</div>
+            </div>
+            <div class="bg-red-50 rounded-lg px-3 py-2">
+              <div class="text-xs text-red-600 uppercase font-semibold">DIFAL a Recolher</div>
+              <div class="text-xl font-bold text-red-700" id="difal-valor">—</div>
+            </div>
+            <div class="bg-slate-50 rounded-lg px-3 py-2">
+              <div class="text-xs text-slate-500 uppercase font-semibold">Responsavel</div>
+              <div class="text-lg font-bold text-slate-800" id="difal-responsavel">—</div>
+            </div>
+          </div>
+          <p class="text-xs text-slate-400 italic" id="difal-lei">EC 87/2015 | LC 190/2022</p>
+        </div>
+      </section>
+
       <section id="sec-cenarios" aria-labelledby="sec-cenarios-titulo" class="fade-in">
         <h2 id="sec-cenarios-titulo" class="text-xl font-semibold text-slate-900 mb-4">Comparativo de Cenários</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -426,6 +464,7 @@
       renderAlertas(d.alertas || []);
       renderCronogramaIVA(d.cronograma_iva || []);
       renderBreakdownRegime(d.breakdown_regime, d.aliquotas);
+      renderDifal(d.difal || {});
       renderCenarios(d.cenarios || {});
       renderServicos(d.alertas || [], d.cenarios || {});
       renderTrilhaAuditoria(d.trilha_auditoria || []);
@@ -646,6 +685,25 @@
 
       var total = aliquotas && aliquotas.total_mensal ? aliquotas.total_mensal : null;
       document.getElementById('breakdown-total').textContent = total ? formatBRL(total) : '--';
+    }
+
+    function renderDifal(difal) {
+      if (!difal || String(difal.aplicavel) !== 'True' && difal.aplicavel !== true) {
+        hideElement('sec-difal');
+        return;
+      }
+      showElement('sec-difal');
+      var ufO = difal.uf_origem || '';
+      var ufD = difal.uf_destino || '';
+      var metodo = (difal.metodo || '').replace(/_/g, ' ');
+      var resp = difal.responsavel || '';
+      document.getElementById('difal-rota').textContent = ufO + ' \u2192 ' + ufD;
+      document.getElementById('difal-metodo').textContent = metodo + (difal.produto_importado === 'True' || difal.produto_importado === true ? ' (Importado)' : '');
+      document.getElementById('difal-aliq-inter').textContent = formatPct(difal.aliquota_interestadual);
+      document.getElementById('difal-aliq-dest').textContent = formatPct(difal.aliquota_interna_destino);
+      document.getElementById('difal-valor').textContent = formatBRL(difal.difal_valor);
+      document.getElementById('difal-responsavel').textContent = resp === 'REMETENTE' ? 'Remetente' : 'Destinatario';
+      if (difal.base_legal) document.getElementById('difal-lei').textContent = difal.base_legal;
     }
 
     function renderCenarios(cenarios) {

@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # 🏛️ MOTOR TRIBUTÁRIO CONECT — BÍBLIA DA REFORMA TRIBUTÁRIA
 
-**Status:** 🚀 Fase 2 Certificada — 188 testes passando (100%)
-**Âncora Legal:** EC 132/2023 | LC 123/2006 | LC 214/2025
-**Data Certificação:** 27/03/2026
+**Status:** 🚀 Produção — 288 testes passando (100%) | 4 regimes + DIFAL + Cronograma + PDF
+**Âncora Legal:** EC 132/2023 | LC 123/2006 | LC 214/2025 | LC 224/2025 | EC 87/2015
+**Data Certificação:** 06/04/2026
 
 ---
 
