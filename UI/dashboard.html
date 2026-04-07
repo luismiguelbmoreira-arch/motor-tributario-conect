@@ -188,11 +188,11 @@
           <div><div class="font-semibold text-sm text-slate-800">MEI</div><div class="text-xs text-slate-500 mt-0.5">Verificação de enquadramento</div></div>
         </a>
 
-        <a href="resultado.html" class="bg-white hover:bg-slate-50 border border-slate-200 rounded-xl p-4 card-hover flex items-start gap-3 transition-colors">
+        <a href="#" onclick="event.preventDefault(); abrirCronograma();" class="bg-white hover:bg-slate-50 border border-slate-200 rounded-xl p-4 card-hover flex items-start gap-3 transition-colors">
           <div class="bg-blue-50 rounded-lg p-2 mt-0.5 shrink-0">
             <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" stroke-linecap="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
           </div>
-          <div><div class="font-semibold text-sm text-slate-800">Cronograma IVA 2026-2033</div><div class="text-xs text-slate-500 mt-0.5">Impacto CBS/IBS por ano</div></div>
+          <div><div class="font-semibold text-sm text-slate-800">Cronograma IVA 2026-2033</div><div class="text-xs text-slate-500 mt-0.5">Timeline CBS/IBS + Split Payment</div></div>
         </a>
 
       </div>
@@ -413,6 +413,18 @@
       err.classList.remove('hidden');
       btn.disabled = false;
       btn.textContent = 'Alterar senha e continuar';
+    }
+  }
+
+  function abrirCronograma() {
+    // Se ha analise na sessao, vai direto para resultado.html com ancora no cronograma
+    // Se nao ha analise, leva para nova analise (evita dead end)
+    const diagnostico = sessionStorage.getItem('diagnostico');
+    if (diagnostico) {
+      window.location.href = 'resultado.html#sec-iva';
+    } else {
+      alert('Para ver o Cronograma IVA personalizado, faca uma analise primeiro.\n\nVoce sera redirecionado para a nova analise.');
+      window.location.href = 'analise.html';
     }
   }
 
