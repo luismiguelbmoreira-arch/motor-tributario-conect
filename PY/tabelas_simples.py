@@ -9,7 +9,12 @@ Fonte primária: LC 123/2006, Anexos I-V (atualizada LC 214/2025)
 FROZEN: Não alterar sem citação de artigo de lei + aprovação de Luiz.
 """
 
+import json
+from pathlib import Path
 from decimal import Decimal
+
+# Load complete CNAE dataset (1,332 mapped correctly)
+_CNAE_MAP_FILE = Path(__file__).resolve().parent.parent / "data" / "cnae_completo.json"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TABELAS DE ALÍQUOTAS — SIMPLES NACIONAL
@@ -305,7 +310,10 @@ ALIQUOTA_IVA_PLENA_ESTIMADA = Decimal("0.265")
 # Limite Split Payment (IBS/CBS retido na fonte — art. X LC 214/2025)
 # Ativo a partir de 2027 para pagamentos eletrônicos
 ANO_INICIO_SPLIT_PAYMENT = 2027
-ALIQUOTA_RETENCAO_SPLIT_PAYMENT = Decimal("0.009")  # ~0.9% sobre valor da NF (2026)
+# DEPRECATED — ERR-003 corrigido. Split Payment agora usa CBS+IBS dinâmico
+# via get_aliquotas_iva_por_ano() em motor_tributario.py.
+# Constante mantida apenas para referência histórica — NÃO USAR.
+_ALIQUOTA_RETENCAO_SPLIT_PAYMENT_DEPRECATED = Decimal("0.009")  # ~0.9% (2026 apenas)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -345,23 +353,12 @@ CNAE_PREFIXO_PARA_ANEXO: dict = {
 }
 
 # Exceções Específicas (7 dígitos tem precedência sobre o prefixo)
-CNAE_PARA_ANEXO: dict = {
-    # TI e Intelectuais (Sujeitos ao Fator R — Anexo V original, III se R>=0.28)
-    "6201501": "V", "6202300": "V", "6203100": "V", "6209100": "V",
-    "6911701": "V", "6920601": "V", "7111100": "V", "7112000": "V",
-    "7119703": "V", "7490101": "V", "8599603": "V",
-
-    # Serviços Especializados Anexo IV (Sem CPP no DAS)
-    "8011101": "IV", "8121400": "IV", "8129000": "IV",
-
-    # Casos de Indústria que podem ser confundidos com Comércio
-    "4721101": "II", # Panificação (Fabricação)
-    "1091102": "II", # Fabricação de biscoitos
-
-    # Saúde (Anexo III se Fator R >= 0.28, senão V)
-    "8610101": "V", "8630501": "V", "8630502": "V", "8630503": "V",
-    "8640202": "V", "8650001": "V",
-}
+try:
+    with open(_CNAE_MAP_FILE, "r", encoding="utf-8") as f:
+        CNAE_PARA_ANEXO: dict = json.load(f)
+except FileNotFoundError:
+    # Se script não tiver rodado, usa fallback vazio
+    CNAE_PARA_ANEXO: dict = {}
 
 def determinar_anexo_por_cnae(cnae_7_digitos: str) -> str:
     """

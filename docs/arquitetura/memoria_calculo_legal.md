@@ -33,11 +33,6 @@ $$AE = \frac{(RBT12 \times AN) - PD}{RBT12}$$
 * **PD:** Parcela a Deduzir da Faixa.
 * **Validação:** Se RBT12 > R$ 3.600.000,00, o ICMS/ISS é calculado por fora (Sublimite).
 
-* **AN:**** Alíquota Nominal da Faixa.
-* **PD:** Parcela a Deduzir da Faixa.
-* **Validação:** Se RBT12 > R$ 3.600.000,00, o ICMS/ISS é calculado por fora (Sublimite).
-**
-
 ### C. Split Payment (Fração IVA Dual)
 
 | Período | Alíquota Split (Calculada sobre DAS) | Fonte Legal |
