@@ -117,7 +117,7 @@ def _setup_logging() -> None:
 _setup_logging()
 logger = logging.getLogger("motor_conect.api")
 
-TOTAL_TESTES = 288  # Atualizado 06/04/2026: Lucro Real LALUR+JCP, DIFAL, Cronograma, PDF, Stress
+TOTAL_TESTES = 320  # Atualizado 07/04/2026: + DIFAL backend (32 testes golden standard)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
