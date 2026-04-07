@@ -1045,8 +1045,33 @@ class MotorReformaTributaria:
         alertas = []
         rbt12 = self.calcular_rbt12()
 
-        # CRÍTICO: RBT12 > 90% do teto
-        if rbt12 > ALERTA_90_PERCENT_TETO:
+        # CRÍTICO: Desenquadramento imediato (RBT12 > 120% do teto = R$ 5.760.000)
+        # LC 123/2006, Art. 3º, §§ 9º e 10 — exclusão retroativa ao mês do excesso
+        teto_excesso_imediato = TETO_SIMPLES_NACIONAL * Decimal("1.20")  # R$ 5.760.000
+        if rbt12 > teto_excesso_imediato:
+            alertas.append({
+                "nivel": "CRITICO",
+                "codigo": "DESENQUADRAMENTO_IMEDIATO",
+                "mensagem": (
+                    f"RBT12 R$ {rbt12:,.2f} ultrapassou R$ {teto_excesso_imediato:,.2f} (120% do teto). "
+                    f"DESENQUADRAMENTO IMEDIATO do Simples Nacional — efeitos RETROATIVOS ao mês do excesso. "
+                    f"LC 123/2006, Art. 3º, §§ 9º e 10."
+                ),
+            })
+        # CRÍTICO: Desenquadramento no exercício seguinte (RBT12 > R$ 4.800.000)
+        # LC 123/2006, Art. 3º, II — exclusão a partir de janeiro do ano seguinte
+        elif rbt12 > TETO_SIMPLES_NACIONAL:
+            alertas.append({
+                "nivel": "CRITICO",
+                "codigo": "DESENQUADRAMENTO_PROXIMO_ANO",
+                "mensagem": (
+                    f"RBT12 R$ {rbt12:,.2f} excedeu o teto de R$ {TETO_SIMPLES_NACIONAL:,.2f}. "
+                    f"Empresa será excluída do Simples Nacional a partir de janeiro/{self.operacao.data_emissao.year + 1}. "
+                    f"LC 123/2006, Art. 3º, II."
+                ),
+            })
+        # ALTO: RBT12 > 90% do teto (alerta preventivo)
+        elif rbt12 > ALERTA_90_PERCENT_TETO:
             alertas.append({
                 "nivel": "CRITICO",
                 "codigo": "RBT12_PROXIMO_TETO",
