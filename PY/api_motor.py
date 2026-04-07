@@ -279,6 +279,13 @@ class AnaliseManualRequest(BaseModel):
         default=Decimal("0"), ge=Decimal("0"),
         description="Créditos PIS/COFINS não-cumulativo (R$). Padrão: 0"
     )
+    produto_importado: bool = Field(
+        default=False,
+        description=(
+            "True se conteúdo de importação > 40% (Res. SF 13/2012). "
+            "Afeta alíquota interestadual ICMS (4%) no cálculo do DIFAL."
+        )
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -826,6 +833,7 @@ def analise_manual(
             beneficio_fiscal_antigo=req.beneficio_fiscal_antigo,
             lucro_real_mensal=req.lucro_real_mensal,
             creditos_pis_cofins=req.creditos_pis_cofins,
+            produto_importado=req.produto_importado,
         )
 
     except PydanticValidationError as exc:
