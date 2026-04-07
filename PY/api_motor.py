@@ -33,7 +33,28 @@ import json
 import logging
 import os
 import sys
+import warnings
 from contextlib import asynccontextmanager
+from pathlib import Path
+
+# ── Fodase warnings: suprime TODO warning nao-fatal no terminal ────────────
+warnings.filterwarnings("ignore")
+os.environ.setdefault("PYTHONWARNINGS", "ignore")
+# Silencia GLib/GIO warnings do WeasyPrint (libs nativas C no Windows)
+os.environ.setdefault("GIO_USE_VFS", "local")
+os.environ.setdefault("G_MESSAGES_DEBUG", "")
+os.environ.setdefault("NO_AT_BRIDGE", "1")
+
+# ── Carrega .env (ANTHROPIC_API_KEY, JWT_SECRET_KEY, LOG_LEVEL, etc) ──────
+try:
+    from dotenv import load_dotenv
+    _here = Path(__file__).resolve().parent
+    for _candidato in (_here / ".env", _here.parent / ".env", Path.cwd() / ".env"):
+        if _candidato.exists():
+            load_dotenv(_candidato, override=True)  # override=True: forca re-leitura mesmo se env ja existe (vazia)
+            break
+except ImportError:
+    pass  # dotenv opcional
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal, Optional
@@ -101,7 +122,7 @@ class _JSONFormatter(logging.Formatter):
 
 
 def _setup_logging() -> None:
-    log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+    log_level = os.environ.get("LOG_LEVEL", "ERROR").upper()
     log_format = os.environ.get("LOG_FORMAT", "text")
     handler = logging.StreamHandler(sys.stdout)
     if log_format == "json":
@@ -112,6 +133,15 @@ def _setup_logging() -> None:
     root.setLevel(log_level)
     root.handlers.clear()
     root.addHandler(handler)
+
+    # Silencia loggers chatos de libs externas
+    for noisy in (
+        "uvicorn", "uvicorn.access", "uvicorn.error",
+        "weasyprint", "fontTools", "fontTools.subset",
+        "PIL", "httpx", "httpcore", "passlib",
+        "anthropic", "multipart", "sqlalchemy",
+    ):
+        logging.getLogger(noisy).setLevel(logging.ERROR)
 
 
 _setup_logging()

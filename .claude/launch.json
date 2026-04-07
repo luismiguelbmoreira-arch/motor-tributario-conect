@@ -2,27 +2,21 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "UI — Motor Tributário (PARA_MEU_PSICOLOGO.html)",
+      "name": "Demo Completa (API + UI)",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8000", "--directory", "."],
+      "runtimeArgs": ["run_demo.py", "--no-browser"],
       "port": 8000
     },
     {
-      "name": "UI — Simulador Reforma (UI/index.html)",
+      "name": "UI estática (só frontend)",
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8001", "--directory", "UI"],
       "port": 8001
     },
     {
-      "name": "Testes — pytest suite completa (127 testes)",
+      "name": "Testes — pytest suite completa (320 testes)",
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "pytest", "PY/tests/", "-v", "--tb=short"],
-      "port": 0
-    },
-    {
-      "name": "Auditoria — audit_universal.py (pipeline IA)",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["PY/audit_universal.py"],
       "port": 0
     }
   ]
