@@ -478,6 +478,20 @@ def dados_para_motor(dados: DadosExtraidosPDF) -> dict:
         if not atividades:
             atividades = None
 
+    # BUG-03: Normalizar competência de BR (MM/AAAA) para ISO (YYYY-MM)
+    # O PROMPT_EXTRACAO pede "MM/AAAA", mas database.py exige "YYYY-MM".
+    competencia_raw = dados.competencia
+    competencia_iso = competencia_raw
+    if competencia_raw and "/" in competencia_raw:
+        partes = competencia_raw.split("/")
+        if len(partes) == 2 and len(partes[0]) == 2 and len(partes[1]) == 4:
+            # Formato BR: "01/2026" → "2026-01"
+            competencia_iso = f"{partes[1]}-{partes[0]}"
+            logger.info(
+                "Competência normalizada: '%s' → '%s' (BR → ISO 8601)",
+                competencia_raw, competencia_iso,
+            )
+
     return {
         # Campos para EmpresaFornecedora
         "empresa": {
@@ -496,7 +510,8 @@ def dados_para_motor(dados: DadosExtraidosPDF) -> dict:
         "auditoria": {
             "rpa": dados.to_decimal("rpa_referencia"),
             "das_ecac": dados.to_decimal("das_ecac_referencia"),
-            "competencia": dados.competencia,
+            "competencia": competencia_iso,
+            "competencia_original": competencia_raw,
             "breakdown": dados.das_breakdown,
         },
         # Metadados

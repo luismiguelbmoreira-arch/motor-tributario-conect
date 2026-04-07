@@ -20,6 +20,7 @@ Fase 2: PostgreSQL (mudar DATABASE_URL, Alembic migra schema)
 import json
 import logging
 import os
+from pathlib import Path
 import re
 from datetime import datetime
 from decimal import Decimal
@@ -53,6 +54,7 @@ class RegimeTributario(str, Enum):
 class NivelAlerta(str, Enum):
     """Níveis de severidade para alertas do motor."""
     INFO = "INFO"
+    MEDIO = "MEDIO"
     ATENCAO = "ATENCAO"
     ALTO = "ALTO"
     CRITICO = "CRITICO"
@@ -76,7 +78,10 @@ class StatusAuditoria(str, Enum):
 # CONFIGURAÇÃO DO BANCO
 # ─────────────────────────────────────────────────────────────────────────────
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///motor_tributario.db")
+DATABASE_URL = os.environ.get(
+    "DATABASE_URL",
+    "sqlite:///" + str(Path(__file__).resolve().parent.parent / "data" / "motor_tributario.db"),
+)
 
 
 def validar_competencia(competencia: str) -> str:

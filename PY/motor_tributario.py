@@ -24,7 +24,7 @@ from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from regimes.base import BaseRegimeEngine
 from regimes.lucro_presumido import LucroPresumidoEngine
@@ -261,6 +261,27 @@ class OperacaoFiscal(BaseModel):
             "Lei 10.637/2002 (PIS) + Lei 10.833/2003 (COFINS)."
         )
     )
+    # ─────────────────────────────────────────────────────────────────────────────
+    # Fase 5 (Stress Test) — Campos Adicionais para testes R14 a R17
+    # ─────────────────────────────────────────────────────────────────────────────
+    data_liquidacao: Optional[date] = Field(
+        default=None,
+        description="Data real do recebimento/liquidação. O Split Payment atua aqui, não na emissão."
+    )
+    qtd_itens: int = Field(
+        default=1, ge=1,
+        description="Quantidade de NCMs distintos na nota (impacta timeout no CGIBS)."
+    )
+    estorno_realizado: bool = Field(
+        default=False,
+        description="Sinaliza se a operação sofreu devolução de mercadoria após liquidação."
+    )
+
+    @model_validator(mode="after")
+    def validar_liquidacao(self):
+        if self.data_liquidacao and self.data_liquidacao < self.data_emissao:
+            raise ValueError(f"Data de liquidação {self.data_liquidacao} não pode ser anterior à emissão {self.data_emissao}")
+        return self
 
     @field_validator("ncm_nbs")
     @classmethod
@@ -379,6 +400,7 @@ class MotorReformaTributaria:
     ) -> None:
         """Registro obrigatório de Memória de Cálculo (MAX_FISCAL_01/02)."""
         passo = {
+            "tipo": "CALCULO",
             "id": id,
             "titulo": titulo,
             "formula": f"Base [{base}] - Deduções [{deducoes}] * Alíquota [{aliquota}] = {valor}",
@@ -891,23 +913,50 @@ class MotorReformaTributaria:
         ibs_no_das = self._calcular_fracao_componente("IBS")
         cbs_no_das = self._calcular_fracao_componente("CBS")
         das_mensal = self.calcular_das_mensal()
-        _ = das_mensal - ibs_no_das - cbs_no_das  # das_sem_iva: reservado para uso futuro
+        das_sem_iva = das_mensal - ibs_no_das - cbs_no_das
 
         # IVA recolhido separadamente (por operação)
+        # ERR-016: aplica fator de redução CBS/IBS (Arts. 258-264 LC 214/2025)
+        fator_reducao = self._fator_reducao_cbs_ibs()
         iva_por_fora = (
-            self.operacao.valor_operacao * (aliquotas_iva["CBS"] + aliquotas_iva["IBS"])
+            self.operacao.valor_operacao
+            * (aliquotas_iva["CBS"] + aliquotas_iva["IBS"])
+            * fator_reducao
         ).quantize(Decimal("0.01"), ROUND_HALF_UP)
 
-        # Custo total = DAS (sem IVA) + IVA por fora
-        custo_das_por_operacao = (self.operacao.valor_operacao * aliquota_efetiva).quantize(
+        # Custo DAS sem IVA (proporcional à operação)
+        # das_sem_iva é mensal; proporcionalizamos para a operação
+        custo_das_por_operacao_completo = (self.operacao.valor_operacao * aliquota_efetiva).quantize(
             Decimal("0.01"), ROUND_HALF_UP
         )
-        custo_total = custo_das_por_operacao + iva_por_fora
+        # Subtrai a fração IBS/CBS que já estava dentro do DAS
+        fracao_iva_no_das = (ibs_no_das + cbs_no_das)
+        custo_das_sem_iva = (custo_das_por_operacao_completo - fracao_iva_no_das).quantize(
+            Decimal("0.01"), ROUND_HALF_UP
+        )
+        # Custo total = DAS (sem IVA) + IVA por fora — sem dupla contagem
+        custo_total = (custo_das_sem_iva + iva_por_fora).quantize(
+            Decimal("0.01"), ROUND_HALF_UP
+        )
+
+        self._registrar_passo(
+            id="OPT_OUT_CALCULO",
+            titulo="Cenário Opt-Out — DAS sem IVA + IVA por fora",
+            base=f"DAS completo R$ {custo_das_por_operacao_completo:,.2f}",
+            deducoes=f"IBS/CBS no DAS R$ {fracao_iva_no_das:,.2f}",
+            aliquota=f"IVA por fora {(aliquotas_iva['CBS']+aliquotas_iva['IBS'])*100:.2f}%",
+            valor=f"R$ {custo_total:,.2f}",
+            lei="LC 214/2025 (dispositivo de opt-out — aguardar regulamentação)",
+            detalhe=(
+                f"DAS sem IVA R$ {custo_das_sem_iva:,.2f} + IVA por fora R$ {iva_por_fora:,.2f} = "
+                f"Total R$ {custo_total:,.2f}. Sem dupla contagem de IBS/CBS."
+            ),
+        )
 
         return {
             "cenario": "OPT_OUT",
             "descricao": "Empresa recolhe IBS/CBS separadamente, mantém Simples para demais tributos",
-            "custo_das_por_operacao": str(custo_das_por_operacao),
+            "custo_das_por_operacao": str(custo_das_sem_iva),
             "iva_recolhido_por_fora": str(iva_por_fora),
             "custo_total": str(custo_total),
             "credito_gerado_para_comprador": str(iva_por_fora),
@@ -933,7 +982,9 @@ class MotorReformaTributaria:
         if ano >= ANO_INICIO_SPLIT_PAYMENT and forma != "DINHEIRO":
             # Split Payment dinâmico: usa CBS+IBS do ano da operação (LC 214/2025, Art. 344)
             aliquotas_ano = self.get_aliquotas_iva_por_ano()
-            taxa_retencao = aliquotas_ano["CBS"] + aliquotas_ano["IBS"]
+            # ERR-016: aplica fator de redução CBS/IBS (Arts. 258-264)
+            fator_reducao = self._fator_reducao_cbs_ibs()
+            taxa_retencao = (aliquotas_ano["CBS"] + aliquotas_ano["IBS"]) * fator_reducao
             retencao = (
                 self.operacao.valor_operacao * taxa_retencao
             ).quantize(Decimal("0.01"), ROUND_HALF_UP)
@@ -1071,6 +1122,61 @@ class MotorReformaTributaria:
                 "mensagem": (
                     "Substituição Tributária de ICMS será extinta com o IBS. "
                     "Capital de giro travado na ST será liberado progressivamente até 2032."
+                ),
+            })
+
+        # ─────────────────────────────────────────────────────────────────────────────
+        # ALERTAS FASE 5 (STRESS TEST) — R14 a R17
+        # ─────────────────────────────────────────────────────────────────────────────
+        
+        # C1 (R14) Fantasma do Ano Novo: Emissão X Liquidação em mudança de regime
+        if self.operacao.data_liquidacao and self.operacao.data_liquidacao.year > self.operacao.data_emissao.year:
+            # Regra: só dispara se cruzar a virada (ex: emissão 2026, pagto 2027 que inicia split payment dinâmico)
+            if self.operacao.data_emissao.year < ANO_INICIO_SPLIT_PAYMENT and self.operacao.data_liquidacao.year >= ANO_INICIO_SPLIT_PAYMENT:
+                alertas.append({
+                    "nivel": "ALTO",
+                    "codigo": "CONCILIACAO_RISCO",
+                    "mensagem": (
+                        f"Fantasma do Ano Novo: Emissão em {self.operacao.data_emissao.year} "
+                        f"e liquidação em {self.operacao.data_liquidacao.year}. "
+                        "Cuidado: contabilidade gera imposto na emissão, mas retenção do Split Payment atua na liquidação."
+                    ),
+                })
+
+        # C2 (R15) Explosão do Sublimite
+        # Se RBT12 estava seguro, mas o delta dessa operação específica estourou o sublimite
+        if rbt12 <= SUBLIMITE_ICMS_ISS and (rbt12 + self.operacao.valor_operacao) > SUBLIMITE_ICMS_ISS:
+            alertas.append({
+                "nivel": "ALTO",
+                "codigo": "SUBLIMITE_CRITICO",
+                "mensagem": (
+                    f"A operação atual (R$ {self.operacao.valor_operacao:,.2f}) "
+                    f"cruzou o Sublimite Estadual (R$ {SUBLIMITE_ICMS_ISS:,.2f}). "
+                    "ICMS e ISS serão ejetados do DAS no próximo mês!"
+                ),
+            })
+
+        # C3 (R16) Salada de Frutas (Timeouts)
+        if self.operacao.qtd_itens > 50:
+            alertas.append({
+                "nivel": "MEDIO",
+                "codigo": "RISCO_TIMEOUT_API",
+                "mensagem": (
+                    f"Carga extrema: NF com {self.operacao.qtd_itens} itens. "
+                    "Risco de instabilidade no CGIBS. Se ocorrer timeout de API, "
+                    "o Split Payment pode aplicar retenção punitiva máxima."
+                ),
+            })
+
+        # C4 (R17) Estorno do Medo
+        if self.operacao.estorno_realizado:
+            alertas.append({
+                "nivel": "ALTO",
+                "codigo": "CAPITAL_GIRO_COMPROMETIDO",
+                "mensagem": (
+                    "Estorno após Split Payment: O imposto já foi retido no PIX/Cartão. "
+                    "Com a devolução, esse saldo virará crédito tributário de difícil "
+                    "recuperação, e não dinheiro em conta."
                 ),
             })
 

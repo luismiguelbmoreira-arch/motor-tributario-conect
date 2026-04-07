@@ -117,7 +117,7 @@ def _setup_logging() -> None:
 _setup_logging()
 logger = logging.getLogger("motor_conect.api")
 
-TOTAL_TESTES = 245  # atualizar após cada fase de testes
+TOTAL_TESTES = 277  # Atualizado 06/04/2026: 249 original + 28 guardrails (G-01 a G-05)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

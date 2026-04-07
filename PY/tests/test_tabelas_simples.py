@@ -41,14 +41,14 @@ class TestDeterminarAnexoPorCNAE:
 
     def test_cnae_com_fonte_explicito(self):
         """Busca exata deve retornar fonte EXPLICITO."""
-        # 4721101 está no mapa explícito CNAE_PARA_ANEXO
-        anexo, fonte = determinar_anexo_por_cnae_com_fonte("4721101")
+        # 4711302 agora está no mapa explícito CNAE_PARA_ANEXO
+        anexo, fonte = determinar_anexo_por_cnae_com_fonte("4711302")
         assert fonte == "EXPLICITO"
 
     def test_cnae_com_fonte_prefixo(self):
         """CNAE não mapeado explicitamente deve usar prefixo."""
-        # CNAE com prefixo 47 (comércio varejo) → Anexo I via prefixo
-        anexo, fonte = determinar_anexo_por_cnae_com_fonte("4711302")
+        # CNAE fictício com prefixo 47 (comércio varejo) → Anexo I via prefixo
+        anexo, fonte = determinar_anexo_por_cnae_com_fonte("4700000")
         assert fonte == "PREFIXO"
 
     def test_cnae_com_fonte_fallback(self):
