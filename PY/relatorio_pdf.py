@@ -6,25 +6,47 @@ Motor Tributário Conect 2026-2033 · FASE 5
 from __future__ import annotations
 
 import logging
+import os
 from decimal import Decimal
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# ── Importação defensiva de weasyprint ─────────────────────────────────────
-try:
-    from weasyprint import HTML as WeasyprintHTML  # type: ignore
-    _WEASYPRINT_DISPONIVEL = True
-except Exception:
-    # ImportError: weasyprint não instalado
-    # OSError: bibliotecas nativas (GTK/Cairo) ausentes — comum no Windows sem GTK3
-    _WEASYPRINT_DISPONIVEL = False
-    WeasyprintHTML = None  # type: ignore
-    logger.warning(
-        "weasyprint indisponível (bibliotecas nativas GTK/Cairo ausentes). "
-        "Geração de PDF desativada. No Windows instale GTK3: "
-        "https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer"
-    )
+# Silencia warnings GLib/GIO das libs nativas C do WeasyPrint ANTES de qualquer import
+os.environ.setdefault("GIO_USE_VFS", "local")
+os.environ.setdefault("G_MESSAGES_DEBUG", "")
+os.environ.setdefault("NO_AT_BRIDGE", "1")
+os.environ.setdefault("GIO_MODULE_DIR", "")
+
+# ── LAZY IMPORT de weasyprint ─────────────────────────────────────────────
+# Import adiado para dentro de gerar_pdf() — evita carregar libs GTK/GIO no
+# startup da API (que disparam GLib-GIO-WARNING no Windows mesmo sem usar PDF).
+_WeasyprintHTML = None
+_WEASYPRINT_DISPONIVEL = None  # None = ainda nao tentou importar
+
+def _tentar_importar_weasyprint():
+    """Importa weasyprint sob demanda. Idempotente."""
+    global _WeasyprintHTML, _WEASYPRINT_DISPONIVEL
+    if _WEASYPRINT_DISPONIVEL is not None:
+        return _WEASYPRINT_DISPONIVEL
+    try:
+        # Redirecionar stderr durante o import para suprimir warnings GLib nativos
+        import sys
+        _stderr_fd = os.dup(2)
+        _devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(_devnull, 2)
+        try:
+            from weasyprint import HTML as WeasyprintHTML  # type: ignore
+            _WeasyprintHTML = WeasyprintHTML
+            _WEASYPRINT_DISPONIVEL = True
+        finally:
+            os.dup2(_stderr_fd, 2)
+            os.close(_devnull)
+            os.close(_stderr_fd)
+    except Exception:
+        _WEASYPRINT_DISPONIVEL = False
+        _WeasyprintHTML = None
+    return _WEASYPRINT_DISPONIVEL
 
 
 def _fmt_moeda(valor: Any) -> str:
