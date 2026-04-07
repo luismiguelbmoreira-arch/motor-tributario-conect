@@ -76,7 +76,8 @@
 
       <div class="flex items-center gap-2 flex-wrap">
         <button id="btn-nova-analise"
-                onclick="window.location.href='analise.html'"
+                onclick="confirmarNovaAnalise()"
+                title="Iniciar uma nova análise (a atual será descartada)"
                 class="focus-ring inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors">
           Nova Análise
         </button>
@@ -910,6 +911,23 @@
     }
 
     // ─────────────────────────────────────────────
+    // NOVA ANALISE (com confirmacao)
+    // ─────────────────────────────────────────────
+    function confirmarNovaAnalise() {
+      const ok = window.confirm(
+        'Iniciar uma nova análise?\n\n' +
+        'A análise atual será descartada. ' +
+        'Se precisar consultá-la, baixe o PDF antes de continuar.'
+      );
+      if (ok) {
+        sessionStorage.removeItem('diagnostico');
+        sessionStorage.removeItem('analise_empresa');
+        sessionStorage.removeItem('analise_cnpj');
+        window.location.href = 'analise.html';
+      }
+    }
+
+    // ─────────────────────────────────────────────
     // DOWNLOAD PDF
     // ─────────────────────────────────────────────
     async function downloadPDF() {
@@ -941,6 +959,7 @@
         });
 
         if (response.status === 401) {
+          alert('Sua sessão expirou. Faça login novamente para continuar.');
           sessionStorage.clear();
           window.location.href = 'login.html';
           return;
