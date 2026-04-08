@@ -69,6 +69,85 @@ def _esc(s: Any) -> str:
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
+def _filtrar_trilha_cliente(passos: list) -> list:
+    """
+    Filtra a trilha_auditoria para exibicao no PDF do cliente.
+
+    Regras (por ordem):
+      1. Exclui validacoes internas do motor (MAX_FISCAL_*, VIOLACAO_*)
+      2. Exclui passos nao aplicaveis ao caso
+         (INFO_DIFAL quando operacao eh interna — "nao se aplica" e ruido)
+      3. Deduplica por id mantendo apenas a ULTIMA ocorrencia
+         (o motor loga cada iteracao; pro cliente so interessa o resultado
+          final de cada cálculo)
+      4. Ordena por prioridade de leitura: anexo > aliquota > opt-out > difal > demais
+
+    Retorna apenas os passos que o empresario precisa ver para entender
+    COMO chegou naquele numero. Elimina o ruido de loop/validacao.
+    """
+    if not passos:
+        return []
+
+    # 1. Exclusoes por prefixo de id ou tipo
+    EXCLUIR_PREFIXOS = ("MAX_FISCAL_", "VIOLACAO_", "_DEBUG", "TESTE_")
+    EXCLUIR_TIPOS = {"VIOLACAO_SEGURANCA", "DEBUG"}
+
+    filtrados = []
+    for passo in passos:
+        if not isinstance(passo, dict):
+            continue
+        pid = str(passo.get("id", ""))
+        ptipo = str(passo.get("tipo", ""))
+
+        # Exclui validacoes internas
+        if pid.startswith(EXCLUIR_PREFIXOS):
+            continue
+        if ptipo in EXCLUIR_TIPOS:
+            continue
+
+        # Exclui "nao aplicavel" declarado
+        if pid == "DIFAL_OPERACAO_INTERNA":
+            continue  # UF origem == UF destino, sem DIFAL
+        if ptipo == "INFO_DIFAL" and not passo.get("formula"):
+            continue  # info-only sem formula, nao calculou nada
+
+        # Exclui vazios (sem formula nem memoria nem detalhe)
+        if not (passo.get("formula") or passo.get("memoria") or passo.get("detalhe")):
+            continue
+
+        filtrados.append(passo)
+
+    # 2. Deduplicacao por id (mantem a ULTIMA ocorrencia)
+    vistos: dict[str, dict] = {}
+    for passo in filtrados:
+        pid = str(passo.get("id", ""))
+        if pid:
+            vistos[pid] = passo  # sobrescreve — fica a ultima
+        else:
+            # Sem id: usa titulo como chave de dedup
+            vistos[str(passo.get("titulo", id(passo)))] = passo
+
+    deduplicados = list(vistos.values())
+
+    # 3. Ordenacao por prioridade de leitura
+    PRIORIDADE = {
+        "DECISAO_ANEXO": 1,
+        "AE_SIMPLES": 2,
+        "FATOR_R": 3,
+        "OPT_OUT_CALCULO": 4,
+        "SPLIT_PAYMENT": 5,
+        "DIFAL_BASE_UNICA": 6,
+        "DIFAL_BASE_DUPLA": 6,
+    }
+
+    def _chave_ordem(p: dict) -> tuple:
+        pid = str(p.get("id", ""))
+        return (PRIORIDADE.get(pid, 99), pid)
+
+    deduplicados.sort(key=_chave_ordem)
+    return deduplicados
+
+
 def _gerar_html(diagnostico: dict, pii: dict | None = None) -> str:
     """
     Gera string HTML completo do relatório — CSS inline, sem CDN.
@@ -147,9 +226,11 @@ def _gerar_html(diagnostico: dict, pii: dict | None = None) -> str:
     disparidade   = cenarios.get("disparidade_anual_estimada")
     economia_str  = _fmt_moeda(disparidade) if disparidade else "—"
 
-    # Trilha de auditoria
+    # Trilha de auditoria — filtrada para o cliente final
+    # (deduplica, remove validacoes internas e "nao aplicavel")
+    passos_relevantes = _filtrar_trilha_cliente(diagnostico.get("trilha_auditoria", []))
     trilha_html = ""
-    for passo in diagnostico.get("trilha_auditoria", []):
+    for passo in passos_relevantes:
         titulo  = _esc(passo.get("titulo") or passo.get("id") or "")
         formula = _esc(passo.get("formula") or "")
         lei     = _esc(passo.get("amparo_legal") or "")
@@ -165,7 +246,7 @@ def _gerar_html(diagnostico: dict, pii: dict | None = None) -> str:
         </div>"""
 
     if not trilha_html:
-        trilha_html = '<p style="color:#9ca3af;font-size:11px;">Trilha de auditoria indisponível.</p>'
+        trilha_html = '<p style="color:#9ca3af;font-size:11px;">Nenhum calculo aplicavel a este caso.</p>'
 
     return f"""<!DOCTYPE html>
 <html lang="pt-BR">
