@@ -1,0 +1,33 @@
+# Normalização de line endings — elimina os warnings LF→CRLF em repositório
+# multi-plataforma (Windows dev + Linux CI).
+
+# Default: auto-detect text, força LF no repo
+* text=auto eol=lf
+
+# Shell / config Linux — sempre LF
+*.sh       text eol=lf
+*.yml      text eol=lf
+*.yaml     text eol=lf
+*.md       text eol=lf
+*.py       text eol=lf
+*.toml     text eol=lf
+*.ini      text eol=lf
+*.cfg      text eol=lf
+*.json     text eol=lf
+
+# Scripts Windows — sempre CRLF
+*.bat      text eol=crlf
+*.cmd      text eol=crlf
+*.ps1      text eol=crlf
+
+# Binários — desabilita normalização
+*.pdf      binary
+*.png      binary
+*.jpg      binary
+*.jpeg     binary
+*.ico      binary
+*.gz       binary
+*.zip      binary
+*.db       binary
+*.bin      binary
+*.whl      binary
