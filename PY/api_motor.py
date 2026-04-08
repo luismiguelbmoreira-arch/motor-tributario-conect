@@ -96,6 +96,10 @@ from motor_tributario import (  # noqa: E402
     MotorReformaTributaria,
     OperacaoFiscal,
 )
+from schemas.catalogo_documentos import montar_cards  # noqa: E402
+from schemas.documentos_requeridos import CardsResponse  # noqa: E402
+from utils.periodo_base import ANO_MAX, ANO_MIN  # noqa: E402
+from utils.periodo_base import derivar as derivar_periodo  # noqa: E402
 
 # relatorio_pdf importado lazy no endpoint — evita crash de startup se GTK ausente (Windows)
 try:
@@ -1099,6 +1103,61 @@ def _validar_docs_por_regime(
                 "(LC 123/2006 Art. 3º §2º — receita real B2C)"
             )
     return faltando
+
+
+@app.get(
+    "/documentos-requeridos",
+    summary="Lista cards de documentos com período-base pontual",
+    tags=["Análise"],
+    response_model=CardsResponse,
+)
+async def documentos_requeridos(
+    ano_alvo: int = Query(
+        ...,
+        ge=ANO_MIN,
+        le=ANO_MAX,
+        description=f"Ano-alvo da análise ({ANO_MIN}..{ANO_MAX} — cronograma IVA EC 132/2023)",
+    ),
+    perfil: Literal["B2B_CONTRIBUINTE", "B2C_CONSUMIDOR_FINAL", "MISTO"] = Query(
+        ...,
+        description="Perfil do comprador",
+    ),
+    regime: Literal["SIMPLES", "PRESUMIDO", "REAL", "MEI"] = Query(
+        ...,
+        description="Regime tributário da empresa analisada",
+    ),
+    mes_corte: int = Query(
+        12,
+        ge=1,
+        le=12,
+        description="Mês de fechamento (default 12 = corte anual em 31/dez)",
+    ),
+) -> CardsResponse:
+    """
+    Retorna a lista de documentos requeridos para a análise com período-base
+    derivado automaticamente do ano-alvo + mês-corte.
+
+    Exemplo: `GET /documentos-requeridos?ano_alvo=2026&perfil=B2B_CONTRIBUINTE&regime=SIMPLES`
+    → cards pedem XMLs de `2025-01..2025-12`, DAS de `Dezembro/2025`, etc.
+
+    Amparo: MAX_FISCAL_03 (declarar data base ANTES do cálculo) +
+    LC 123/2006 Art. 3º §1º (RBT12 = 12 meses imediatamente anteriores).
+
+    Endpoint público (sem JWT) — não vaza dados, só configuração.
+    """
+    try:
+        periodo = derivar_periodo(ano_alvo, mes_corte=mes_corte)
+        cards = montar_cards(perfil, regime, periodo)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    return CardsResponse(
+        ano_alvo=ano_alvo,
+        periodo_base=periodo.to_dict(),
+        perfil=perfil,
+        regime=regime,
+        cards=cards,
+    )
 
 
 @app.post(
