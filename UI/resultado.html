@@ -353,22 +353,32 @@
           </p>
         </div>
 
-        <!-- Sub-bloco 2: Sua situação (tabela comparativa) -->
+        <!-- Sub-bloco 2: Sua situação (tabela comparativa com sinais +/-) -->
         <div class="bg-white border border-slate-200 rounded-xl p-5 mb-4">
-          <h3 class="text-sm font-bold text-slate-900 mb-3">Sua situação específica</h3>
+          <h3 class="text-sm font-bold text-slate-900 mb-1">Sua situação específica</h3>
+          <p class="text-xs text-slate-500 mb-3">Valores mensais baseados no RPA declarado. Anualize multiplicando por 12.</p>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
-                <tr class="border-b border-slate-200">
-                  <th class="text-left py-2 text-xs font-semibold text-slate-500 uppercase">Item</th>
+                <tr class="border-b-2 border-slate-300">
+                  <th class="text-left py-2 text-xs font-semibold text-slate-500 uppercase">Item (por mês)</th>
                   <th class="text-right py-2 text-xs font-semibold text-slate-500 uppercase">Simples Puro</th>
                   <th class="text-right py-2 text-xs font-semibold text-slate-500 uppercase">Opt-Out IVA</th>
+                  <th class="text-right py-2 text-xs font-semibold text-slate-500 uppercase">Diferença</th>
                 </tr>
               </thead>
               <tbody id="optout-tabela-situacao">
                 <!-- Preenchido por JS -->
               </tbody>
+              <tfoot id="optout-tabela-footer" class="border-t-2 border-slate-300">
+                <!-- Preenchido por JS: linha anual + legenda -->
+              </tfoot>
             </table>
+          </div>
+          <div class="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">
+            <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded bg-red-100 border border-red-300"></span> ▲ Pior para você (custo extra)</span>
+            <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded bg-emerald-100 border border-emerald-300"></span> ▼ Melhor para o cliente (crédito maior)</span>
+            <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded bg-slate-100 border border-slate-300"></span> = Neutro (sem impacto)</span>
           </div>
         </div>
 
@@ -693,27 +703,132 @@
     // ─────────────────────────────────────────────
     // DECISÃO ESTRATÉGICA: OPT-OUT (6 sub-blocos)
     // ─────────────────────────────────────────────
+
+    /**
+     * Formata uma célula de diferença com sinal e cor.
+     * sentido: 'custo' (positivo = pior, vermelho) ou 'beneficio' (positivo = melhor, verde)
+     */
+    function formatDiferenca(valorA, valorB, sentido) {
+      const a = parseFloat(valorA) || 0;
+      const b = parseFloat(valorB) || 0;
+      const delta = b - a;
+
+      if (Math.abs(delta) < 0.005) {
+        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-600 font-mono text-xs">= R$ 0,00</span>';
+      }
+
+      const eh_pior = sentido === 'custo' ? delta > 0 : delta < 0;
+      const seta = delta > 0 ? '▲' : '▼';
+      const sinal = delta > 0 ? '+' : '-';
+      const classe = eh_pior
+        ? 'bg-red-100 text-red-800 border border-red-200'
+        : 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+      return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded ${classe} font-mono text-xs font-semibold">${seta} ${sinal}${formatBRL(Math.abs(delta))}</span>`;
+    }
+
     function renderDecisaoOptOut(cenarios) {
       const simples = cenarios.simples_puro || {};
       const optOut = cenarios.opt_out || {};
       const rec = cenarios.recomendacao_inteligente || {};
+      // % B2B real do cliente — chave pra entender o impacto real
+      const pctB2B = parseFloat(cenarios.percentual_b2b || 0);
+      const pctB2BFrac = pctB2B / 100;
 
-      // Tabela comparativa
+      // Valores brutos (por mês, baseados no RPA)
+      const dasSimples = parseFloat(simples.custo_das_por_operacao || 0);
+      const dasOptOut = parseFloat(optOut.custo_das_por_operacao || 0);
+      const ivaForaOptOut = parseFloat(optOut.iva_recolhido_por_fora || 0);
+      const custoTotalSimples = dasSimples;
+      const custoTotalOptOut = parseFloat(optOut.custo_total || 0);
+
+      // Crédito POTENCIAL por 1 operação B2B (o que o motor calcula)
+      const credPotencialSimples = parseFloat(simples.credito_gerado_para_comprador || 0);
+      const credPotencialOptOut = parseFloat(optOut.credito_gerado_para_comprador || 0);
+
+      // Crédito EFETIVO ponderado pelo % B2B real
+      const credEfetivoSimples = credPotencialSimples * pctB2BFrac;
+      const credEfetivoOptOut = credPotencialOptOut * pctB2BFrac;
+
+      // Impacto líquido = custo total que a empresa paga − crédito que ela de
+      // fato devolve na forma de desconto/competitividade para clientes B2B.
+      // Para a empresa fornecedora, é o custo líquido real que afeta caixa.
+      // Com pct_b2b=0, nenhum crédito é "aproveitado" pelos clientes, então
+      // o impacto líquido = custo total (o crédito não vai pra ninguém).
+      const liquidoSimples = custoTotalSimples;  // crédito B2B minimo é irrelevante
+      const liquidoOptOut = custoTotalOptOut;
+
       const tbody = document.getElementById('optout-tabela-situacao');
-      const linhas = [
-        ['DAS por operação', formatBRL(simples.custo_das_por_operacao), formatBRL(optOut.custo_das_por_operacao)],
-        ['IVA recolhido por fora', '<span class="text-slate-400">—</span>', formatBRL(optOut.iva_recolhido_por_fora)],
-        ['<strong>Custo total por operação</strong>', '<strong>' + formatBRL(simples.custo_das_por_operacao) + '</strong>', '<strong>' + formatBRL(optOut.custo_total) + '</strong>'],
-        ['Crédito gerado para comprador B2B',
-         formatBRL(simples.credito_gerado_para_comprador) + ' <span class="text-slate-400 text-xs">(' + sanitize(simples.percentual_credito_nf || '1%') + ')</span>',
-         '<strong class="text-emerald-700">' + formatBRL(optOut.credito_gerado_para_comprador) + ' (' + sanitize(optOut.percentual_credito_nf || '100%') + ')</strong>'],
-      ];
+      const linhas = [];
+      const DIFF_COMPONENTE = '<span class="text-slate-400 text-xs">— componente</span>';
+
+      // Linha 1: DAS base (componente — sem diferença pra não duplicar visualmente)
+      linhas.push({
+        label: 'DAS base (IRPJ+CSLL+CPP+ICMS+ISS)',
+        simples: formatBRL(dasSimples),
+        optout: formatBRL(dasOptOut),
+        diff: DIFF_COMPONENTE,
+        destaque: false,
+      });
+
+      // Linha 2: IVA por fora (componente — idem, sem diferença)
+      linhas.push({
+        label: '<span class="pl-4 text-slate-700">+ IVA (CBS+IBS) recolhido por fora</span>',
+        simples: '<span class="text-slate-400">—</span>',
+        optout: formatBRL(ivaForaOptOut),
+        diff: DIFF_COMPONENTE,
+        destaque: false,
+      });
+
+      // Linha 3: Custo TOTAL mensal (aqui sim a diferença aparece)
+      linhas.push({
+        label: '<strong>= Custo total mensal que sai do caixa</strong>',
+        simples: '<strong>' + formatBRL(custoTotalSimples) + '</strong>',
+        optout: '<strong>' + formatBRL(custoTotalOptOut) + '</strong>',
+        diff: formatDiferenca(custoTotalSimples, custoTotalOptOut, 'custo'),
+        destaque: true,
+      });
+
+      // Linha 4: Crédito B2B — só quando há clientes B2B
+      if (pctB2B > 0) {
+        linhas.push({
+          label: `Crédito aproveitado por clientes B2B <span class="text-xs text-slate-500">(ponderado por ${pctB2B.toFixed(0)}%)</span>`,
+          simples: formatBRL(credEfetivoSimples) + ' <span class="text-slate-400 text-xs">(' + sanitize(simples.percentual_credito_nf || '1%') + ' × ' + pctB2B.toFixed(0) + '% B2B)</span>',
+          optout: '<strong class="text-emerald-700">' + formatBRL(credEfetivoOptOut) + ' (' + sanitize(optOut.percentual_credito_nf || '100%') + ' × ' + pctB2B.toFixed(0) + '% B2B)</strong>',
+          diff: formatDiferenca(credEfetivoSimples, credEfetivoOptOut, 'beneficio'),
+          destaque: false,
+        });
+      }
+
       tbody.innerHTML = linhas.map(l =>
-        `<tr class="border-b border-slate-100">
-          <td class="py-2 text-slate-700">${l[0]}</td>
-          <td class="py-2 text-right font-mono text-slate-900">${l[1]}</td>
-          <td class="py-2 text-right font-mono text-slate-900">${l[2]}</td>
+        `<tr class="border-b border-slate-100${l.destaque ? ' bg-blue-50' : ''}">
+          <td class="py-2 text-slate-700">${l.label}</td>
+          <td class="py-2 text-right font-mono text-slate-900">${l.simples}</td>
+          <td class="py-2 text-right font-mono text-slate-900">${l.optout}</td>
+          <td class="py-2 text-right">${l.diff}</td>
         </tr>`).join('');
+
+      // Rodapé: projeção anual (× 12) — mantida explicitamente
+      const custoAnualSimples = custoTotalSimples * 12;
+      const custoAnualOptOut = custoTotalOptOut * 12;
+      const avisoContexto = pctB2B === 0
+        ? `<tr class="bg-amber-50">
+            <td colspan="4" class="py-2 px-3 text-xs text-amber-900">
+              ⚠ <strong>Atenção:</strong> Com 0% de clientes B2B, o crédito de 100% do Opt-Out
+              <strong>não beneficia ninguém</strong> — consumidor final não usa crédito de CBS/IBS.
+              Opt-Out só geraria custo extra sem retorno.
+            </td>
+           </tr>`
+        : '';
+
+      const tfoot = document.getElementById('optout-tabela-footer');
+      tfoot.innerHTML = `
+        <tr class="bg-slate-50">
+          <td class="py-3 text-slate-700 text-xs font-semibold uppercase tracking-wider">Projeção anual (× 12 meses)</td>
+          <td class="py-3 text-right font-mono text-slate-900 font-bold">${formatBRL(custoAnualSimples)}</td>
+          <td class="py-3 text-right font-mono text-slate-900 font-bold">${formatBRL(custoAnualOptOut)}</td>
+          <td class="py-3 text-right">${formatDiferenca(custoAnualSimples, custoAnualOptOut, 'custo')}</td>
+        </tr>
+        ${avisoContexto}`;
 
       // Diagnóstico personalizado com semáforo
       const codigo = rec.codigo || 'ZONA_CINZA';

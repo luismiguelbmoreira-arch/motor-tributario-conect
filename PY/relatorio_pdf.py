@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 import os
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -415,15 +415,97 @@ def _secao_decisao_opt_out(diagnostico: dict) -> str:
     }
     cor_texto, cor_bg, cor_borda = cor_map.get(codigo, cor_map["ZONA_CINZA"])
 
-    # Tabela Sua Situação
-    custo_simples = _fmt_moeda(simples_puro.get("custo_das_por_operacao", 0))
-    custo_opt_das = _fmt_moeda(opt_out.get("custo_das_por_operacao", 0))
-    iva_por_fora = _fmt_moeda(opt_out.get("iva_recolhido_por_fora", 0))
-    custo_opt_total = _fmt_moeda(opt_out.get("custo_total", 0))
-    credito_simples = _fmt_moeda(simples_puro.get("credito_gerado_para_comprador", 0))
-    credito_opt = _fmt_moeda(opt_out.get("credito_gerado_para_comprador", 0))
+    # Tabela Sua Situação — valores crus + helper de formatação de diferença
+    def _to_dec(v: Any) -> Decimal:
+        try:
+            return Decimal(str(v or 0))
+        except Exception:
+            return Decimal("0")
+
+    das_simples_dec = _to_dec(simples_puro.get("custo_das_por_operacao"))
+    das_opt_dec = _to_dec(opt_out.get("custo_das_por_operacao"))
+    iva_fora_dec = _to_dec(opt_out.get("iva_recolhido_por_fora"))
+    custo_tot_simples_dec = das_simples_dec
+    custo_tot_opt_dec = _to_dec(opt_out.get("custo_total"))
+
+    # Crédito POTENCIAL (por 1 operação B2B) — o que o motor calcula
+    cred_pot_simples_dec = _to_dec(simples_puro.get("credito_gerado_para_comprador"))
+    cred_pot_opt_dec = _to_dec(opt_out.get("credito_gerado_para_comprador"))
+
+    # % B2B real — fundamental para ponderar o crédito aproveitado
+    pct_b2b_dec = _to_dec(cenarios.get("percentual_b2b", 0))
+    pct_b2b_frac = pct_b2b_dec / Decimal("100")
+    tem_b2b = pct_b2b_dec > Decimal("0")
+
+    # Crédito EFETIVO ponderado pelo perfil real de clientes
+    cred_efet_simples_dec = (cred_pot_simples_dec * pct_b2b_frac).quantize(
+        Decimal("0.01"), ROUND_HALF_UP
+    )
+    cred_efet_opt_dec = (cred_pot_opt_dec * pct_b2b_frac).quantize(
+        Decimal("0.01"), ROUND_HALF_UP
+    )
+
+    custo_simples = _fmt_moeda(das_simples_dec)
+    custo_opt_das = _fmt_moeda(das_opt_dec)
+    iva_por_fora = _fmt_moeda(iva_fora_dec)
+    custo_opt_total = _fmt_moeda(custo_tot_opt_dec)
     pct_credito_simples = _esc(simples_puro.get("percentual_credito_nf", "1%"))
     pct_credito_opt = _esc(opt_out.get("percentual_credito_nf", "100%"))
+
+    def _diff_html(a: Decimal, b: Decimal, sentido: str) -> str:
+        """
+        Formata célula de diferença com sinal e cor.
+        sentido: 'custo' (positivo = pior, vermelho) ou 'beneficio' (positivo = melhor, verde)
+        """
+        delta = b - a
+        if abs(delta) < Decimal("0.005"):
+            return (
+                '<span style="display:inline-block;padding:2px 6px;border-radius:3px;'
+                'background:#f1f5f9;color:#475569;font-family:monospace;font-size:9px;">'
+                '= R$ 0,00</span>'
+            )
+        eh_pior = (delta > 0) if sentido == "custo" else (delta < 0)
+        seta = "▲" if delta > 0 else "▼"
+        sinal = "+" if delta > 0 else "-"
+        if eh_pior:
+            bg, cor, borda = "#fee2e2", "#991b1b", "#fca5a5"
+        else:
+            bg, cor, borda = "#d1fae5", "#065f46", "#6ee7b7"
+        return (
+            f'<span style="display:inline-block;padding:2px 6px;border-radius:3px;'
+            f'background:{bg};color:{cor};border:1px solid {borda};'
+            f'font-family:monospace;font-size:9px;font-weight:700;">'
+            f'{seta} {sinal}{_fmt_moeda(abs(delta))}</span>'
+        )
+
+    # Diferenças só nas linhas de TOTAL (custo mensal + crédito)
+    # As linhas de componentes (DAS, IVA por fora) não mostram diferença
+    # para não duplicar visualmente o mesmo valor.
+    diff_custo_total = _diff_html(custo_tot_simples_dec, custo_tot_opt_dec, "custo")
+    diff_credito = _diff_html(cred_efet_simples_dec, cred_efet_opt_dec, "beneficio")
+
+    # Projeção anual (× 12) — mostrada explicitamente no rodapé da tabela
+    custo_anual_simples = custo_tot_simples_dec * Decimal("12")
+    custo_anual_opt = custo_tot_opt_dec * Decimal("12")
+    diff_anual = _diff_html(custo_anual_simples, custo_anual_opt, "custo")
+
+    # Textos formatados do crédito B2B (só aparecem se há clientes B2B)
+    credito_simples = _fmt_moeda(cred_efet_simples_dec)
+    credito_opt = _fmt_moeda(cred_efet_opt_dec)
+
+    # Aviso contextual quando 0% B2B
+    if not tem_b2b:
+        aviso_tabela = (
+            '<div style="background:#fef3c7;border-left:3px solid #f59e0b;'
+            'padding:8px 12px;margin-top:6px;border-radius:0 4px 4px 0;'
+            'font-size:10px;color:#78350f;line-height:1.5;">'
+            '<strong>⚠ Você não tem clientes B2B:</strong> o crédito de 100% '
+            'do Opt-Out <strong>não beneficia ninguém</strong> — consumidor final '
+            'não usa crédito de CBS/IBS. Opt-Out só geraria custo extra sem retorno.'
+            '</div>'
+        )
+    else:
+        aviso_tabela = ""
 
     return f"""
 <!-- Decisão Estratégica: Opt-Out IVA -->
@@ -441,35 +523,59 @@ def _secao_decisao_opt_out(diagnostico: dict) -> str:
   </div>
 </div>
 
-<!-- Sub-bloco 2: Sua situação (tabela comparativa) -->
+<!-- Sub-bloco 2: Sua situação (tabela comparativa com breakdown + totais) -->
 <h3 style="margin-top:14px;">Sua Situação Específica</h3>
-<table style="margin-bottom:12px;">
+<p style="font-size:10px;color:#6b7280;margin-bottom:6px;">Valores mensais baseados no RPA declarado. A diferença aparece apenas nas linhas de total para evitar dupla contagem.</p>
+<table style="margin-bottom:8px;">
   <thead>
-    <tr><th>Item</th><th>Simples Puro</th><th>Opt-Out IVA</th></tr>
+    <tr>
+      <th>Componente (por mês)</th>
+      <th style="text-align:right;">Simples Puro</th>
+      <th style="text-align:right;">Opt-Out IVA</th>
+      <th style="text-align:right;">Diferença</th>
+    </tr>
   </thead>
   <tbody>
     <tr>
-      <td><strong>DAS por operação</strong></td>
-      <td>{custo_simples}</td>
-      <td>{custo_opt_das}</td>
+      <td>DAS base (IRPJ+CSLL+CPP+ICMS+ISS)</td>
+      <td style="text-align:right;font-family:monospace;">{custo_simples}</td>
+      <td style="text-align:right;font-family:monospace;">{custo_opt_das}</td>
+      <td style="text-align:right;color:#9ca3af;font-size:9px;">— componente</td>
     </tr>
     <tr>
-      <td><strong>IVA recolhido por fora</strong></td>
-      <td style="color:#9ca3af;">—</td>
-      <td>{iva_por_fora}</td>
+      <td style="padding-left:18px;">+ IVA (CBS+IBS) recolhido por fora</td>
+      <td style="color:#9ca3af;text-align:right;">—</td>
+      <td style="text-align:right;font-family:monospace;">{iva_por_fora}</td>
+      <td style="text-align:right;color:#9ca3af;font-size:9px;">— componente</td>
     </tr>
-    <tr style="background:#eff6ff;">
-      <td><strong>Custo total por operação</strong></td>
-      <td><strong>{custo_simples}</strong></td>
-      <td><strong>{custo_opt_total}</strong></td>
+    <tr style="background:#eff6ff;border-top:1px solid #bfdbfe;">
+      <td><strong>= Custo total mensal que sai do caixa</strong></td>
+      <td style="text-align:right;font-family:monospace;"><strong>{custo_simples}</strong></td>
+      <td style="text-align:right;font-family:monospace;"><strong>{custo_opt_total}</strong></td>
+      <td style="text-align:right;">{diff_custo_total}</td>
     </tr>
-    <tr>
-      <td><strong>Crédito gerado para comprador B2B</strong></td>
-      <td>{credito_simples} <span style="color:#9ca3af;">({pct_credito_simples})</span></td>
-      <td><strong style="color:#065f46;">{credito_opt} ({pct_credito_opt})</strong></td>
-    </tr>
+    {'' if not tem_b2b else f'''<tr>
+      <td>Crédito aproveitado por clientes B2B<br/><span style="font-size:9px;color:#9ca3af;">(ponderado por {pct_b2b_dec:.0f}% B2B)</span></td>
+      <td style="text-align:right;font-family:monospace;">{credito_simples} <span style="color:#9ca3af;font-size:9px;">({pct_credito_simples})</span></td>
+      <td style="text-align:right;font-family:monospace;"><strong style="color:#065f46;">{credito_opt} ({pct_credito_opt})</strong></td>
+      <td style="text-align:right;">{diff_credito}</td>
+    </tr>'''}
   </tbody>
+  <tfoot>
+    <tr style="background:#f1f5f9;border-top:2px solid #cbd5e1;">
+      <td style="padding-top:6px;font-weight:700;font-size:9px;text-transform:uppercase;letter-spacing:.03em;">Projeção anual (× 12 meses)</td>
+      <td style="text-align:right;font-family:monospace;font-weight:700;">{_fmt_moeda(custo_anual_simples)}</td>
+      <td style="text-align:right;font-family:monospace;font-weight:700;">{_fmt_moeda(custo_anual_opt)}</td>
+      <td style="text-align:right;">{diff_anual}</td>
+    </tr>
+  </tfoot>
 </table>
+{aviso_tabela}
+<div style="font-size:9px;color:#6b7280;margin-top:6px;margin-bottom:14px;line-height:1.6;">
+  <span style="display:inline-block;margin-right:12px;"><span style="display:inline-block;width:8px;height:8px;border:1px solid #fca5a5;background:#fee2e2;vertical-align:middle;"></span> ▲ Custo extra</span>
+  <span style="display:inline-block;margin-right:12px;"><span style="display:inline-block;width:8px;height:8px;border:1px solid #6ee7b7;background:#d1fae5;vertical-align:middle;"></span> ▼ Melhor resultado</span>
+  <span style="display:inline-block;"><span style="display:inline-block;width:8px;height:8px;border:1px solid #cbd5e1;background:#f1f5f9;vertical-align:middle;"></span> = Neutro</span>
+</div>
 
 <!-- Sub-bloco 3: Diagnóstico personalizado -->
 <div style="background:{cor_bg};border:2px solid {cor_borda};padding:14px 16px;border-radius:6px;margin-bottom:14px;">

@@ -62,7 +62,7 @@ except ImportError:
 from decimal import Decimal  # noqa: E402
 from typing import Any, Literal, Optional  # noqa: E402
 
-from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile  # noqa: E402
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import JSONResponse, Response, StreamingResponse  # noqa: E402
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # noqa: E402
@@ -992,21 +992,39 @@ async def gerar_relatorio_pdf(
     tags=["Análise"],
 )
 async def analise_pdf(
+    request: Request,
     files: list[UploadFile] = File(..., description="PDFs do e-CAC (máx. 10 arquivos)"),
+    termo_aceite: bool = Form(
+        False,
+        description="Termo de aceite digital obrigatório (CTN Art. 142 + LGPD Art. 37)",
+    ),
     current_user: dict = Depends(get_current_user),
 ) -> JSONResponse:
     """
     Aceita múltiplos PDFs do e-CAC (PGDAS-D, DAS, SIMEI, comprovantes).
     Extrai dados via pipeline extrator_pdfs.py + Claude Vision API.
-    Retorna diagnóstico fiscal completo.
+    Retorna envelope {"diagnostico": ..., "pii": {cnpj, razao_social}}.
 
     Auditoria documental (gap P0): cada PDF é cifrado AES-256-GCM e
     registrado na tabela auditoria_documentos APÓS a extração descobrir
     o CNPJ. Falhas de auditoria não bloqueiam o diagnóstico — o status
     fica em diagnostico["_extracao"]["auditoria_status"].
 
+    Termo de aceite digital (P0 #3): sem `termo_aceite=true`, o endpoint
+    rejeita o request com 400. Ao persistir os documentos, chama
+    `aceitar_documento()` marcando quem confirmou, quando e de qual IP.
+
     Exige Bearer token JWT válido.
     """
+    if not termo_aceite:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Termo de aceite digital obrigatório. "
+                "Marque a caixa 'Confirmo que estes são os documentos oficiais' "
+                "antes de enviar (CTN Art. 142 + LGPD Art. 37)."
+            ),
+        )
     if not files:
         raise HTTPException(status_code=422, detail="Nenhum arquivo enviado.")
     if len(files) > 10:
@@ -1044,13 +1062,35 @@ async def analise_pdf(
             processar_pdfs_bytes,  # importação lazy — evita falha no startup se ANTHROPIC_API_KEY ausente
         )
 
-        diagnostico = processar_pdfs_bytes(
+        payload = processar_pdfs_bytes(
             conteudos,
             arquivos_nomes=nomes,
             user_id=user_id,
             persistir_auditoria=True,
+            envelope=True,
         )
-        return JSONResponse(content=_serializar_decimal(diagnostico))
+        diagnostico = payload["diagnostico"]
+
+        # Registra termo de aceite para cada documento persistido (LGPD Art. 37)
+        ip_origem = request.client.host if request.client else None
+        docs_auditoria = (
+            diagnostico.get("_extracao", {}).get("documentos_auditoria", []) or []
+        )
+        if docs_auditoria and user_id is not None:
+            try:
+                from database import aceitar_documento
+                for doc in docs_auditoria:
+                    doc_id = doc.get("id")
+                    if doc_id is not None:
+                        aceitar_documento(
+                            documento_id=doc_id,
+                            aceito_por_user_id=user_id,
+                            aceito_ip=ip_origem,
+                        )
+            except Exception as exc_aceite:
+                logger.warning("Falha ao registrar termo de aceite: %s", exc_aceite)
+
+        return JSONResponse(content=_serializar_decimal(payload))
 
     except ImportError:
         raise HTTPException(

@@ -573,6 +573,7 @@ def processar_pdfs_bytes(
     arquivos_nomes: Optional[list[str]] = None,
     user_id: Optional[int] = None,
     persistir_auditoria: bool = False,
+    envelope: bool = False,
 ) -> dict:
     """
     Extrai dados tributários a partir de bytes de PDFs em memória.
@@ -588,10 +589,18 @@ def processar_pdfs_bytes(
                              extração. Falhas de persistência NÃO bloqueiam o
                              diagnóstico — apenas anotam status em
                              diagnostico["_extracao"]["auditoria_status"].
+        envelope: Se True, retorna {"diagnostico": {...}, "pii": {cnpj, razao_social}}
+                  separando PII do diagnóstico despersonalizado (LGPD). Se False
+                  (default, backward compat), retorna só o diagnóstico dict.
 
     Returns:
-        dict diagnóstico fiscal — mesmo formato de MotorReformaTributaria.gerar_diagnostico()
-        Se persistir_auditoria=True, inclui:
+        Sem envelope: dict diagnóstico fiscal — mesmo formato de
+                      MotorReformaTributaria.gerar_diagnostico()
+        Com envelope: dict com 2 chaves top-level:
+                      - "diagnostico": dict completo SEM PII
+                      - "pii": {"cnpj": str, "razao_social": str}
+
+        Se persistir_auditoria=True, o diagnóstico inclui:
             diagnostico["_extracao"]["documentos_auditoria"] = [
                 {"id": int, "hash_sha256": str, "nome_original": str},
                 ...
@@ -868,7 +877,15 @@ def processar_pdfs_bytes(
         "auditoria_status": auditoria_status,
     }
 
+    # Captura PII antes do purge — para envelope (se solicitado)
+    pii_payload = {
+        "cnpj": empresa_params.get("cnpj", ""),
+        "razao_social": empresa_params.get("razao_social", ""),
+    }
+
     # LGPD: purge após uso
     dados.purge()
 
+    if envelope:
+        return {"diagnostico": diagnostico, "pii": pii_payload}
     return diagnostico

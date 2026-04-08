@@ -1144,14 +1144,25 @@ class MotorReformaTributaria:
           - simples_puro: cenário A
           - opt_out: cenário B
           - disparidade_anual_estimada: diferença financeira anual (str)
+          - percentual_b2b: float 0-100 — perfil real de clientes (usado para
+            ponderar o crédito B2B na tabela de exibição)
           - recomendacao: frase curta (compat retrô — usada por testes antigos)
           - recomendacao_inteligente: dict {codigo, titulo, justificativa, amparo_legal}
         """
         rec = self._gerar_recomendacao_opt_out()
+
+        # Percentual real de clientes B2B (mesmo cálculo do _gerar_recomendacao)
+        pct_b2b = self.compradora.percentual_b2b or Decimal("0")
+        if self.compradora.tipo == "B2B_CONTRIBUINTE":
+            pct_b2b = Decimal("100")
+        elif self.compradora.tipo == "B2C_CONSUMIDOR_FINAL":
+            pct_b2b = Decimal("0")
+
         return {
             "simples_puro": self.cenario_simples_puro(),
             "opt_out": self.cenario_opt_out(),
             "disparidade_anual_estimada": str(self.calcular_disparidade_anual()),
+            "percentual_b2b": str(pct_b2b),
             # Compatibilidade com testes antigos (string curta)
             "recomendacao": (
                 "OPT_OUT recomendado para reter cliente B2B."
