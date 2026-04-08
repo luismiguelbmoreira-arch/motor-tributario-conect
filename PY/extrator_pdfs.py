@@ -531,21 +531,84 @@ def dados_para_motor(dados: DadosExtraidosPDF) -> dict:
 # ENTRY POINT PARA API — Recebe bytes em memória (sem disco)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def processar_pdfs_bytes(conteudos: list[bytes]) -> dict:
+def _inferir_campo_origem(passo_id: str) -> str:
+    """
+    Heurística para mapear id de passo da trilha → campo-fonte no PDF
+    original. Usado para enriquecer a trilha com rastreabilidade fina
+    quando o dossiê de prova for gerado.
+
+    IDs conhecidos do motor (motor_tributario.py::trilha_auditoria):
+      - FASE2_RBT12 / RBT12_* → "RBT12 (Receita Bruta 12m)"
+      - FATOR_R / FOLHA_* → "Folha de pagamento 12m"
+      - FASE2_ANEXO / CNAE_* → "CNAE principal + tabela de Anexo"
+      - FASE2_ALIQUOTA / DAS_* → "cálculo derivado" (não tem campo único)
+      - STRESS_R* / ALERTA_* → "cálculo derivado"
+      - CRONOGRAMA_IVA_* → "cronograma LC 214/2025" (não vem do PDF)
+      - DIFAL_* → "UF origem/destino + valor operação"
+      - Default → "dados do extrato PGDAS-D"
+    """
+    pid = (passo_id or "").upper()
+    # Ordem importa: checagens mais específicas antes das genéricas.
+    # "ALIQUOTA_EFETIVA" contém "IVA" como substring — ALIQUOTA vem primeiro.
+    if "RBT12" in pid:
+        return "RBT12 (Receita Bruta 12m)"
+    if "FATOR_R" in pid or "FOLHA" in pid:
+        return "Folha de pagamento 12m"
+    if "ANEXO" in pid or "CNAE" in pid:
+        return "CNAE principal + tabela de Anexo"
+    if "DIFAL" in pid:
+        return "UF origem/destino + valor operacao"
+    if "ALIQUOTA" in pid or "DAS" in pid or "SPLIT" in pid:
+        return "calculo derivado"
+    if "STRESS" in pid or "ALERTA" in pid:
+        return "calculo derivado"
+    if "CRONOGRAMA" in pid or "IVA" in pid or "CBS" in pid or "IBS" in pid:
+        return "Cronograma LC 214/2025 (nao vem do PDF)"
+    return "dados do extrato PGDAS-D"
+
+
+def processar_pdfs_bytes(
+    conteudos: list[bytes],
+    *,
+    arquivos_nomes: Optional[list[str]] = None,
+    user_id: Optional[int] = None,
+    persistir_auditoria: bool = False,
+) -> dict:
     """
     Extrai dados tributários a partir de bytes de PDFs em memória.
     Usado pelo endpoint POST /analise/pdf — PDFs chegam via HTTP upload, sem gravar em disco.
 
     Args:
         conteudos: Lista de bytes de cada PDF (já lidos pelo FastAPI UploadFile)
+        arquivos_nomes: Lista paralela com os filenames originais (mesmo length).
+                        Obrigatório se persistir_auditoria=True.
+        user_id: ID do operador autenticado (uploaded_by_user_id na auditoria)
+        persistir_auditoria: Se True, cifra cada PDF e registra na tabela
+                             auditoria_documentos APÓS descobrir o CNPJ via
+                             extração. Falhas de persistência NÃO bloqueiam o
+                             diagnóstico — apenas anotam status em
+                             diagnostico["_extracao"]["auditoria_status"].
 
     Returns:
         dict diagnóstico fiscal — mesmo formato de MotorReformaTributaria.gerar_diagnostico()
+        Se persistir_auditoria=True, inclui:
+            diagnostico["_extracao"]["documentos_auditoria"] = [
+                {"id": int, "hash_sha256": str, "nome_original": str},
+                ...
+            ]
 
     Raises:
         ValueError: ANTHROPIC_API_KEY ausente
         RuntimeError: Confiança insuficiente, campos obrigatórios ausentes, ou falha de API
     """
+    if persistir_auditoria and not arquivos_nomes:
+        raise ValueError(
+            "persistir_auditoria=True exige arquivos_nomes (lista paralela com filenames)"
+        )
+    if arquivos_nomes and len(arquivos_nomes) != len(conteudos):
+        raise ValueError(
+            f"arquivos_nomes ({len(arquivos_nomes)}) precisa ter o mesmo tamanho de conteudos ({len(conteudos)})"
+        )
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         raise ValueError(
@@ -730,6 +793,67 @@ def processar_pdfs_bytes(conteudos: list[bytes]) -> dict:
                 "status": "OK" if delta_bd < Decimal("1.00") else "DIVERGENTE",
             })
 
+    # ── Auditoria documental: cifrar PDFs originais e registrar em DB ──────
+    # Frente do gap P0 — bloqueia "dado errado culpa do contador" + LGPD.
+    # Falha de persistência NÃO derruba o diagnóstico, apenas anota status.
+    documentos_auditoria: list[dict[str, Any]] = []
+    auditoria_status = "DESATIVADO"
+    if persistir_auditoria:
+        try:
+            from database import registrar_documento_auditoria
+            from storage_cifrado import cifrar_e_persistir, hash_documento
+
+            cnpj_cliente = empresa_params["cnpj"]
+            for i, pdf_bytes in enumerate(conteudos):
+                nome = arquivos_nomes[i] if arquivos_nomes else f"documento_{i+1}.pdf"
+                try:
+                    h = hash_documento(pdf_bytes)
+                    _, path = cifrar_e_persistir(pdf_bytes, cnpj_cliente)
+                    doc = registrar_documento_auditoria(
+                        hash_sha256=h,
+                        empresa_cnpj=cnpj_cliente,
+                        nome_original=nome,
+                        tamanho_bytes=len(pdf_bytes),
+                        storage_path=str(path),
+                        uploaded_by_user_id=user_id,
+                    )
+                    documentos_auditoria.append({
+                        "id": doc.id,
+                        "hash_sha256": h,
+                        "nome_original": nome,
+                        "tamanho_bytes": len(pdf_bytes),
+                    })
+                except Exception as exc_doc:
+                    logger.error(
+                        "Falha ao persistir auditoria de '%s': %s",
+                        nome, exc_doc,
+                    )
+            auditoria_status = (
+                "OK" if len(documentos_auditoria) == len(conteudos) else "PARCIAL"
+            )
+        except Exception as exc_aud:
+            logger.error("Auditoria documental falhou completamente: %s", exc_aud)
+            auditoria_status = f"FALHOU: {type(exc_aud).__name__}"
+
+    # ── Enriquecer trilha de auditoria com fonte_documentos ────────────────
+    # Cada passo derivado de extração ganha a lista de doc IDs que originou
+    # os dados de entrada. Heurística pelo id do passo — extração PDF é a
+    # fonte de dados brutos (RBT12, folha, RPA, competência, anexo, CNAE).
+    # Passos de cálculo puro (fórmulas matemáticas sobre os dados) herdam
+    # implicitamente a mesma fonte, então marcamos todos os passos.
+    if documentos_auditoria:
+        doc_ids = [d["id"] for d in documentos_auditoria]
+        doc_hashes = [d["hash_sha256"] for d in documentos_auditoria]
+        for passo in diagnostico.get("trilha_auditoria", []):
+            if not isinstance(passo, dict):
+                continue
+            passo["fonte"] = {
+                "tipo": "extracao_pdf",
+                "documentos_ids": doc_ids,
+                "documentos_hashes": doc_hashes,
+                "campo_origem": _inferir_campo_origem(passo.get("id", "")),
+            }
+
     # Injeta metadados da extração no diagnóstico
     diagnostico["_extracao"] = {
         "confianca": dados.confianca_extracao,
@@ -740,6 +864,8 @@ def processar_pdfs_bytes(conteudos: list[bytes]) -> dict:
         "das_ecac_referencia": str(das_ecac or ""),
         "competencia": competencia,
         "validacao_cruzada": validacao_cruzada,
+        "documentos_auditoria": documentos_auditoria,
+        "auditoria_status": auditoria_status,
     }
 
     # LGPD: purge após uso

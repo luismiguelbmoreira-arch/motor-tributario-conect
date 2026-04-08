@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # 🏛️ MOTOR TRIBUTÁRIO CONECT — BÍBLIA DA REFORMA TRIBUTÁRIA
 
-**Status:** 🚀 Produção — 320 testes passando (100%) | 4 regimes + DIFAL backend + Cronograma + PDF
-**Âncora Legal:** EC 132/2023 | LC 123/2006 | LC 214/2025 | LC 224/2025 | EC 87/2015
-**Data Certificação:** 06/04/2026
+**Status:** 🚀 Produção — 452 testes passando (100%) | 4 regimes + DIFAL + Cronograma + PDF educativo + Auditoria Documental LGPD
+**Âncora Legal:** EC 132/2023 | LC 123/2006 | LC 214/2025 | LC 224/2025 | EC 87/2015 | LGPD 13.709/2018 | CTN Arts. 142 e 173
+**Data Certificação:** 08/04/2026
 
 ---
 
@@ -41,7 +41,13 @@ alembic revision --autogenerate -m "descricao"
 ```
 ANTHROPIC_API_KEY=sk-ant-api03-...
 DATABASE_URL=sqlite:///motor_tributario.db
+MOTOR_CONECT_MASTER_KEY=<64 chars hex — gere com `python -c "import secrets; print(secrets.token_hex(32))"`>
+JWT_SECRET_KEY=<chave JWT>
 ```
+
+**⚠️ MOTOR_CONECT_MASTER_KEY** é a chave raiz da auditoria documental cifrada.
+Perder essa chave = impossibilidade de decifrar PDFs antigos. Guardar em
+cofre seguro (1Password, Bitwarden). Ver seção "🔐 AUDITORIA DOCUMENTAL".
 
 ---
 
@@ -135,6 +141,118 @@ Todo evento gravado em `trilha_auditoria[]` segue este formato:
 
 ---
 
+## 🔐 AUDITORIA DOCUMENTAL (LGPD + CTN)
+
+Camada que bloqueia o vetor "dado errado culpa do contador" e cumpre
+LGPD Art. 16/37/46 + CTN Arts. 142/173. Ativa automaticamente em toda
+chamada de `POST /analise/pdf` autenticada.
+
+### Fluxo completo de upload
+
+```
+1. Cliente/operador sobe PDFs via POST /analise/pdf (FastAPI UploadFile)
+2. API chama processar_pdfs_bytes(conteudos, arquivos_nomes, user_id, persistir_auditoria=True)
+3. Extrator Claude Vision processa → descobre CNPJ, RBT12, competência
+4. Motor roda → gera diagnóstico + trilha_auditoria
+5. Para cada PDF:
+     a. hash_documento(bytes) → SHA-256 hex do plaintext
+     b. cifrar_e_persistir(bytes, cnpj) → AES-256-GCM
+        chave = HKDF-SHA256(MOTOR_CONECT_MASTER_KEY, salt=cnpj)
+        path = data/auditoria/{sha256(cnpj)[:16]}/{hash[:16]}.bin
+     c. registrar_documento_auditoria(...) → row em auditoria_documentos
+6. Cada passo da trilha_auditoria ganha { "fonte": {documentos_ids, hashes, campo_origem} }
+7. Diagnóstico retorna com _extracao.documentos_auditoria + auditoria_status
+```
+
+### Arquitetura dos módulos
+
+```
+PY/storage_cifrado.py        ← AES-256-GCM + HKDF, puro
+├── cifrar_e_persistir(bytes, cnpj) → (hash, path)
+├── decifrar(path, cnpj, hash_esperado) → bytes
+├── hash_documento(bytes) → sha256 hex
+├── anonimizar_cnpj(cnpj) → hash16 irreversível
+├── existe(cnpj, hash) → bool
+└── purge(cnpj, hash) → bool (sobrescreve + unlink, LGPD Art. 16)
+
+PY/database.py::AuditoriaDocumentoDB   ← metadata em SQLite
+├── hash_sha256 (unique, PK lógica)
+├── empresa_cnpj (indexed)
+├── nome_original, mime, tamanho, paginas
+├── storage_path → ponteiro para arquivo cifrado
+├── uploaded_at, uploaded_by_user_id
+├── aceito_em, aceito_por_user_id, aceito_ip   ← termo de aceite digital
+├── diagnostico_id (soft FK)
+├── purge_after (uploaded_at + 5 anos)
+└── purged_at
+
+PY/database.py::AuditoriaAcessoDB      ← log LGPD Art. 37
+├── documento_id (FK)
+├── acessado_em, acessado_por_user_id, ip
+└── motivo (obrigatório, 10-500 chars)
+
+PY/extrator_pdfs.py
+├── processar_pdfs_bytes(conteudos, *, arquivos_nomes, user_id, persistir_auditoria)
+└── _inferir_campo_origem(passo_id) → label humano do campo-fonte
+
+PY/api_motor.py
+├── POST /analise/pdf                     ← cifra + registra no upload
+└── GET /auditoria/prova/cnpj/{digitos}?motivo=... ← dossiê ZIP
+```
+
+### Formato do `fonte` em cada passo da trilha
+
+```python
+{
+    "tipo": "CALCULO",
+    "id": "FASE2_RBT12",
+    "titulo": "Receita Bruta 12 meses",
+    "formula": "...",
+    "amparo_legal": "LC 123/2006, Art. 12, § 1º",
+    "fonte": {                                   # ← NOVO (quando persistir_auditoria)
+        "tipo": "extracao_pdf",
+        "documentos_ids": [1, 2, 3],
+        "documentos_hashes": ["abc123...", "def456...", "fed789..."],
+        "campo_origem": "RBT12 (Receita Bruta 12m)"
+    },
+    "timestamp": "...",
+}
+```
+
+### Endpoint de dossiê de prova
+
+```bash
+# Gera ZIP binário com todos os PDFs decifrados + HASHES.txt + README.txt
+curl -H "Authorization: Bearer <JWT>" \
+     "http://localhost:8000/auditoria/prova/cnpj/54657895000160?motivo=Fiscalizacao%20RFB%20processo%20123-2026" \
+     -o dossie.zip
+
+unzip dossie.zip
+sha256sum originais/*.pdf   # deve bater com HASHES.txt
+```
+
+Cada decifragem registra linha em `AuditoriaAcessoDB` com `user_id + IP + motivo`.
+CNPJ na URL é apenas dígitos (14 chars, sem pontuação).
+
+### Política LGPD de retenção
+
+| Arquivo | Onde | Por quanto tempo | Purge |
+|---|---|---|---|
+| PDF cifrado | `data/auditoria/{hash}/{id}.bin` | 5 anos (CTN Art. 173) | `storage_cifrado.purge(cnpj, hash)` + `marcar_documento_purgado(id)` |
+| Metadata em DB | `auditoria_documentos` | 5 anos + marca `purged_at` | permanente como registro histórico |
+| Log de acesso | `auditoria_acessos` | Permanente (LGPD Art. 37) | nunca purga |
+
+Cron diário deve rodar `listar_documentos_purgaveis()` e executar o purge dos que passaram do prazo.
+
+### O que fazer se algo explodir
+
+1. **Master key perdida** → PDFs antigos **irrecuperáveis**. Dossiê de casos novos funciona com nova key, antigos só pelos hashes em DB.
+2. **DB corrompido** → Arquivos cifrados em disco são inúteis sem os metadados (hash, path, cnpj). **Backup diário do DB é obrigatório.**
+3. **Cliente pede direito de eliminação (LGPD Art. 18 V)** → Chamar `storage_cifrado.purge()` + `marcar_documento_purgado()` para cada doc do CNPJ. Log em `auditoria_acessos` permanece.
+4. **Fiscalização exige os originais** → Chamar `GET /auditoria/prova/cnpj/{digitos}?motivo=...` com justificativa detalhada.
+
+---
+
 ## 🛑 REGRAS MÁXIMAS — MAX_FISCAL (Inegociáveis)
 
 | ID | Diretriz |
@@ -143,6 +261,7 @@ Todo evento gravado em `trilha_auditoria[]` segue este formato:
 | **MAX_02** | Toda regra, alíquota ou isenção cita explicitamente a base legal |
 | **MAX_03** | Declarar a data base ANTES do cálculo (regra do ano errado invalida tudo) |
 | **MAX_04** | Premissa alterada → salvar como `Cenario_Estudo_A`, nunca deletar |
+| **MAX_05** | Toda análise via `/analise/pdf` deve ter os PDFs-fonte cifrados e registrados em `auditoria_documentos` — sem isso o diagnóstico não pode ser usado em defesa jurídica. Ativado por `persistir_auditoria=True`. |
 
 ---
 

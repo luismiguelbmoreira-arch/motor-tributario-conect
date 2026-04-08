@@ -62,9 +62,9 @@ except ImportError:
 from decimal import Decimal  # noqa: E402
 from typing import Any, Literal, Optional  # noqa: E402
 
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile  # noqa: E402
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-from fastapi.responses import JSONResponse, Response  # noqa: E402
+from fastapi.responses import JSONResponse, Response, StreamingResponse  # noqa: E402
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel, ConfigDict, Field  # noqa: E402
@@ -993,12 +993,18 @@ async def gerar_relatorio_pdf(
 )
 async def analise_pdf(
     files: list[UploadFile] = File(..., description="PDFs do e-CAC (máx. 10 arquivos)"),
-    current_user: dict = Depends(get_current_user),  # noqa: ARG001
+    current_user: dict = Depends(get_current_user),
 ) -> JSONResponse:
     """
     Aceita múltiplos PDFs do e-CAC (PGDAS-D, DAS, SIMEI, comprovantes).
     Extrai dados via pipeline extrator_pdfs.py + Claude Vision API.
     Retorna diagnóstico fiscal completo.
+
+    Auditoria documental (gap P0): cada PDF é cifrado AES-256-GCM e
+    registrado na tabela auditoria_documentos APÓS a extração descobrir
+    o CNPJ. Falhas de auditoria não bloqueiam o diagnóstico — o status
+    fica em diagnostico["_extracao"]["auditoria_status"].
+
     Exige Bearer token JWT válido.
     """
     if not files:
@@ -1009,6 +1015,7 @@ async def analise_pdf(
     # Validar tipo e tamanho
     MAX_BYTES = 50 * 1024 * 1024  # 50 MB por arquivo
     conteudos: list[bytes] = []
+    nomes: list[str] = []
     for f in files:
         if not (f.filename or "").lower().endswith(".pdf"):
             raise HTTPException(
@@ -1022,14 +1029,27 @@ async def analise_pdf(
                 detail=f"Arquivo '{f.filename}' excede o limite de 50 MB.",
             )
         conteudos.append(conteudo)
+        nomes.append(f.filename or "documento.pdf")
 
-    # Pipeline de extração
+    # Operador autenticado (para uploaded_by_user_id na auditoria)
+    user_id = None
+    try:
+        user_id = int(current_user.get("id")) if current_user else None
+    except (TypeError, ValueError):
+        user_id = None
+
+    # Pipeline de extração + auditoria documental
     try:
         from extrator_pdfs import (
             processar_pdfs_bytes,  # importação lazy — evita falha no startup se ANTHROPIC_API_KEY ausente
         )
 
-        diagnostico = processar_pdfs_bytes(conteudos)
+        diagnostico = processar_pdfs_bytes(
+            conteudos,
+            arquivos_nomes=nomes,
+            user_id=user_id,
+            persistir_auditoria=True,
+        )
         return JSONResponse(content=_serializar_decimal(diagnostico))
 
     except ImportError:
@@ -1052,6 +1072,201 @@ async def analise_pdf(
             status_code=500,
             detail="Falha na extração dos documentos. Verifique se os PDFs são do e-CAC.",
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GET /auditoria/prova/cnpj/{cnpj} — Dossiê de prova ZIP (Gap P0 / Etapa 5)
+#
+# Decifra todos os PDFs cifrados de um cliente e devolve um ZIP com:
+#   - originais/<nome>.pdf         (decifrados on-the-fly)
+#   - HASHES.txt                   (hash SHA-256 esperado de cada arquivo)
+#   - README.txt                   (metadados: quando, quem, LGPD Art. 37)
+#
+# Cada decifragem é registrada em AuditoriaAcessoDB (LGPD Art. 37).
+# Exige motivo explícito via query param.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get(
+    "/auditoria/prova/cnpj/{cnpj_digitos}",
+    summary="Gera dossiê de prova ZIP com PDFs decifrados de um cliente",
+    tags=["Auditoria"],
+)
+async def gerar_dossie_prova(
+    cnpj_digitos: str,
+    motivo: str = Query(
+        ...,
+        min_length=10,
+        max_length=500,
+        description="Motivo do acesso (LGPD Art. 37). Ex: 'Fiscalizacao RFB processo 123/2026'",
+    ),
+    current_user: dict = Depends(get_current_user),
+    request: Request = None,  # type: ignore[assignment]
+) -> StreamingResponse:
+    """
+    Monta o dossiê de prova de um cliente como ZIP binário:
+
+      dossie_<cnpj_anon>_<timestamp>.zip
+      ├── originais/
+      │   ├── pgdasd-extrato.pdf
+      │   ├── das_01_2026.pdf
+      │   └── ...
+      ├── HASHES.txt
+      └── README.txt
+
+    Cada PDF é decifrado on-the-fly via storage_cifrado.decifrar usando
+    a chave derivada do CNPJ. O registro de acesso é gravado em
+    AuditoriaAcessoDB com o motivo, user_id e IP (LGPD Art. 37).
+
+    Exige Bearer token JWT válido e motivo explícito. Retorna 404 se o
+    cliente não tem documentos, 500 se alguma decifragem falhar.
+    """
+    import io
+    import zipfile
+    from datetime import datetime as _dt
+    from pathlib import Path as _Path
+
+    from database import (
+        buscar_documentos_por_cnpj,
+        registrar_acesso_documento,
+    )
+    from storage_cifrado import anonimizar_cnpj, decifrar
+
+    # Normaliza CNPJ: remove qualquer não-dígito, exige 14 dígitos
+    apenas_digitos = "".join(c for c in (cnpj_digitos or "") if c.isdigit())
+    if len(apenas_digitos) != 14:
+        raise HTTPException(
+            status_code=422,
+            detail=f"CNPJ deve ter 14 digitos. Recebido: {len(apenas_digitos)}.",
+        )
+    # Formata para o formato canônico usado pelo extrator (XX.XXX.XXX/XXXX-XX)
+    cnpj_formatado = (
+        f"{apenas_digitos[:2]}.{apenas_digitos[2:5]}.{apenas_digitos[5:8]}"
+        f"/{apenas_digitos[8:12]}-{apenas_digitos[12:]}"
+    )
+    # Usamos o formato formatado para buscar (é o que está no DB),
+    # mas passamos os dígitos puros para storage_cifrado.decifrar
+    # (que normaliza internamente via HKDF sobre dígitos).
+    cnpj = cnpj_formatado
+
+    # Extrai user_id + IP para auditoria
+    try:
+        user_id = int(current_user.get("id")) if current_user else None
+    except (TypeError, ValueError):
+        user_id = None
+    ip = None
+    if request is not None:
+        try:
+            ip = request.client.host if request.client else None  # type: ignore[attr-defined]
+        except Exception:
+            ip = None
+
+    # Busca documentos do cliente (não purgados) — tenta primeiro o formato
+    # canônico, depois os dígitos puros (compat com entradas antigas)
+    docs = buscar_documentos_por_cnpj(cnpj_formatado)
+    if not docs:
+        docs = buscar_documentos_por_cnpj(apenas_digitos)
+    if not docs:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Nenhum documento de auditoria encontrado para o CNPJ {cnpj_formatado}.",
+        )
+
+    # Monta ZIP em memória
+    buffer = io.BytesIO()
+    cnpj_anon = anonimizar_cnpj(cnpj)
+    timestamp = _dt.now().strftime("%Y%m%d-%H%M%S")
+    hashes_txt = [
+        "# DOSSIE DE PROVA — Motor Tributario Conect",
+        f"# CNPJ anonimizado: {cnpj_anon}",
+        f"# Gerado em: {_dt.now().isoformat()}",
+        f"# Solicitante: user_id={user_id}",
+        f"# Motivo: {motivo}",
+        "#",
+        "# Verificacao: sha256sum originais/*.pdf deve bater com as linhas abaixo.",
+        "#",
+    ]
+    erros: list[str] = []
+
+    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for doc in docs:
+            try:
+                plaintext = decifrar(
+                    _Path(doc.storage_path),
+                    cnpj,
+                    hash_esperado=doc.hash_sha256,
+                )
+                # Sanitiza nome (evita path traversal no ZIP)
+                nome_seguro = doc.nome_original.replace("/", "_").replace("\\", "_")
+                zf.writestr(f"originais/{nome_seguro}", plaintext)
+                hashes_txt.append(f"{doc.hash_sha256}  originais/{nome_seguro}")
+
+                # LGPD Art. 37: registra o acesso
+                registrar_acesso_documento(
+                    documento_id=doc.id,
+                    motivo=motivo,
+                    acessado_por_user_id=user_id,
+                    ip=ip,
+                )
+            except Exception as exc:
+                logger.error(
+                    "Falha ao decifrar doc_id=%s no dossie de %s: %s",
+                    doc.id, cnpj_anon, exc,
+                )
+                erros.append(f"{doc.nome_original}: {type(exc).__name__}")
+
+        # HASHES.txt
+        zf.writestr("HASHES.txt", "\n".join(hashes_txt).encode("utf-8"))
+
+        # README.txt
+        readme = [
+            "DOSSIE DE PROVA — Motor Tributario Conect",
+            "=" * 50,
+            "",
+            f"Cliente (CNPJ anonimizado): {cnpj_anon}",
+            f"Gerado em: {_dt.now().isoformat()}",
+            f"Documentos incluidos: {len(docs) - len(erros)}",
+            f"Falhas de decifragem: {len(erros)}",
+            "",
+            "Solicitante:",
+            f"  user_id: {user_id}",
+            f"  ip: {ip or 'N/A'}",
+            f"  motivo: {motivo}",
+            "",
+            "Conteudo do ZIP:",
+            "  originais/         PDFs decifrados, idênticos ao upload original",
+            "  HASHES.txt         SHA-256 esperado de cada arquivo",
+            "  README.txt         este arquivo",
+            "",
+            "Como verificar integridade:",
+            "  1. Extraia o ZIP",
+            "  2. Rode: sha256sum originais/*.pdf",
+            "  3. Compare com HASHES.txt — devem bater byte a byte",
+            "",
+            "Base legal:",
+            "  - LGPD Art. 37 (Lei 13.709/2018): registro de operacoes de tratamento",
+            "  - CTN Art. 173: prazo decadencial de 5 anos",
+            "  - CTN Art. 142: constituicao do credito exige prova documental",
+            "",
+            "Este dossie eh prova de que os dados analisados vieram EXATAMENTE",
+            "destes arquivos, no momento registrado. Qualquer divergencia entre",
+            "os PDFs aqui e os calculos do diagnostico eh responsabilidade de",
+            "quem enviou o arquivo, nao do contador que processou.",
+        ]
+        if erros:
+            readme.extend(["", "FALHAS DE DECIFRAGEM:", *[f"  - {e}" for e in erros]])
+        zf.writestr("README.txt", "\n".join(readme).encode("utf-8"))
+
+    buffer.seek(0)
+    filename = f"dossie_{cnpj_anon}_{timestamp}.zip"
+    logger.info(
+        "Dossie gerado | cnpj_anon=%s | docs=%d | erros=%d | user_id=%s",
+        cnpj_anon, len(docs), len(erros), user_id,
+    )
+    return StreamingResponse(
+        buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
