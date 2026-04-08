@@ -14,7 +14,6 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Optional
 
-
 # Limiares (ajustaveis apos observacao de producao)
 _RBT12_VS_RPA_LIMITE = Decimal("20")   # RBT12 > 20x RPA medio
 _CONFIANCA_OCR_LIMIAR = 0.75           # Claude Vision abaixo disso
