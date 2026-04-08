@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-size: 12px; color: #1c1c1c; background: #fff;
+      padding: 32px 40px;
+    }
+    h1 { font-size: 20px; color: #1e3a5f; margin-bottom: 4px; }
+    h2 { font-size: 13px; color: #1e3a5f; font-weight: 700;
+          margin: 20px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #e2e8f0; }
+    h3 { font-size: 11px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th { background: #1e40af; color: #fff; padding: 6px 10px; text-align: left; font-size: 10px; }
+    td { padding: 6px 10px; border-bottom: 1px solid #f1f5f9; }
+    tr:nth-child(even) td { background: #f8fafc; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 4px; }
+    .kpi { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 12px; }
+    .kpi-label { font-size: 9px; text-transform: uppercase; color: #64748b; letter-spacing: .04em; margin-bottom: 2px; }
+    .kpi-value { font-size: 15px; font-weight: 700; color: #1e3a5f; }
+    .cenarios-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .cenario { border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; }
+    .cenario-opt { border-color: #059669; background: #f0fdf4; }
+    .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #e2e8f0;
+                font-size: 9px; color: #94a3b8; text-align: center; }
+    @page { margin: 20mm 15mm; size: A4; }
+  </style>
+</head>
+<body>
+
+<!-- Cabeçalho -->
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid #1e40af;">
+  <div>
+    <div style="font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Motor Tributário Conect · Diagnóstico Fiscal</div>
+    <h1>REFRIGERACAO CANAVEZI LTDA</h1>
+    <div style="font-size:11px;color:#475569;margin-top:2px;">CNPJ: 54657895000160 · Regime: SIMPLES · Anexo I</div>
+  </div>
+  <div style="text-align:right;font-size:10px;color:#64748b;">
+    <div>Calculado em:</div>
+    <div style="font-weight:600;color:#1e3a5f;">2026-04-08</div>
+  </div>
+</div>
+
+<!-- KPIs -->
+<h2>Situação Atual</h2>
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="kpi-label">Receita Bruta 12m</div>
+    <div class="kpi-value">R$ 2.014.303,11</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Alíquota Efetiva</div>
+    <div class="kpi-value">9,97%</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">DAS Mensal</div>
+    <div class="kpi-value">R$ 16.728,79</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Fator R</div>
+    <div class="kpi-value">N/A</div>
+  </div>
+</div>
+
+<!-- Alertas -->
+<h2>Alertas de Risco</h2>
+<p style="color:#6b7280;font-size:11px;">Nenhum alerta identificado.</p>
+
+<!-- Cronograma IVA -->
+<h2>Cronograma de Transição IVA 2026–2033</h2>
+<p style="font-size:10px;color:#6b7280;margin-bottom:8px;">Conforme LC 214/2025, Art. 348 — CBS (Federal) + IBS (Subnacional)</p>
+<table>
+  <thead>
+    <tr><th>Ano</th><th>CBS</th><th>IBS</th><th>Total IVA</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>2026</td><td>0,900%</td><td>0,100%</td><td style='font-weight:600'>1,000%</td></tr><tr><td>2027</td><td>8,800%</td><td>0,100%</td><td style='font-weight:600'>8,900%</td></tr><tr><td>2028</td><td>8,800%</td><td>0,100%</td><td style='font-weight:600'>8,900%</td></tr><tr><td>2029</td><td>8,800%</td><td>3,500%</td><td style='font-weight:600'>12,300%</td></tr><tr><td>2030</td><td>8,800%</td><td>7,100%</td><td style='font-weight:600'>15,900%</td></tr><tr><td>2031</td><td>8,800%</td><td>10,600%</td><td style='font-weight:600'>19,400%</td></tr><tr><td>2032</td><td>8,800%</td><td>14,200%</td><td style='font-weight:600'>23,000%</td></tr><tr><td>2033</td><td>8,800%</td><td>17,700%</td><td style='font-weight:600'>26,500%</td></tr>
+  </tbody>
+</table>
+
+<!-- Cenários comparativos -->
+<h2>Cenários Comparativos</h2>
+<div class="cenarios-grid">
+  <div class="cenario">
+    <h3>Simples Nacional Puro</h3>
+    <div style="font-size:18px;font-weight:700;color:#1e3a5f;margin-top:4px;">R$ 4.983,00</div>
+    <div style="font-size:10px;color:#64748b;margin-top:2px;">Carga tributária anual estimada</div>
+  </div>
+  <div class="cenario cenario-opt">
+    <h3 style="color:#065f46;">Opt-Out IVA</h3>
+    <div style="font-size:18px;font-weight:700;color:#065f46;margin-top:4px;">R$ 5.483,00</div>
+    <div style="font-size:10px;color:#047857;margin-top:2px;">Carga tributária anual estimada</div>
+    <div style="margin-top:6px;background:#d1fae5;border-radius:4px;padding:4px 8px;font-size:10px;font-weight:700;color:#065f46;display:inline-block;">Disparidade anual: R$ 6.000,00</div>
+  </div>
+</div>
+
+
+<!-- Decisão Estratégica: Opt-Out IVA -->
+<h2>Decisão Estratégica: Opt-Out IVA</h2>
+
+<!-- Sub-bloco 1: O que é -->
+<div style="background:#f8fafc;border-left:4px solid #1e40af;padding:10px 14px;margin-bottom:12px;border-radius:0 4px 4px 0;">
+  <div style="font-weight:700;font-size:11px;color:#1e3a5f;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;">O que é</div>
+  <div style="font-size:11px;color:#374151;line-height:1.5;">
+    Opt-Out é a opção do Simples Nacional de <strong>sair do recolhimento unificado</strong>
+    de CBS/IBS, recolhendo esses dois tributos separadamente. O resto continua no DAS
+    (IRPJ, CSLL, CPP, ICMS, ISS). A grande diferença é que, com Opt-Out, seu cliente B2B
+    recebe <strong>100% de crédito de CBS/IBS</strong> em vez de 1% — o que pode ser
+    decisivo para reter clientes corporativos depois de 2027.
+  </div>
+</div>
+
+<!-- Sub-bloco 2: Sua situação (tabela comparativa) -->
+<h3 style="margin-top:14px;">Sua Situação Específica</h3>
+<table style="margin-bottom:12px;">
+  <thead>
+    <tr><th>Item</th><th>Simples Puro</th><th>Opt-Out IVA</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>DAS por operação</strong></td>
+      <td>R$ 4.983,00</td>
+      <td>R$ 4.983,00</td>
+    </tr>
+    <tr>
+      <td><strong>IVA recolhido por fora</strong></td>
+      <td style="color:#9ca3af;">—</td>
+      <td>R$ 500,00</td>
+    </tr>
+    <tr style="background:#eff6ff;">
+      <td><strong>Custo total por operação</strong></td>
+      <td><strong>R$ 4.983,00</strong></td>
+      <td><strong>R$ 5.483,00</strong></td>
+    </tr>
+    <tr>
+      <td><strong>Crédito gerado para comprador B2B</strong></td>
+      <td>R$ 500,00 <span style="color:#9ca3af;">(1.00%)</span></td>
+      <td><strong style="color:#065f46;">R$ 500,00 (100%)</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- Sub-bloco 3: Diagnóstico personalizado -->
+<div style="background:#f3f4f6;border:2px solid #6b7280;padding:14px 16px;border-radius:6px;margin-bottom:14px;">
+  <div style="font-weight:800;font-size:13px;color:#1f2937;margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em;">
+    📋 Diagnóstico Personalizado: MANTENHA SIMPLES PURO
+  </div>
+  <div style="font-size:11px;color:#1f2937;line-height:1.6;">
+    Você tem apenas 0% de clientes B2B — a maioria da sua receita vem de consumidores finais (pessoa física), que NÃO usam crédito de CBS/IBS. Sair do Simples Puro para o Opt-Out aumentaria a complexidade operacional (EFD-Reinf, EFD-Contribuições) e o custo anual em R$ 6,000.00 sem trazer benefício comercial. Mantenha o regime atual e reavalie apenas se o perfil de clientes mudar.
+  </div>
+</div>
+
+<!-- Sub-bloco 4: Datas-chave 2026 -->
+<h3 style="margin-top:14px;">Datas-Chave 2026 — Janelas de Decisão</h3>
+<table style="margin-bottom:8px;">
+  <thead>
+    <tr><th style="width:110px;">Data Limite</th><th>Decisão</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>30/04/2026</strong></td>
+      <td>Janela do <strong>1º semestre</strong> — opção válida de Jul/2026 em diante</td>
+    </tr>
+    <tr>
+      <td><strong>30/09/2026</strong></td>
+      <td>Janela do <strong>2º semestre</strong> — opção válida de Jan/2027 em diante (CBS sobe para 8,8%)</td>
+    </tr>
+  </tbody>
+</table>
+<div style="background:#fef2f2;border-left:4px solid #dc2626;padding:10px 14px;margin-bottom:14px;border-radius:0 4px 4px 0;">
+  <div style="font-weight:700;font-size:11px;color:#991b1b;margin-bottom:3px;">⚠ ATENÇÃO — IRRETRATABILIDADE</div>
+  <div style="font-size:10px;color:#7f1d1d;">
+    A decisão pelo Opt-Out é <strong>irretratável por 5 anos-calendário</strong>
+    (LC 214/2025, Art. 43). Avalie com seu contador antes de optar.
+  </div>
+</div>
+
+<!-- Sub-bloco 5: Como fazer (checklist) -->
+<h3 style="margin-top:14px;">Como Fazer o Opt-Out na Prática</h3>
+<table style="margin-bottom:14px;">
+  <thead>
+    <tr><th style="width:40px;">Passo</th><th>Ação</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align:center;font-weight:700;color:#1e40af;">1</td>
+      <td>Acessar o <strong>portal do Simples Nacional</strong> (gov.br/receitafederal) com certificado digital ou código de acesso</td>
+    </tr>
+    <tr>
+      <td style="text-align:center;font-weight:700;color:#1e40af;">2</td>
+      <td>No menu PGDAS-D, marcar a opção <strong>"Recolhimento de CBS/IBS fora do DAS"</strong> dentro da janela semestral aberta</td>
+    </tr>
+    <tr>
+      <td style="text-align:center;font-weight:700;color:#1e40af;">3</td>
+      <td>Confirmar e <strong>imprimir o protocolo</strong>. A partir do semestre seguinte, recolher CBS/IBS via DARF (códigos a serem definidos por ato da RFB)</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- Sub-bloco 6: Riscos -->
+<h3 style="margin-top:14px;">Riscos do Opt-Out</h3>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
+  <div style="background:#fef2f2;border-left:3px solid #dc2626;padding:8px 10px;border-radius:0 4px 4px 0;">
+    <div style="font-weight:700;font-size:10px;color:#991b1b;margin-bottom:2px;">5 ANOS SEM VOLTA</div>
+    <div style="font-size:9px;color:#7f1d1d;line-height:1.4;">
+      Decisão irretratável por 5 anos-calendário. LC 214/2025, Art. 43.
+    </div>
+  </div>
+  <div style="background:#fffbeb;border-left:3px solid #f59e0b;padding:8px 10px;border-radius:0 4px 4px 0;">
+    <div style="font-weight:700;font-size:10px;color:#92400e;margin-bottom:2px;">OBRIGAÇÕES EXTRAS</div>
+    <div style="font-size:9px;color:#78350f;line-height:1.4;">
+      EFD-Reinf e EFD-Contribuições passam a ser obrigatórias mensalmente.
+    </div>
+  </div>
+  <div style="background:#fef2f2;border-left:3px solid #dc2626;padding:8px 10px;border-radius:0 4px 4px 0;">
+    <div style="font-weight:700;font-size:10px;color:#991b1b;margin-bottom:2px;">MULTA POR ERRO</div>
+    <div style="font-size:9px;color:#7f1d1d;line-height:1.4;">
+      Multa de 20% sobre valor não recolhido (Lei 9.430/1996, Art. 44).
+    </div>
+  </div>
+</div>
+
+<p style="font-size:9px;color:#6b7280;font-style:italic;margin-top:4px;">
+  ⚖ LC 214/2025, Arts. 41-44 (dispositivo de Opt-Out) | CF Art. 146, III, 'd' (regime diferenciado Simples Nacional) | Resolução CGSN 183/2025 (janelas semestrais abr/set)
+</p>
+
+
+<!-- Serviços recomendados -->
+<h2>Serviços Recomendados</h2>
+<table>
+  <thead><tr><th>Serviço</th><th>Contexto</th></tr></thead>
+  <tbody>
+    <tr><td style="font-weight:600;">Relatório de Conformidade Fiscal 2026</td><td>Documentação completa da situação tributária — sempre indicado</td></tr>
+    <tr><td style='font-weight:600;'>Análise de Viabilidade Opt-Out</td><td>Disparidade entre cenários identificada — avaliação completa de viabilidade</td></tr>
+  </tbody>
+</table>
+<p style="font-size:10px;color:#9ca3af;margin-top:6px;font-style:italic;">* Valores e condições a combinar com o escritório. Esta lista não constitui proposta comercial.</p>
+
+<!-- Trilha de auditoria -->
+<h2>Trilha de Auditoria</h2>
+<p style="font-size:10px;color:#6b7280;margin-bottom:10px;">Todos os cálculos abaixo citam base legal explícita — MAX_02 Motor Tributário Conect.</p>
+
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Validação de Cronograma de Transição</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [Ano 2026] - Deduções [N/A] * Alíquota [Configurada por Data] = Status: TESTE</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 214/2025, Art. 360</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Ano de operação 2026 validado para motor transicional.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Alíquota Efetiva (Anexo I)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [PD R$ 87,300.00] * Alíquota [Nominal 14.30%] = 9.9660%</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Base de Cálculo do DAS Mensal</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [N/A] * Alíquota [N/A] = R$ 167,858.59</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º — estimativa por RBT12 médio (ERR-007: delta aceito &lt; 0,3%)</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">RBT12/12 = R$ 167,858.59 (RPA não informado — aproximação mensal)</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Alíquota Efetiva (Anexo I)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [PD R$ 87,300.00] * Alíquota [Nominal 14.30%] = 9.9660%</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Base de Cálculo do DAS Mensal</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [N/A] * Alíquota [N/A] = R$ 167,858.59</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º — estimativa por RBT12 médio (ERR-007: delta aceito &lt; 0,3%)</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">RBT12/12 = R$ 167,858.59 (RPA não informado — aproximação mensal)</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Alíquota Efetiva (Anexo I)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [PD R$ 87,300.00] * Alíquota [Nominal 14.30%] = 9.9660%</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Alíquota Efetiva (Anexo I)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [PD R$ 87,300.00] * Alíquota [Nominal 14.30%] = 9.9660%</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Alíquota Efetiva (Anexo I)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [PD R$ 87,300.00] * Alíquota [Nominal 14.30%] = 9.9660%</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Base de Cálculo do DAS Mensal</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [N/A] * Alíquota [N/A] = R$ 167,858.59</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º — estimativa por RBT12 médio (ERR-007: delta aceito &lt; 0,3%)</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">RBT12/12 = R$ 167,858.59 (RPA não informado — aproximação mensal)</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Alíquota Efetiva (Anexo I)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [PD R$ 87,300.00] * Alíquota [Nominal 14.30%] = 9.9660%</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Base de Cálculo do DAS Mensal</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [N/A] * Alíquota [N/A] = R$ 167,858.59</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º — estimativa por RBT12 médio (ERR-007: delta aceito &lt; 0,3%)</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">RBT12/12 = R$ 167,858.59 (RPA não informado — aproximação mensal)</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Alíquota Efetiva (Anexo I)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [PD R$ 87,300.00] * Alíquota [Nominal 14.30%] = 9.9660%</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Cenário Opt-Out — DAS sem IVA + IVA por fora</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [DAS completo R$ 4,983.00] - Deduções [IBS/CBS no DAS R$ 0.00] * Alíquota [IVA por fora 1.00%] = R$ 5,483.00</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 214/2025 (dispositivo de opt-out — aguardar regulamentação)</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">DAS sem IVA R$ 4,983.00 + IVA por fora R$ 500.00 = Total R$ 5,483.00. Sem dupla contagem de IBS/CBS.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Alíquota Efetiva (Anexo I)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [PD R$ 87,300.00] * Alíquota [Nominal 14.30%] = 9.9660%</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Alíquota Efetiva (Anexo I)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [PD R$ 87,300.00] * Alíquota [Nominal 14.30%] = 9.9660%</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Base de Cálculo do DAS Mensal</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [N/A] * Alíquota [N/A] = R$ 167,858.59</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º — estimativa por RBT12 médio (ERR-007: delta aceito &lt; 0,3%)</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">RBT12/12 = R$ 167,858.59 (RPA não informado — aproximação mensal)</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Alíquota Efetiva (Anexo I)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [PD R$ 87,300.00] * Alíquota [Nominal 14.30%] = 9.9660%</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Base de Cálculo do DAS Mensal</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [N/A] * Alíquota [N/A] = R$ 167,858.59</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º — estimativa por RBT12 médio (ERR-007: delta aceito &lt; 0,3%)</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">RBT12/12 = R$ 167,858.59 (RPA não informado — aproximação mensal)</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Alíquota Efetiva (Anexo I)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [PD R$ 87,300.00] * Alíquota [Nominal 14.30%] = 9.9660%</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Cenário Opt-Out — DAS sem IVA + IVA por fora</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [DAS completo R$ 4,983.00] - Deduções [IBS/CBS no DAS R$ 0.00] * Alíquota [IVA por fora 1.00%] = R$ 5,483.00</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 214/2025 (dispositivo de opt-out — aguardar regulamentação)</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">DAS sem IVA R$ 4,983.00 + IVA por fora R$ 500.00 = Total R$ 5,483.00. Sem dupla contagem de IBS/CBS.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Alíquota Efetiva (Anexo I)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [PD R$ 87,300.00] * Alíquota [Nominal 14.30%] = 9.9660%</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Alíquota Efetiva (Anexo I)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [PD R$ 87,300.00] * Alíquota [Nominal 14.30%] = 9.9660%</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Base de Cálculo do DAS Mensal</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [N/A] * Alíquota [N/A] = R$ 167,858.59</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º — estimativa por RBT12 médio (ERR-007: delta aceito &lt; 0,3%)</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">RBT12/12 = R$ 167,858.59 (RPA não informado — aproximação mensal)</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Alíquota Efetiva (Anexo I)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [PD R$ 87,300.00] * Alíquota [Nominal 14.30%] = 9.9660%</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Base de Cálculo do DAS Mensal</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [N/A] * Alíquota [N/A] = R$ 167,858.59</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º — estimativa por RBT12 médio (ERR-007: delta aceito &lt; 0,3%)</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">RBT12/12 = R$ 167,858.59 (RPA não informado — aproximação mensal)</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Anexo Simples Nacional: I (explícito)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [CNAE 4757100] - Deduções [N/A] * Alíquota [N/A] = I</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, §§ 1º e 24</div>
+          <div style="font-size:10px;color:#6b7280;">Vigente desde: 01/07/2007 (LC 123/2006)</div>
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Anexo I informado explicitamente pelo operador.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Alíquota Efetiva (Anexo I)</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [RBT12 R$ 2,014,303.11] - Deduções [PD R$ 87,300.00] * Alíquota [Nominal 14.30%] = 9.9660%</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 123/2006, Art. 18, § 1º</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">Cenário Opt-Out — DAS sem IVA + IVA por fora</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">Base [DAS completo R$ 4,983.00] - Deduções [IBS/CBS no DAS R$ 0.00] * Alíquota [IVA por fora 1.00%] = R$ 5,483.00</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ LC 214/2025 (dispositivo de opt-out — aguardar regulamentação)</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">DAS sem IVA R$ 4,983.00 + IVA por fora R$ 500.00 = Total R$ 5,483.00. Sem dupla contagem de IBS/CBS.</div>
+        </div>
+        <div style="border-left:3px solid #dbeafe;padding:8px 12px;margin-bottom:8px;background:#f8fafc;border-radius:0 4px 4px 0;">
+          <div style="font-weight:600;font-size:11px;color:#1e3a5f;margin-bottom:3px;">DIFAL — Operação interna</div>
+          <div style="font-size:10px;color:#374151;font-family:monospace;background:#f1f5f9;padding:3px 6px;border-radius:2px;margin:3px 0;">UF origem (SP) = UF destino (SP) → DIFAL = R$ 0,00</div>
+          <div style="font-size:10px;color:#1e40af;margin-top:3px;">⚖ CF/1988, Art. 155, §2º, VII — DIFAL apenas em operações interestaduais</div>
+          
+          <div style="font-size:10px;color:#4b5563;margin-top:2px;">Operação intra-estadual. Nenhum diferencial de alíquota aplicável.</div>
+        </div>
+
+<!-- Rodapé -->
+<div class="footer">
+  Calculado em 2026-04-08 · LC 123/2006 + LC 214/2025 (vigente 01/01/2026) ·
+  Auditado por Luiz Moreira 26/03/2026 · Motor Tributário Conect v2.1 ·
+  Este relatório tem fins informativos e não substitui assessoria jurídica/tributária.
+</div>
+
+</body>
+</html>
