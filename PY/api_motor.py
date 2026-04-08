@@ -885,8 +885,18 @@ def analise_manual(
             operacao=operacao,
         )
         diagnostico = motor.gerar_diagnostico()
-        # Serializa Decimal como str — nunca float
-        return JSONResponse(content=_serializar_decimal(diagnostico))
+
+        # Envelope com PII separada do diagnóstico despersonalizado (LGPD).
+        # cnpj e razao_social vieram do formulário — devolvemos ao cliente
+        # num campo separado para popular o header do resultado.html.
+        payload = {
+            "diagnostico": diagnostico,
+            "pii": {
+                "cnpj": fornecedora.cnpj,
+                "razao_social": fornecedora.razao_social,
+            },
+        }
+        return JSONResponse(content=_serializar_decimal(payload))
 
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=422, detail=str(exc))
