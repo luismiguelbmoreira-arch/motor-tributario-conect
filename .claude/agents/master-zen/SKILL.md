@@ -21,6 +21,8 @@ compatibility: |
   - JavaScript vanilla (ES6+)
   - WCAG 2.1 AA compliance
   - FastAPI (backend Python)
+  - NOTA: Exemplos abaixo usam React/JSX para ilustração de padrões.
+    O projeto atual usa HTML/Tailwind/Chart.js. Adaptar ao implementar.
 
 ---
 
