@@ -235,6 +235,8 @@ def _gerar_html(diagnostico: dict, pii: dict | None = None) -> str:
   </div>
 </div>
 
+{_secao_validacao_ecac(diagnostico)}
+
 <!-- Alertas -->
 <h2>Alertas de Risco</h2>
 {alertas_html}
@@ -472,6 +474,107 @@ def _secao_decisao_opt_out(diagnostico: dict) -> str:
 <p style="font-size:9px;color:#6b7280;font-style:italic;margin-top:4px;">
   ⚖ {amparo_rec or 'LC 214/2025, Arts. 41-44 | CF Art. 146, III, "d" | Resolução CGSN 183/2025'}
 </p>
+"""
+
+
+def _secao_validacao_ecac(diagnostico: dict) -> str:
+    """
+    Gera a seção 'Validação contra e-CAC' do PDF.
+
+    Frente 3.5 (Bloco D): expõe a validação cruzada DAS calculado × DAS pago no
+    e-CAC que hoje fica escondida em `_extracao.validacao_cruzada`. Só aparece
+    em PDFs gerados a partir de extração (upload de PDFs do e-CAC); em análise
+    manual o bloco fica oculto.
+
+    Semáforo:
+      🟢 delta < 0,5%   → verde  "Aprovado — confere com o e-CAC"
+      🟡 0,5% ≤ Δ < 5% → amarelo "Diferença pequena — revisar antes de pagar"
+      🔴 delta ≥ 5%     → vermelho "Diferença significativa — investigar"
+
+    Base legal: LC 123/2006, Art. 18 (DAS = alíquota efetiva × receita do PA).
+    """
+    extracao = diagnostico.get("_extracao") or {}
+    validacoes = extracao.get("validacao_cruzada") or []
+
+    # Encontra o item DAS_CALCULADO_VS_ECAC (pode haver outros tipos como BREAKDOWN)
+    item = next(
+        (v for v in validacoes if v.get("tipo") == "DAS_CALCULADO_VS_ECAC"),
+        None,
+    )
+    if not item:
+        return ""  # PDF de análise manual — sem validação cruzada
+
+    try:
+        das_calc = Decimal(str(item.get("das_calculado", "0")))
+        das_ecac = Decimal(str(item.get("das_ecac", "0")))
+        delta = Decimal(str(item.get("delta", "0")))
+        delta_pct = Decimal(str(item.get("delta_pct", "0")))
+    except Exception:
+        return ""
+
+    # Semáforo de cor por delta percentual
+    if delta_pct < Decimal("0.5"):
+        cor_bg, cor_borda, cor_texto = "#f0fdf4", "#10b981", "#065f46"
+        icone = "✓"
+        titulo = "Aprovado — confere com o e-CAC"
+        explicacao = (
+            "O DAS calculado pelo motor está alinhado com o valor pago no e-CAC. "
+            "Diferença dentro da margem aceitável (< 0,5%)."
+        )
+    elif delta_pct < Decimal("5"):
+        cor_bg, cor_borda, cor_texto = "#fffbeb", "#f59e0b", "#92400e"
+        icone = "⚠"
+        titulo = "Diferença pequena — revisar antes de pagar"
+        explicacao = (
+            "O DAS calculado difere do pago no e-CAC em menos de 5%. "
+            "Geralmente é arredondamento, RPA aproximado ou pequeno descasamento "
+            "de competência. Confira antes de usar como referência."
+        )
+    else:
+        cor_bg, cor_borda, cor_texto = "#fef2f2", "#ef4444", "#991b1b"
+        icone = "✗"
+        titulo = "Diferença significativa — investigue antes de usar"
+        explicacao = (
+            "O DAS calculado difere do pago no e-CAC em mais de 5%. "
+            "Possíveis causas: ICMS-ST não segregado, multi-atividade não declarada, "
+            "RPA real diferente do extraído, CNAE/Anexo divergente, ou Fator R com "
+            "folha desatualizada. Não use este diagnóstico como referência sem revisão."
+        )
+
+    delta_str = _fmt_moeda(delta)
+    delta_pct_str = f"{delta_pct:.2f}%".replace(".", ",")
+    das_calc_str = _fmt_moeda(das_calc)
+    das_ecac_str = _fmt_moeda(das_ecac)
+
+    return f"""
+<!-- Validação contra e-CAC (Frente 3.5 / Bloco D) -->
+<h2>Validação contra o e-CAC</h2>
+<div style="background:{cor_bg};border:2px solid {cor_borda};border-radius:6px;padding:12px 14px;margin-bottom:12px;">
+  <div style="font-weight:800;font-size:13px;color:{cor_texto};margin-bottom:8px;">
+    {icone} {titulo}
+  </div>
+  <table style="margin-bottom:8px;">
+    <thead>
+      <tr><th>Origem</th><th style="text-align:right;">Valor</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>DAS calculado pelo motor</strong></td><td style="text-align:right;font-family:monospace;">{das_calc_str}</td></tr>
+      <tr><td><strong>DAS pago no e-CAC</strong></td><td style="text-align:right;font-family:monospace;">{das_ecac_str}</td></tr>
+      <tr style="background:{cor_bg};">
+        <td><strong>Diferença</strong></td>
+        <td style="text-align:right;font-family:monospace;font-weight:700;color:{cor_texto};">
+          {delta_str} ({delta_pct_str})
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <div style="font-size:10px;color:#374151;line-height:1.5;">
+    {explicacao}
+  </div>
+  <div style="font-size:9px;color:#6b7280;margin-top:6px;font-style:italic;">
+    ⚖ LC 123/2006, Art. 18 — DAS = alíquota efetiva × receita do período de apuração
+  </div>
+</div>
 """
 
 
