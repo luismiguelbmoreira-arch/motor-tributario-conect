@@ -993,12 +993,18 @@ async def gerar_relatorio_pdf(
 )
 async def analise_pdf(
     files: list[UploadFile] = File(..., description="PDFs do e-CAC (máx. 10 arquivos)"),
-    current_user: dict = Depends(get_current_user),  # noqa: ARG001
+    current_user: dict = Depends(get_current_user),
 ) -> JSONResponse:
     """
     Aceita múltiplos PDFs do e-CAC (PGDAS-D, DAS, SIMEI, comprovantes).
     Extrai dados via pipeline extrator_pdfs.py + Claude Vision API.
     Retorna diagnóstico fiscal completo.
+
+    Auditoria documental (gap P0): cada PDF é cifrado AES-256-GCM e
+    registrado na tabela auditoria_documentos APÓS a extração descobrir
+    o CNPJ. Falhas de auditoria não bloqueiam o diagnóstico — o status
+    fica em diagnostico["_extracao"]["auditoria_status"].
+
     Exige Bearer token JWT válido.
     """
     if not files:
@@ -1009,6 +1015,7 @@ async def analise_pdf(
     # Validar tipo e tamanho
     MAX_BYTES = 50 * 1024 * 1024  # 50 MB por arquivo
     conteudos: list[bytes] = []
+    nomes: list[str] = []
     for f in files:
         if not (f.filename or "").lower().endswith(".pdf"):
             raise HTTPException(
@@ -1022,14 +1029,27 @@ async def analise_pdf(
                 detail=f"Arquivo '{f.filename}' excede o limite de 50 MB.",
             )
         conteudos.append(conteudo)
+        nomes.append(f.filename or "documento.pdf")
 
-    # Pipeline de extração
+    # Operador autenticado (para uploaded_by_user_id na auditoria)
+    user_id = None
+    try:
+        user_id = int(current_user.get("id")) if current_user else None
+    except (TypeError, ValueError):
+        user_id = None
+
+    # Pipeline de extração + auditoria documental
     try:
         from extrator_pdfs import (
             processar_pdfs_bytes,  # importação lazy — evita falha no startup se ANTHROPIC_API_KEY ausente
         )
 
-        diagnostico = processar_pdfs_bytes(conteudos)
+        diagnostico = processar_pdfs_bytes(
+            conteudos,
+            arquivos_nomes=nomes,
+            user_id=user_id,
+            persistir_auditoria=True,
+        )
         return JSONResponse(content=_serializar_decimal(diagnostico))
 
     except ImportError:
