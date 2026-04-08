@@ -16,13 +16,13 @@ description: |
   **Trigger phrases**: "MASTER ZEN", "Interface", "UX/UI", "Frontend", "Design", "Usuário confuso", "Mobile", "Acessibilidade", "Cards", "Dashboard", "Visualização", "Serenidade"
 
 compatibility: |
-  - React 18+
-  - Vue 3
-  - Tailwind CSS 3+
-  - Framer Motion
-  - Recharts / Nivo (gráficos)
-  - Radix UI / shadcn/ui (componentes acessíveis)
+  - HTML5 + Tailwind CSS 3+ (stack atual do projeto)
+  - Chart.js (gráficos)
+  - JavaScript vanilla (ES6+)
   - WCAG 2.1 AA compliance
+  - FastAPI (backend Python)
+  - NOTA: Exemplos abaixo usam React/JSX para ilustração de padrões.
+    O projeto atual usa HTML/Tailwind/Chart.js. Adaptar ao implementar.
 
 ---
 

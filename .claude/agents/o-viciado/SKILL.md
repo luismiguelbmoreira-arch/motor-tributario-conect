@@ -66,7 +66,7 @@ Se tudo estiver OK, desenho a solução:
 - Defino a classe Pydantic V2 com Field validators rigorosos
 - Uso Enum para categóricas (Regime, Anexo, Forma de Pagamento)
 - Strategy Pattern se houver múltiplas regras (Anexo I vs V, 2026 vs 2027)
-- Decimal com getcontext().prec = 6 e ROUND_HALF_UP obrigatório
+- Decimal com .quantize() e ROUND_HALF_UP obrigatório (6 casas para alíquota, 2 para monetário)
 - Exceções customizadas (CalculoTributarioError, DadoInvalidoError)
 
 ### Fase 4: Entrega Blindada (Output)
@@ -95,7 +95,7 @@ Se você pedir algo que eu não posso fazer:
 ║                                                                            ║
 ║ 1️⃣  A LEI DO DECIMAL                                                       ║
 ║    ✅ decimal.Decimal("1234.56")                                           ║
-║    ✅ getcontext().prec = 6                                                ║
+║    ✅ .quantize(Decimal("0.000001"), ROUND_HALF_UP) para alíquotas         ║
 ║    ✅ .quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)                   ║
 ║    ❌ float(1234.56) — PROIBIDO. Sempre.                                   ║
 ║    ❌ int(123456) para centavos — Use Decimal.                             ║
@@ -216,8 +216,9 @@ from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 from typing import Literal
 
-# Configuração global Decimal
-getcontext().prec = 6
+# Precisão via quantize() explícito (não getcontext().prec global)
+# Monetário: .quantize(Decimal("0.01"), ROUND_HALF_UP)
+# Alíquota: .quantize(Decimal("0.000001"), ROUND_HALF_UP)
 
 # Enum para Anexos (nada de string solta)
 class AnexoSimples(Enum):
