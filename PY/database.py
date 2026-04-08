@@ -310,6 +310,94 @@ class EmpresaHistoricoDB(SQLModel, table=True):
     motivo: Optional[str] = Field(default=None, sa_column=Column(TEXT, nullable=True))
 
 
+class AuditoriaDocumentoDB(SQLModel, table=True):
+    """
+    Persistência do registro de cada documento (PDF) submetido pelo cliente
+    para análise. Armazena APENAS os metadados — o conteúdo cifrado vive
+    em disco via storage_cifrado.py.
+
+    Bloqueia o vetor "dado errado culpa do contador":
+      - hash_sha256 = ID canônico do plaintext (imutável, irrefutável)
+      - storage_path = ponteiro para o arquivo cifrado AES-256-GCM
+      - aceito_em + aceito_por = termo de aceite digital do operador
+      - empresa_cnpj armazenado em claro AQUI (precisa pra busca por
+        cliente), mas o conteúdo do PDF jamais aparece em texto plano
+        em DB ou logs.
+
+    LGPD Art. 16 + CTN Art. 173:
+      - purge_after = uploaded_at + 5 anos (decadência fiscal)
+      - purged_at preenchido quando storage_cifrado.purge() é chamado
+      - listar_documentos_purgaveis() permite cron de limpeza
+
+    Vínculo com diagnóstico:
+      - diagnostico_id (FK opcional): em qual análise este doc foi usado
+      - Um doc pode ser referenciado por múltiplos diagnósticos (re-análise),
+        mas só é cifrado uma vez (hash_sha256 unique).
+    """
+    __tablename__ = "auditoria_documentos"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Identificação imutável do conteúdo
+    hash_sha256: str = Field(unique=True, index=True, max_length=64)
+
+    # Ligação com cliente — empresa_cnpj precisa estar em claro para busca,
+    # mas storage_path usa hash anônimo da pasta (LGPD)
+    empresa_cnpj: str = Field(index=True, max_length=18)
+
+    # Metadados do upload
+    nome_original: str = Field(max_length=255)
+    mime_type: str = Field(default="application/pdf", max_length=64)
+    tamanho_bytes: int
+    paginas: Optional[int] = Field(default=None)
+
+    # Onde o arquivo cifrado vive em disco (relativo a STORAGE_ROOT)
+    storage_path: str = Field(max_length=500)
+
+    # Auditoria temporal — user_id e soft (UserDB tem engine proprio em auth.py)
+    uploaded_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    uploaded_by_user_id: Optional[int] = Field(default=None, index=True)
+
+    # Termo de aceite digital — registra quem confirmou que aquele é o
+    # documento oficial a ser analisado. Sem aceite, o doc não pode ser
+    # usado em diagnóstico (proteção do escritório).
+    aceito_em: Optional[str] = Field(default=None)
+    aceito_por_user_id: Optional[int] = Field(default=None, index=True)
+    aceito_ip: Optional[str] = Field(default=None, max_length=64)
+
+    # Vínculo com a análise que usou este doc — soft FK para permitir
+    # registro do doc ANTES do diagnóstico ser persistido (cifragem
+    # acontece no upload, motor roda depois)
+    diagnostico_id: Optional[int] = Field(default=None, index=True)
+
+    # LGPD Art. 16 — política de retenção
+    purge_after: str = Field(
+        default_factory=lambda: (
+            datetime.now().replace(year=datetime.now().year + 5).isoformat()
+        ),
+        description="ISO datetime — quando este doc deve ser purgado (uploaded_at + 5 anos)",
+    )
+    purged_at: Optional[str] = Field(default=None)
+
+
+class AuditoriaAcessoDB(SQLModel, table=True):
+    """
+    Log estruturado de cada acesso a documento original cifrado.
+    LGPD Art. 37 — registro de operações de tratamento.
+
+    Toda chamada a decifrar() em produção DEVE primeiro registrar aqui
+    quem está acessando, qual documento, e por quê (motivo livre).
+    """
+    __tablename__ = "auditoria_acessos"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    documento_id: int = Field(foreign_key="auditoria_documentos.id", index=True)
+    acessado_em: str = Field(default_factory=lambda: datetime.now().isoformat())
+    acessado_por_user_id: Optional[int] = Field(default=None, index=True)
+    motivo: str = Field(max_length=500)
+    ip: Optional[str] = Field(default=None, max_length=64)
+
+
 class AlertaDB(SQLModel, table=True):
     """
     Histórico de alertas gerados pelo motor.
@@ -646,6 +734,232 @@ def resolver_alerta(
             session.rollback()
             logger.error("Erro ao resolver alerta | id=%s | %s", alerta_id, exc)
             raise RuntimeError(f"Falha ao persistir resolução do alerta id={alerta_id}.") from exc
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AUDITORIA DOCUMENTAL — Tabela auditoria_documentos
+# Bloqueia o vetor "dado errado culpa do contador" + LGPD Art. 16/37/46
+# ─────────────────────────────────────────────────────────────────────────────
+
+def registrar_documento_auditoria(
+    hash_sha256: str,
+    empresa_cnpj: str,
+    nome_original: str,
+    tamanho_bytes: int,
+    storage_path: str,
+    mime_type: str = "application/pdf",
+    paginas: Optional[int] = None,
+    uploaded_by_user_id: Optional[int] = None,
+    diagnostico_id: Optional[int] = None,
+) -> AuditoriaDocumentoDB:
+    """
+    Persiste o registro de um documento submetido pelo cliente.
+
+    O conteúdo cifrado já deve estar em disco — esta função só grava os
+    metadados que apontam pra ele. Se o hash já existe (mesmo arquivo
+    re-enviado), retorna o registro existente atualizando opcionalmente
+    o diagnostico_id (vinculando a uma nova análise).
+
+    Args:
+        hash_sha256: SHA-256 hex do plaintext (vem de storage_cifrado.hash_documento)
+        empresa_cnpj: CNPJ do cliente (já normalizado/validado upstream)
+        nome_original: nome do arquivo enviado (sem path)
+        tamanho_bytes: tamanho do plaintext
+        storage_path: caminho relativo retornado por cifrar_e_persistir
+        mime_type: default "application/pdf"
+        paginas: opcional, n° de páginas (extraído via PyPDF2 se disponível)
+        uploaded_by_user_id: id do operador autenticado
+        diagnostico_id: análise que vai usar este doc (pode vincular depois)
+
+    Returns:
+        AuditoriaDocumentoDB persistido (novo ou existente atualizado).
+    """
+    if not hash_sha256 or len(hash_sha256) != 64:
+        raise ValueError(f"hash_sha256 invalido: '{hash_sha256}' (esperado 64 chars hex)")
+    if not empresa_cnpj or not nome_original:
+        raise ValueError("empresa_cnpj e nome_original sao obrigatorios")
+    if tamanho_bytes <= 0:
+        raise ValueError(f"tamanho_bytes invalido: {tamanho_bytes}")
+
+    with get_session() as session:
+        existente = session.query(AuditoriaDocumentoDB).filter(
+            AuditoriaDocumentoDB.hash_sha256 == hash_sha256
+        ).first()
+
+        if existente:
+            # Re-upload do mesmo arquivo: vincula novo diagnóstico se fornecido
+            if diagnostico_id and existente.diagnostico_id != diagnostico_id:
+                existente.diagnostico_id = diagnostico_id
+                session.add(existente)
+                session.commit()
+                session.refresh(existente)
+            logger.info(
+                "Documento ja registrado | id=%s | hash=%s...",
+                existente.id, hash_sha256[:16],
+            )
+            return existente
+
+        novo = AuditoriaDocumentoDB(
+            hash_sha256=hash_sha256,
+            empresa_cnpj=empresa_cnpj,
+            nome_original=nome_original,
+            mime_type=mime_type,
+            tamanho_bytes=tamanho_bytes,
+            paginas=paginas,
+            storage_path=storage_path,
+            uploaded_by_user_id=uploaded_by_user_id,
+            diagnostico_id=diagnostico_id,
+        )
+        try:
+            session.add(novo)
+            session.commit()
+            session.refresh(novo)
+            logger.info(
+                "Documento auditoria registrado | id=%s | hash=%s... | bytes=%d",
+                novo.id, hash_sha256[:16], tamanho_bytes,
+            )
+            return novo
+        except IntegrityError as exc:
+            session.rollback()
+            logger.error("IntegrityError em registrar_documento_auditoria | %s", exc)
+            raise RuntimeError(f"Falha ao registrar documento de auditoria: {exc.orig}") from exc
+
+
+def aceitar_documento(
+    documento_id: int,
+    aceito_por_user_id: int,
+    aceito_ip: Optional[str] = None,
+) -> Optional[AuditoriaDocumentoDB]:
+    """
+    Marca o termo de aceite digital — operador confirma que aquele é o
+    documento oficial a ser analisado. Sem aceite, o doc não deve ser
+    usado em diagnóstico (verificação fica a cargo do caller).
+
+    Args:
+        documento_id: ID retornado por registrar_documento_auditoria
+        aceito_por_user_id: id do operador que clicou "aceito"
+        aceito_ip: IP de origem (auditoria forense)
+
+    Returns:
+        Registro atualizado, ou None se não encontrado.
+    """
+    with get_session() as session:
+        doc = session.query(AuditoriaDocumentoDB).filter(
+            AuditoriaDocumentoDB.id == documento_id
+        ).first()
+        if not doc:
+            return None
+        doc.aceito_em = datetime.now().isoformat()
+        doc.aceito_por_user_id = aceito_por_user_id
+        doc.aceito_ip = aceito_ip
+        session.add(doc)
+        session.commit()
+        session.refresh(doc)
+        logger.info(
+            "Termo de aceite registrado | doc_id=%s | user_id=%s",
+            documento_id, aceito_por_user_id,
+        )
+        return doc
+
+
+def buscar_documentos_por_cnpj(empresa_cnpj: str) -> List[AuditoriaDocumentoDB]:
+    """Lista todos os docs de auditoria de um cliente, mais recentes primeiro."""
+    with get_session() as session:
+        return list(
+            session.query(AuditoriaDocumentoDB)
+            .filter(AuditoriaDocumentoDB.empresa_cnpj == empresa_cnpj)
+            .filter(AuditoriaDocumentoDB.purged_at.is_(None))  # type: ignore[union-attr]
+            .order_by(AuditoriaDocumentoDB.uploaded_at.desc())
+            .all()
+        )
+
+
+def buscar_documentos_por_diagnostico(diagnostico_id: int) -> List[AuditoriaDocumentoDB]:
+    """Lista os docs vinculados a uma análise específica."""
+    with get_session() as session:
+        return list(
+            session.query(AuditoriaDocumentoDB)
+            .filter(AuditoriaDocumentoDB.diagnostico_id == diagnostico_id)
+            .filter(AuditoriaDocumentoDB.purged_at.is_(None))  # type: ignore[union-attr]
+            .order_by(AuditoriaDocumentoDB.uploaded_at.asc())
+            .all()
+        )
+
+
+def buscar_documento_por_hash(hash_sha256: str) -> Optional[AuditoriaDocumentoDB]:
+    """Busca documento por hash SHA-256 (ID canônico)."""
+    with get_session() as session:
+        return session.query(AuditoriaDocumentoDB).filter(
+            AuditoriaDocumentoDB.hash_sha256 == hash_sha256
+        ).first()
+
+
+def registrar_acesso_documento(
+    documento_id: int,
+    motivo: str,
+    acessado_por_user_id: Optional[int] = None,
+    ip: Optional[str] = None,
+) -> AuditoriaAcessoDB:
+    """
+    LGPD Art. 37 — registra cada acesso a documento original cifrado.
+
+    Deve ser chamado ANTES de toda decifragem em produção. Em testes
+    pode ser omitido. O log fica permanentemente no banco — não há
+    deleção mesmo após purge do documento.
+    """
+    if not motivo or not motivo.strip():
+        raise ValueError("motivo do acesso e obrigatorio (LGPD Art. 37)")
+
+    log = AuditoriaAcessoDB(
+        documento_id=documento_id,
+        acessado_por_user_id=acessado_por_user_id,
+        motivo=motivo.strip()[:500],
+        ip=ip,
+    )
+    with get_session() as session:
+        session.add(log)
+        session.commit()
+        session.refresh(log)
+        logger.info(
+            "Acesso a documento registrado | doc_id=%s | user_id=%s",
+            documento_id, acessado_por_user_id,
+        )
+        return log
+
+
+def listar_documentos_purgaveis(referencia: Optional[datetime] = None) -> List[AuditoriaDocumentoDB]:
+    """
+    Lista documentos cujo purge_after já passou e ainda não foram purgados.
+    Útil para cron diário de limpeza LGPD.
+    """
+    ref = (referencia or datetime.now()).isoformat()
+    with get_session() as session:
+        return list(
+            session.query(AuditoriaDocumentoDB)
+            .filter(AuditoriaDocumentoDB.purge_after <= ref)
+            .filter(AuditoriaDocumentoDB.purged_at.is_(None))  # type: ignore[union-attr]
+            .all()
+        )
+
+
+def marcar_documento_purgado(documento_id: int) -> Optional[AuditoriaDocumentoDB]:
+    """
+    Marca o registro como purgado APÓS storage_cifrado.purge() ter sido
+    chamado com sucesso. Mantém o registro no banco (fato histórico) mas
+    indica que o conteúdo cifrado em disco já não existe.
+    """
+    with get_session() as session:
+        doc = session.query(AuditoriaDocumentoDB).filter(
+            AuditoriaDocumentoDB.id == documento_id
+        ).first()
+        if not doc:
+            return None
+        doc.purged_at = datetime.now().isoformat()
+        session.add(doc)
+        session.commit()
+        session.refresh(doc)
+        logger.info("Documento marcado como purgado | id=%s", documento_id)
+        return doc
 
 
 # ─────────────────────────────────────────────────────────────────────────────
