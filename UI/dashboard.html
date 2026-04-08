@@ -396,15 +396,9 @@
   }
 
   function abrirCronograma() {
-    // Se ha analise na sessao, vai direto para resultado.html com ancora no cronograma
-    // Se nao ha analise, leva para nova analise (evita dead end)
-    const diagnostico = sessionStorage.getItem('diagnostico');
-    if (diagnostico) {
-      window.location.href = 'resultado.html#sec-iva';
-    } else {
-      alert('Para ver o Cronograma IVA personalizado, faca uma analise primeiro.\n\nVoce sera redirecionado para a nova analise.');
-      window.location.href = 'analise.html';
-    }
+    // Cronograma standalone — independente de qualquer análise.
+    // Mostra a timeline oficial da Reforma Tributária 2026-2033 (LC 214/2025).
+    window.location.href = 'cronograma.html';
   }
 
   function toggleSidebar() {

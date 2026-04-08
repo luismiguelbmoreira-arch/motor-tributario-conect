@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cronograma da Reforma Tributária 2026–2033 — Motor Tributário Conect</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .timeline-line {
+      background: linear-gradient(180deg, #93c5fd 0%, #3b82f6 50%, #1e3a8a 100%);
+    }
+    .year-card {
+      transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+    }
+    .year-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+    }
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+
+  <!-- HEADER -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 no-print">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between flex-wrap gap-3">
+      <div class="flex items-center gap-3">
+        <a href="dashboard.html"
+           class="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-blue-700 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          Dashboard
+        </a>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="window.print()"
+                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+          </svg>
+          Imprimir
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 text-white">
+    <div class="max-w-6xl mx-auto px-4 py-12">
+      <p class="text-xs font-semibold uppercase tracking-wider text-blue-200 mb-2">Reforma Tributária do Consumo</p>
+      <h1 class="text-4xl md:text-5xl font-bold mb-4 leading-tight">Cronograma 2026 → 2033</h1>
+      <p class="text-lg text-blue-100 max-w-3xl leading-relaxed">
+        Linha do tempo oficial da transição CBS, IBS, Imposto Seletivo e Split Payment conforme
+        <strong>EC 132/2023</strong> e <strong>Lei Complementar 214/2025</strong>. Marcos legais
+        com data, alíquota vigente e ação prática para o contador e o empresário.
+      </p>
+      <div class="flex flex-wrap gap-3 mt-6 text-xs">
+        <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span> CBS = Federal (substitui PIS+COFINS)
+        </span>
+        <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20">
+          <span class="w-2 h-2 rounded-full bg-amber-400"></span> IBS = Estadual + Municipal (substitui ICMS+ISS)
+        </span>
+        <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20">
+          <span class="w-2 h-2 rounded-full bg-rose-400"></span> IS = Imposto Seletivo (do pecado)
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- AVISO -->
+  <section class="max-w-6xl mx-auto px-4 mt-8">
+    <div class="bg-amber-50 border-l-4 border-amber-500 rounded-r-xl p-4 flex items-start gap-3">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+      </svg>
+      <div class="text-sm text-amber-900">
+        <strong>Atenção:</strong> as alíquotas de referência de 2027+ dependem de Resolução do Senado
+        Federal (LC 214/2025, Art. 18). Os valores abaixo são as melhores estimativas disponíveis em
+        abril/2026 — monitorar Diário Oficial para ajustes oficiais.
+      </div>
+    </div>
+  </section>
+
+  <!-- TIMELINE -->
+  <main class="max-w-6xl mx-auto px-4 py-12">
+    <div class="relative">
+      <!-- Linha vertical (desktop) -->
+      <div class="hidden md:block absolute left-32 top-0 bottom-0 w-0.5 timeline-line"></div>
+
+      <!-- ============== 2026 ============== -->
+      <div class="relative md:pl-44 mb-10">
+        <div class="hidden md:block absolute left-28 top-2 w-8 h-8 rounded-full bg-white border-4 border-blue-600 shadow-md z-10"></div>
+        <div class="md:absolute md:left-0 md:top-0 md:w-24 text-right pr-2 mb-3 md:mb-0">
+          <div class="text-3xl md:text-4xl font-bold text-blue-900">2026</div>
+          <div class="text-xs uppercase tracking-wider text-slate-500 font-semibold">Período de teste</div>
+        </div>
+
+        <div class="year-card bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="inline-block px-2 py-0.5 text-xs font-bold rounded bg-blue-100 text-blue-800 uppercase">FASE TESTE</span>
+            <span class="text-xs text-slate-500">LC 214/2025, Art. 348</span>
+          </div>
+
+          <h2 class="text-xl font-bold text-slate-900 mb-3">CBS e IBS entram em modo de teste</h2>
+          <p class="text-sm text-slate-700 mb-4">
+            Alíquotas simbólicas com objetivo de adaptação dos sistemas, da Receita Federal e dos
+            contribuintes. <strong>Recolhimento dispensado</strong> — eventuais valores compensáveis
+            contra PIS/COFINS ou outros federais.
+          </p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+              <p class="text-xs text-emerald-700 uppercase font-semibold">CBS</p>
+              <p class="text-2xl font-bold text-emerald-900">0,9%</p>
+              <p class="text-xs text-emerald-700">Federal — teste</p>
+            </div>
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p class="text-xs text-amber-700 uppercase font-semibold">IBS</p>
+              <p class="text-2xl font-bold text-amber-900">0,1%</p>
+              <p class="text-xs text-amber-700">Subnacional — teste</p>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
+              <p class="text-xs text-slate-600 uppercase font-semibold">Total</p>
+              <p class="text-2xl font-bold text-slate-900">1,0%</p>
+              <p class="text-xs text-slate-600">CBS + IBS</p>
+            </div>
+          </div>
+
+          <div class="border-t border-slate-100 pt-4">
+            <h3 class="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2">Datas-chave 2026</h3>
+            <ul class="space-y-2 text-sm text-slate-700">
+              <li class="flex items-start gap-3">
+                <span class="inline-block px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-xs font-mono font-semibold flex-shrink-0">01/01/2026</span>
+                <span>Início da fase-teste de CBS e IBS — destacar nas notas fiscais (sem recolher)</span>
+              </li>
+              <li class="flex items-start gap-3">
+                <span class="inline-block px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-xs font-mono font-semibold flex-shrink-0">30/04/2026</span>
+                <span>1ª janela semestral de Opt-Out do Simples Nacional (LC 214/2025, Art. 41) — válido para Jul/2026 em diante</span>
+              </li>
+              <li class="flex items-start gap-3">
+                <span class="inline-block px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-xs font-mono font-semibold flex-shrink-0">30/09/2026</span>
+                <span>2ª janela semestral de Opt-Out — válido para Jan/2027 em diante (quando CBS sobe para 8,8%)</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="mt-4 bg-slate-50 border-l-4 border-slate-400 rounded-r p-3 text-xs text-slate-700">
+            <strong>Para o Simples Nacional:</strong> Art. 348, III, "c" — optantes do Simples
+            <strong>não aplicam</strong> as alíquotas de transição em 2026. Mantêm o DAS unificado
+            sem destaque de CBS/IBS. Crédito gerado para clientes B2B = <strong>R$ 0</strong> em 2026.
+          </div>
+        </div>
+      </div>
+
+      <!-- ============== 2027 ============== -->
+      <div class="relative md:pl-44 mb-10">
+        <div class="hidden md:block absolute left-28 top-2 w-8 h-8 rounded-full bg-white border-4 border-emerald-600 shadow-md z-10"></div>
+        <div class="md:absolute md:left-0 md:top-0 md:w-24 text-right pr-2 mb-3 md:mb-0">
+          <div class="text-3xl md:text-4xl font-bold text-emerald-700">2027</div>
+          <div class="text-xs uppercase tracking-wider text-emerald-700 font-semibold">CBS plena</div>
+        </div>
+
+        <div class="year-card bg-white border-2 border-emerald-300 rounded-2xl shadow-sm p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="inline-block px-2 py-0.5 text-xs font-bold rounded bg-emerald-100 text-emerald-800 uppercase">VIRADA</span>
+            <span class="text-xs text-slate-500">LC 214/2025, Arts. 344, 353</span>
+          </div>
+
+          <h2 class="text-xl font-bold text-slate-900 mb-3">PIS/COFINS extintos. CBS em vigor pleno</h2>
+          <p class="text-sm text-slate-700 mb-4">
+            <strong>PIS e COFINS deixam de existir</strong>. CBS substitui os dois com alíquota cheia.
+            IBS continua em fase-in (0,1%) para 2027 e 2028. <strong>Imposto Seletivo entra em vigor</strong>
+            sobre bens prejudiciais à saúde e ao meio ambiente.
+          </p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <div class="bg-emerald-50 border-2 border-emerald-400 rounded-lg p-3">
+              <p class="text-xs text-emerald-700 uppercase font-semibold">CBS</p>
+              <p class="text-2xl font-bold text-emerald-900">8,8%</p>
+              <p class="text-xs text-emerald-700">Plena — substitui PIS+COFINS</p>
+            </div>
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p class="text-xs text-amber-700 uppercase font-semibold">IBS</p>
+              <p class="text-2xl font-bold text-amber-900">0,1%</p>
+              <p class="text-xs text-amber-700">Ainda em fase-in</p>
+            </div>
+            <div class="bg-rose-50 border border-rose-200 rounded-lg p-3">
+              <p class="text-xs text-rose-700 uppercase font-semibold">IS</p>
+              <p class="text-2xl font-bold text-rose-900">Vigor</p>
+              <p class="text-xs text-rose-700">Imposto Seletivo</p>
+            </div>
+          </div>
+
+          <div class="border-t border-slate-100 pt-4">
+            <h3 class="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2">Marcos importantes</h3>
+            <ul class="space-y-2 text-sm text-slate-700">
+              <li class="flex items-start gap-3">
+                <span class="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-mono font-semibold flex-shrink-0">01/01/2027</span>
+                <span>PIS e COFINS extintos. CBS começa a ser efetivamente cobrada</span>
+              </li>
+              <li class="flex items-start gap-3">
+                <span class="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-mono font-semibold flex-shrink-0">01/01/2027</span>
+                <span>Imposto Seletivo entra em vigor (Arts. 409-422 LC 214/2025)</span>
+              </li>
+              <li class="flex items-start gap-3">
+                <span class="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-mono font-semibold flex-shrink-0">01/01/2027</span>
+                <span><strong>Split Payment</strong> começa a operar em transações com cartão (Arts. 31-36)</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============== 2028 ============== -->
+      <div class="relative md:pl-44 mb-10">
+        <div class="hidden md:block absolute left-28 top-2 w-8 h-8 rounded-full bg-white border-4 border-blue-500 shadow-md z-10"></div>
+        <div class="md:absolute md:left-0 md:top-0 md:w-24 text-right pr-2 mb-3 md:mb-0">
+          <div class="text-3xl md:text-4xl font-bold text-blue-700">2028</div>
+          <div class="text-xs uppercase tracking-wider text-blue-700 font-semibold">Estabilização</div>
+        </div>
+
+        <div class="year-card bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="inline-block px-2 py-0.5 text-xs font-bold rounded bg-blue-100 text-blue-800 uppercase">CBS PLENA + IBS FASE-IN</span>
+            <span class="text-xs text-slate-500">LC 214/2025, Art. 344</span>
+          </div>
+
+          <h2 class="text-xl font-bold text-slate-900 mb-3">Estabilização da CBS, IBS ainda baixa</h2>
+          <p class="text-sm text-slate-700 mb-4">
+            Último ano antes do início da redução escalonada de ICMS e ISS. Empresas ajustam
+            sistemas e processos antes da grande virada de 2029.
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+              <p class="text-xs text-emerald-700 uppercase font-semibold">CBS</p>
+              <p class="text-2xl font-bold text-emerald-900">8,8%</p>
+            </div>
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p class="text-xs text-amber-700 uppercase font-semibold">IBS</p>
+              <p class="text-2xl font-bold text-amber-900">0,1%</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============== 2029-2032 ============== -->
+      <div class="relative md:pl-44 mb-10">
+        <div class="hidden md:block absolute left-28 top-2 w-8 h-8 rounded-full bg-white border-4 border-orange-500 shadow-md z-10"></div>
+        <div class="md:absolute md:left-0 md:top-0 md:w-24 text-right pr-2 mb-3 md:mb-0">
+          <div class="text-3xl md:text-4xl font-bold text-orange-700">2029<br><span class="text-2xl">↓ 2032</span></div>
+          <div class="text-xs uppercase tracking-wider text-orange-700 font-semibold">Transição ICMS/ISS</div>
+        </div>
+
+        <div class="year-card bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="inline-block px-2 py-0.5 text-xs font-bold rounded bg-orange-100 text-orange-800 uppercase">REDUÇÃO ESCALONADA</span>
+            <span class="text-xs text-slate-500">LC 214/2025, Arts. 356-360</span>
+          </div>
+
+          <h2 class="text-xl font-bold text-slate-900 mb-3">ICMS e ISS reduzem 10% ao ano. IBS aumenta proporcionalmente</h2>
+          <p class="text-sm text-slate-700 mb-4">
+            Quatro anos de transição em que ICMS e ISS perdem 10% por ano enquanto o IBS cresce
+            para compensar a perda de arrecadação dos estados e municípios.
+          </p>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b-2 border-slate-300">
+                  <th class="text-left py-2 text-xs font-semibold text-slate-500 uppercase">Ano</th>
+                  <th class="text-right py-2 text-xs font-semibold text-slate-500 uppercase">CBS</th>
+                  <th class="text-right py-2 text-xs font-semibold text-slate-500 uppercase">IBS</th>
+                  <th class="text-right py-2 text-xs font-semibold text-slate-500 uppercase">ICMS/ISS reduzido em</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="border-b border-slate-100">
+                  <td class="py-2 font-semibold">2029</td>
+                  <td class="py-2 text-right font-mono">8,8%</td>
+                  <td class="py-2 text-right font-mono">3,5%</td>
+                  <td class="py-2 text-right text-orange-600">10%</td>
+                </tr>
+                <tr class="border-b border-slate-100">
+                  <td class="py-2 font-semibold">2030</td>
+                  <td class="py-2 text-right font-mono">8,8%</td>
+                  <td class="py-2 text-right font-mono">7,1%</td>
+                  <td class="py-2 text-right text-orange-600">20%</td>
+                </tr>
+                <tr class="border-b border-slate-100">
+                  <td class="py-2 font-semibold">2031</td>
+                  <td class="py-2 text-right font-mono">8,8%</td>
+                  <td class="py-2 text-right font-mono">10,6%</td>
+                  <td class="py-2 text-right text-orange-600">30%</td>
+                </tr>
+                <tr>
+                  <td class="py-2 font-semibold">2032</td>
+                  <td class="py-2 text-right font-mono">8,8%</td>
+                  <td class="py-2 text-right font-mono">14,2%</td>
+                  <td class="py-2 text-right text-orange-600">40%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============== 2033 ============== -->
+      <div class="relative md:pl-44 mb-10">
+        <div class="hidden md:block absolute left-28 top-2 w-8 h-8 rounded-full bg-white border-4 border-rose-600 shadow-md z-10"></div>
+        <div class="md:absolute md:left-0 md:top-0 md:w-24 text-right pr-2 mb-3 md:mb-0">
+          <div class="text-3xl md:text-4xl font-bold text-rose-700">2033</div>
+          <div class="text-xs uppercase tracking-wider text-rose-700 font-semibold">Sistema novo pleno</div>
+        </div>
+
+        <div class="year-card bg-white border-2 border-rose-300 rounded-2xl shadow-sm p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <span class="inline-block px-2 py-0.5 text-xs font-bold rounded bg-rose-100 text-rose-800 uppercase">FIM DA TRANSIÇÃO</span>
+            <span class="text-xs text-slate-500">LC 214/2025, Arts. 361-366</span>
+          </div>
+
+          <h2 class="text-xl font-bold text-slate-900 mb-3">ICMS e ISS extintos. IVA dual em pleno funcionamento</h2>
+          <p class="text-sm text-slate-700 mb-4">
+            <strong>Fim da transição</strong>. ICMS e ISS são extintos. CBS e IBS são os únicos
+            tributos sobre consumo. Sistema de IVA dual brasileiro plenamente operacional.
+          </p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <div class="bg-emerald-50 border-2 border-emerald-400 rounded-lg p-3">
+              <p class="text-xs text-emerald-700 uppercase font-semibold">CBS</p>
+              <p class="text-2xl font-bold text-emerald-900">8,8%</p>
+              <p class="text-xs text-emerald-700">Federal</p>
+            </div>
+            <div class="bg-amber-50 border-2 border-amber-400 rounded-lg p-3">
+              <p class="text-xs text-amber-700 uppercase font-semibold">IBS</p>
+              <p class="text-2xl font-bold text-amber-900">17,7%</p>
+              <p class="text-xs text-amber-700">Estados + Municípios</p>
+            </div>
+            <div class="bg-blue-50 border-2 border-blue-400 rounded-lg p-3">
+              <p class="text-xs text-blue-700 uppercase font-semibold">Total</p>
+              <p class="text-2xl font-bold text-blue-900">26,5%</p>
+              <p class="text-xs text-blue-700">Carga IVA pleno</p>
+            </div>
+          </div>
+
+          <div class="bg-rose-50 border-l-4 border-rose-600 rounded-r p-3 text-xs text-rose-900">
+            <strong>Atenção:</strong> a alíquota de referência IBS 17,7% é estimativa. O valor exato
+            será fixado por Resolução do Senado conforme LC 214/2025, Art. 18, considerando a
+            arrecadação histórica de ICMS+ISS dos entes federativos.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- BLOCO LEGAL -->
+  <section class="max-w-6xl mx-auto px-4 pb-12">
+    <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+      <h2 class="text-lg font-bold text-slate-900 mb-4">Bases legais consolidadas</h2>
+      <dl class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+        <div>
+          <dt class="font-bold text-slate-900">EC 132/2023</dt>
+          <dd class="text-slate-600 text-xs leading-relaxed mt-1">
+            Emenda Constitucional que reformou o sistema tributário. Criou CBS, IBS e Imposto Seletivo.
+            Estabeleceu o princípio da neutralidade tributária e o cronograma 2026-2033.
+          </dd>
+        </div>
+        <div>
+          <dt class="font-bold text-slate-900">LC 214/2025</dt>
+          <dd class="text-slate-600 text-xs leading-relaxed mt-1">
+            Lei Complementar que regulamenta a EC 132/2023. Define alíquotas, base de cálculo,
+            opt-out do Simples (Arts. 41-44), creditamento (Art. 47), Split Payment (Arts. 31-36),
+            cronograma de transição (Art. 348) e Imposto Seletivo (Arts. 409-422).
+          </dd>
+        </div>
+        <div>
+          <dt class="font-bold text-slate-900">LC 224/2025</dt>
+          <dd class="text-slate-600 text-xs leading-relaxed mt-1">
+            Complemento sobre regimes especiais e setores diferenciados (saúde, educação, agro,
+            transporte coletivo).
+          </dd>
+        </div>
+        <div>
+          <dt class="font-bold text-slate-900">Resolução Senado (anual)</dt>
+          <dd class="text-slate-600 text-xs leading-relaxed mt-1">
+            Fixa anualmente a alíquota de referência de IBS conforme LC 214/2025, Art. 18.
+            Acompanhar Diário Oficial da União.
+          </dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="bg-slate-800 text-slate-400 mt-12 no-print">
+    <div class="max-w-6xl mx-auto px-4 py-5">
+      <p class="text-xs text-center leading-relaxed">
+        Cronograma baseado em LC 214/2025 (vigente 01/01/2026) | Auditado por Luiz Moreira |
+        Motor Tributário Conect 2026–2033 |
+        Este conteúdo tem fins informativos e não substitui assessoria jurídica/tributária.
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    // Auth gate: redireciona para login se não estiver logado
+    (function () {
+      const token = sessionStorage.getItem('token');
+      if (!token) {
+        window.location.href = 'login.html';
+      }
+    })();
+  </script>
+
+</body>
+</html>
