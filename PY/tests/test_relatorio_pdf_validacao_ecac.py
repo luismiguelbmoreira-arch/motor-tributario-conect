@@ -13,7 +13,6 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import pytest  # noqa: E402
 
 from relatorio_pdf import _gerar_html, _secao_validacao_ecac  # noqa: E402
 

@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import os
 import sys
-from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 import pytest

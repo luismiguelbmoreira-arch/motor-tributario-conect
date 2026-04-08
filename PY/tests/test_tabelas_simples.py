@@ -8,7 +8,6 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-import pytest
 from decimal import Decimal
 from tabelas_simples import (
     determinar_anexo_por_cnae,
@@ -16,8 +15,6 @@ from tabelas_simples import (
     estimar_perfil_b2b,
     obter_faixa_numero,
     calcular_partilha_iss_cap,
-    TABELAS_ANEXOS,
-    TETO_SIMPLES_NACIONAL,
 )
 
 
