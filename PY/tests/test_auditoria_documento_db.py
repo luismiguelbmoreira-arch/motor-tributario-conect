@@ -31,6 +31,7 @@ from database import (  # noqa: E402
     registrar_acesso_documento,
     registrar_documento_auditoria,
 )
+from sqlalchemy.pool import StaticPool  # noqa: E402
 from sqlmodel import SQLModel, create_engine  # noqa: E402
 
 
@@ -44,7 +45,11 @@ CNPJ_B = "08172834000100"
 @pytest.fixture(autouse=True)
 def db_em_memoria(monkeypatch):
     """Cada teste recebe um banco SQLite em memória limpo."""
-    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     SQLModel.metadata.create_all(engine)
     monkeypatch.setattr(database, "engine", engine)
     yield engine
