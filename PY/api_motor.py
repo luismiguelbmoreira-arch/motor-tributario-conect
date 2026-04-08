@@ -55,26 +55,29 @@ try:
             break
 except ImportError:
     pass  # dotenv opcional
-from decimal import Decimal
-from pathlib import Path
-from typing import Any, Literal, Optional
 
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic import ValidationError as PydanticValidationError
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
+# NOTA: imports abaixo ficam após o bloco de warnings/dotenv de propósito
+# (precisam que PYTHONWARNINGS e ANTHROPIC_API_KEY estejam seteados primeiro).
+# O ruff E402 é silenciado via noqa por motivo documentado.
+from decimal import Decimal  # noqa: E402
+from typing import Any, Literal, Optional  # noqa: E402
+
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.responses import JSONResponse, Response  # noqa: E402
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+from pydantic import BaseModel, ConfigDict, Field  # noqa: E402
+from pydantic import ValidationError as PydanticValidationError  # noqa: E402
+from slowapi import Limiter, _rate_limit_exceeded_handler  # noqa: E402
+from slowapi.errors import RateLimitExceeded  # noqa: E402
+from slowapi.util import get_remote_address  # noqa: E402
 
 # Adiciona PY/ ao path para imports relativos
 sys.path.insert(0, str(Path(__file__).parent))
 
-from audit_universal import auditar_empresa
-from auth import (
+from audit_universal import auditar_empresa  # noqa: E402
+from auth import (  # noqa: E402
     autenticar_usuario,
     criar_admin_default,
     criar_tabela_users,
@@ -87,7 +90,7 @@ from auth import (
     trocar_senha_proprio,
     verificar_token,
 )
-from motor_tributario import (
+from motor_tributario import (  # noqa: E402
     EmpresaCompradora,
     EmpresaFornecedora,
     MotorReformaTributaria,
@@ -147,7 +150,7 @@ def _setup_logging() -> None:
 _setup_logging()
 logger = logging.getLogger("motor_conect.api")
 
-TOTAL_TESTES = 320  # Atualizado 07/04/2026: + DIFAL backend (32 testes golden standard)
+TOTAL_TESTES = 327  # Atualizado 08/04/2026: + 7 testes LGPD PII separation (fix bug latente Lucro Real)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

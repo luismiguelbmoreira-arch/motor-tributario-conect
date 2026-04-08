@@ -917,11 +917,9 @@ class MotorReformaTributaria:
         aliquotas_iva = self.get_aliquotas_iva_por_ano()
         aliquota_efetiva = self.calcular_aliquota_efetiva()
 
-        # Custo Simples sem as frações IBS/CBS (mantém IRPJ/CSLL/CPP/ICMS/ISS)
+        # Frações IBS/CBS que já estão dentro do DAS (serão subtraídas no Opt-Out)
         ibs_no_das = self._calcular_fracao_componente("IBS")
         cbs_no_das = self._calcular_fracao_componente("CBS")
-        das_mensal = self.calcular_das_mensal()
-        das_sem_iva = das_mensal - ibs_no_das - cbs_no_das
 
         # IVA recolhido separadamente (por operação)
         # ERR-016: aplica fator de redução CBS/IBS (Arts. 258-264 LC 214/2025)
@@ -932,12 +930,11 @@ class MotorReformaTributaria:
             * fator_reducao
         ).quantize(Decimal("0.01"), ROUND_HALF_UP)
 
-        # Custo DAS sem IVA (proporcional à operação)
-        # das_sem_iva é mensal; proporcionalizamos para a operação
+        # Custo DAS completo (proporcional à operação) antes de tirar o IVA
         custo_das_por_operacao_completo = (self.operacao.valor_operacao * aliquota_efetiva).quantize(
             Decimal("0.01"), ROUND_HALF_UP
         )
-        # Subtrai a fração IBS/CBS que já estava dentro do DAS
+        # Subtrai a fração IBS/CBS que já estava dentro do DAS (evita dupla contagem)
         fracao_iva_no_das = (ibs_no_das + cbs_no_das)
         custo_das_sem_iva = (custo_das_por_operacao_completo - fracao_iva_no_das).quantize(
             Decimal("0.01"), ROUND_HALF_UP
@@ -1183,7 +1180,7 @@ class MotorReformaTributaria:
         # ─────────────────────────────────────────────────────────────────────────────
         # ALERTAS FASE 5 (STRESS TEST) — R14 a R17
         # ─────────────────────────────────────────────────────────────────────────────
-        
+
         # C1 (R14) Fantasma do Ano Novo: Emissão X Liquidação em mudança de regime
         if self.operacao.data_liquidacao and self.operacao.data_liquidacao.year > self.operacao.data_emissao.year:
             # Regra: só dispara se cruzar a virada (ex: emissão 2026, pagto 2027 que inicia split payment dinâmico)
