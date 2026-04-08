@@ -49,6 +49,43 @@ JWT_SECRET_KEY=<chave JWT>
 Perder essa chave = impossibilidade de decifrar PDFs antigos. Guardar em
 cofre seguro (1Password, Bitwarden). Ver seção "🔐 AUDITORIA DOCUMENTAL".
 
+### Fontes alternativas da master key (produção)
+
+O `storage_cifrado._master_key()` aceita 3 fontes em ordem de prioridade:
+
+| # | Fonte | Quando usar |
+|---|---|---|
+| 1 | `$MOTOR_CONECT_MASTER_KEY` env var | Dev local (via `PY/.env`) |
+| 2 | Arquivo protegido (`/etc/motor-conect/master.key` ou `%PROGRAMDATA%\motor-conect\master.key`) | Deploy em servidor físico/VM. Permissões: owner do usuário do serviço, mode 0600 |
+| 3 | `$MOTOR_CONECT_MASTER_KEY_AWS_SECRET` | Deploy cloud AWS (ECS/EC2/Lambda com IAM role) |
+
+**Override do path do arquivo:** `$MOTOR_CONECT_MASTER_KEY_FILE=/caminho/custom.key`
+
+**Setup servidor Linux:**
+```bash
+sudo mkdir -p /etc/motor-conect
+sudo chown motor-conect:motor-conect /etc/motor-conect
+sudo chmod 700 /etc/motor-conect
+echo "<sua-chave-hex-64-chars>" | sudo tee /etc/motor-conect/master.key
+sudo chmod 600 /etc/motor-conect/master.key
+sudo chown motor-conect:motor-conect /etc/motor-conect/master.key
+```
+
+**Setup servidor Windows:**
+```powershell
+mkdir $env:PROGRAMDATA\motor-conect
+Set-Content -Path "$env:PROGRAMDATA\motor-conect\master.key" -Value "<chave>"
+icacls "$env:PROGRAMDATA\motor-conect\master.key" /inheritance:r /grant:r "NT SERVICE\MotorConect:(R)"
+```
+
+**Setup AWS Secrets Manager:**
+```bash
+aws secretsmanager create-secret --name motor-conect/master-key \
+  --secret-string "$(python -c 'import secrets; print(secrets.token_hex(32))')"
+```
+Depois no `.env` do servidor: `MOTOR_CONECT_MASTER_KEY_AWS_SECRET=motor-conect/master-key`
+Requer: `pip install boto3` + IAM role com permissão `secretsmanager:GetSecretValue`.
+
 ---
 
 ## 🏗️ ARQUITETURA — VISÃO GERAL
@@ -243,6 +280,59 @@ CNPJ na URL é apenas dígitos (14 chars, sem pontuação).
 | Log de acesso | `auditoria_acessos` | Permanente (LGPD Art. 37) | nunca purga |
 
 Cron diário deve rodar `listar_documentos_purgaveis()` e executar o purge dos que passaram do prazo.
+
+### Backup diário do DB (OBRIGATÓRIO em produção)
+
+Os metadados em `auditoria_documentos` são **inúteis** sem o DB.
+Perda do banco = impossibilidade de gerar dossiê mesmo com os arquivos
+cifrados intactos. Use `PY/scripts/backup_db.py`:
+
+```bash
+# Execução manual
+python PY/scripts/backup_db.py
+
+# Dry run (só mostra o plano)
+python PY/scripts/backup_db.py --dry-run
+```
+
+**Layout gerado:**
+```
+data/backups/
+├── diarios/
+│   ├── 2026-04-08.db.gz   ← retenção 30 dias rolling
+│   ├── 2026-04-09.db.gz
+│   └── ...
+└── mensais/
+    ├── 2026-04.db.gz       ← criado automaticamente no dia 1 do mês
+    └── 2026-05.db.gz       ← permanente (purge manual apenas)
+```
+
+**Implementação:**
+- Usa `sqlite3.Connection.backup()` (transação-safe) em vez de `shutil.copy`
+- Comprime com gzip nível 9 (tipicamente 3-6× menor)
+- Escrita atômica (tmp + rename) — se falhar no meio, não corrompe backup anterior
+- Retorna exit code 0/1 para integração com cron
+
+**Setup cron (Linux):**
+```
+0 3 * * * cd /app && /usr/bin/python PY/scripts/backup_db.py >> /var/log/motor-backup.log 2>&1
+```
+
+**Setup Task Scheduler (Windows):**
+```
+schtasks /Create /SC DAILY /ST 03:00 /TN "MotorConectBackup" ^
+  /TR "python C:\app\PY\scripts\backup_db.py"
+```
+
+**Restauração:**
+```bash
+# 1. Parar API
+# 2. Descomprimir
+gzip -dk data/backups/diarios/2026-04-08.db.gz
+# 3. Mover para a posição
+mv data/backups/diarios/2026-04-08.db data/motor_tributario.db
+# 4. Reiniciar API
+```
 
 ### O que fazer se algo explodir
 

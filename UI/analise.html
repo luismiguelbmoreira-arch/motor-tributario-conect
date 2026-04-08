@@ -970,10 +970,18 @@
         return;
       }
 
-      const diagnostico = await res.json();
+      // Envelope: {"diagnostico": {...}, "pii": {cnpj, razao_social}}
+      // Backward compat: se vier só o dict do diagnóstico (sem envelope), usa direto.
+      const payloadResp = await res.json();
+      const diagnostico = payloadResp.diagnostico || payloadResp;
+      const pii = payloadResp.pii || {};
+
       sessionStorage.setItem('diagnostico', JSON.stringify(diagnostico));
-      sessionStorage.setItem('analise_empresa', document.getElementById('razao_social').value.trim());
-      sessionStorage.setItem('analise_cnpj', document.getElementById('cnpj').value.replace(/\D/g, ''));
+      // Prioriza o PII do envelope; fallback para o formulário preenchido
+      const razaoSocial = pii.razao_social || document.getElementById('razao_social').value.trim();
+      const cnpjDigitos = (pii.cnpj || document.getElementById('cnpj').value).replace(/\D/g, '');
+      sessionStorage.setItem('analise_empresa', razaoSocial);
+      sessionStorage.setItem('analise_cnpj', cnpjDigitos);
       window.location.href = 'resultado.html';
 
     } catch (e) {

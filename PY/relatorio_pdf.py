@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 import os
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -351,6 +351,8 @@ def _gerar_html(diagnostico: dict, pii: dict | None = None) -> str:
 
 {_secao_decisao_opt_out(diagnostico)}
 
+{_secao_documentos_precisao()}
+
 <!-- Serviços recomendados -->
 <h2>Serviços Recomendados</h2>
 <table>
@@ -415,15 +417,97 @@ def _secao_decisao_opt_out(diagnostico: dict) -> str:
     }
     cor_texto, cor_bg, cor_borda = cor_map.get(codigo, cor_map["ZONA_CINZA"])
 
-    # Tabela Sua Situação
-    custo_simples = _fmt_moeda(simples_puro.get("custo_das_por_operacao", 0))
-    custo_opt_das = _fmt_moeda(opt_out.get("custo_das_por_operacao", 0))
-    iva_por_fora = _fmt_moeda(opt_out.get("iva_recolhido_por_fora", 0))
-    custo_opt_total = _fmt_moeda(opt_out.get("custo_total", 0))
-    credito_simples = _fmt_moeda(simples_puro.get("credito_gerado_para_comprador", 0))
-    credito_opt = _fmt_moeda(opt_out.get("credito_gerado_para_comprador", 0))
+    # Tabela Sua Situação — valores crus + helper de formatação de diferença
+    def _to_dec(v: Any) -> Decimal:
+        try:
+            return Decimal(str(v or 0))
+        except Exception:
+            return Decimal("0")
+
+    das_simples_dec = _to_dec(simples_puro.get("custo_das_por_operacao"))
+    das_opt_dec = _to_dec(opt_out.get("custo_das_por_operacao"))
+    iva_fora_dec = _to_dec(opt_out.get("iva_recolhido_por_fora"))
+    custo_tot_simples_dec = das_simples_dec
+    custo_tot_opt_dec = _to_dec(opt_out.get("custo_total"))
+
+    # Crédito POTENCIAL (por 1 operação B2B) — o que o motor calcula
+    cred_pot_simples_dec = _to_dec(simples_puro.get("credito_gerado_para_comprador"))
+    cred_pot_opt_dec = _to_dec(opt_out.get("credito_gerado_para_comprador"))
+
+    # % B2B real — fundamental para ponderar o crédito aproveitado
+    pct_b2b_dec = _to_dec(cenarios.get("percentual_b2b", 0))
+    pct_b2b_frac = pct_b2b_dec / Decimal("100")
+    tem_b2b = pct_b2b_dec > Decimal("0")
+
+    # Crédito EFETIVO ponderado pelo perfil real de clientes
+    cred_efet_simples_dec = (cred_pot_simples_dec * pct_b2b_frac).quantize(
+        Decimal("0.01"), ROUND_HALF_UP
+    )
+    cred_efet_opt_dec = (cred_pot_opt_dec * pct_b2b_frac).quantize(
+        Decimal("0.01"), ROUND_HALF_UP
+    )
+
+    custo_simples = _fmt_moeda(das_simples_dec)
+    custo_opt_das = _fmt_moeda(das_opt_dec)
+    iva_por_fora = _fmt_moeda(iva_fora_dec)
+    custo_opt_total = _fmt_moeda(custo_tot_opt_dec)
     pct_credito_simples = _esc(simples_puro.get("percentual_credito_nf", "1%"))
     pct_credito_opt = _esc(opt_out.get("percentual_credito_nf", "100%"))
+
+    def _diff_html(a: Decimal, b: Decimal, sentido: str) -> str:
+        """
+        Formata célula de diferença com sinal e cor.
+        sentido: 'custo' (positivo = pior, vermelho) ou 'beneficio' (positivo = melhor, verde)
+        """
+        delta = b - a
+        if abs(delta) < Decimal("0.005"):
+            return (
+                '<span style="display:inline-block;padding:2px 6px;border-radius:3px;'
+                'background:#f1f5f9;color:#475569;font-family:monospace;font-size:9px;">'
+                '= R$ 0,00</span>'
+            )
+        eh_pior = (delta > 0) if sentido == "custo" else (delta < 0)
+        seta = "▲" if delta > 0 else "▼"
+        sinal = "+" if delta > 0 else "-"
+        if eh_pior:
+            bg, cor, borda = "#fee2e2", "#991b1b", "#fca5a5"
+        else:
+            bg, cor, borda = "#d1fae5", "#065f46", "#6ee7b7"
+        return (
+            f'<span style="display:inline-block;padding:2px 6px;border-radius:3px;'
+            f'background:{bg};color:{cor};border:1px solid {borda};'
+            f'font-family:monospace;font-size:9px;font-weight:700;">'
+            f'{seta} {sinal}{_fmt_moeda(abs(delta))}</span>'
+        )
+
+    # Diferenças só nas linhas de TOTAL (custo mensal + crédito)
+    # As linhas de componentes (DAS, IVA por fora) não mostram diferença
+    # para não duplicar visualmente o mesmo valor.
+    diff_custo_total = _diff_html(custo_tot_simples_dec, custo_tot_opt_dec, "custo")
+    diff_credito = _diff_html(cred_efet_simples_dec, cred_efet_opt_dec, "beneficio")
+
+    # Projeção anual (× 12) — mostrada explicitamente no rodapé da tabela
+    custo_anual_simples = custo_tot_simples_dec * Decimal("12")
+    custo_anual_opt = custo_tot_opt_dec * Decimal("12")
+    diff_anual = _diff_html(custo_anual_simples, custo_anual_opt, "custo")
+
+    # Textos formatados do crédito B2B (só aparecem se há clientes B2B)
+    credito_simples = _fmt_moeda(cred_efet_simples_dec)
+    credito_opt = _fmt_moeda(cred_efet_opt_dec)
+
+    # Aviso contextual quando 0% B2B
+    if not tem_b2b:
+        aviso_tabela = (
+            '<div style="background:#fef3c7;border-left:3px solid #f59e0b;'
+            'padding:8px 12px;margin-top:6px;border-radius:0 4px 4px 0;'
+            'font-size:10px;color:#78350f;line-height:1.5;">'
+            '<strong>⚠ Você não tem clientes B2B:</strong> o crédito de 100% '
+            'do Opt-Out <strong>não beneficia ninguém</strong> — consumidor final '
+            'não usa crédito de CBS/IBS. Opt-Out só geraria custo extra sem retorno.'
+            '</div>'
+        )
+    else:
+        aviso_tabela = ""
 
     return f"""
 <!-- Decisão Estratégica: Opt-Out IVA -->
@@ -441,35 +525,59 @@ def _secao_decisao_opt_out(diagnostico: dict) -> str:
   </div>
 </div>
 
-<!-- Sub-bloco 2: Sua situação (tabela comparativa) -->
+<!-- Sub-bloco 2: Sua situação (tabela comparativa com breakdown + totais) -->
 <h3 style="margin-top:14px;">Sua Situação Específica</h3>
-<table style="margin-bottom:12px;">
+<p style="font-size:10px;color:#6b7280;margin-bottom:6px;">Valores mensais baseados no RPA declarado. A diferença aparece apenas nas linhas de total para evitar dupla contagem.</p>
+<table style="margin-bottom:8px;">
   <thead>
-    <tr><th>Item</th><th>Simples Puro</th><th>Opt-Out IVA</th></tr>
+    <tr>
+      <th>Componente (por mês)</th>
+      <th style="text-align:right;">Simples Puro</th>
+      <th style="text-align:right;">Opt-Out IVA</th>
+      <th style="text-align:right;">Diferença</th>
+    </tr>
   </thead>
   <tbody>
     <tr>
-      <td><strong>DAS por operação</strong></td>
-      <td>{custo_simples}</td>
-      <td>{custo_opt_das}</td>
+      <td>DAS base (IRPJ+CSLL+CPP+ICMS+ISS)</td>
+      <td style="text-align:right;font-family:monospace;">{custo_simples}</td>
+      <td style="text-align:right;font-family:monospace;">{custo_opt_das}</td>
+      <td style="text-align:right;color:#9ca3af;font-size:9px;">— componente</td>
     </tr>
     <tr>
-      <td><strong>IVA recolhido por fora</strong></td>
-      <td style="color:#9ca3af;">—</td>
-      <td>{iva_por_fora}</td>
+      <td style="padding-left:18px;">+ IVA (CBS+IBS) recolhido por fora</td>
+      <td style="color:#9ca3af;text-align:right;">—</td>
+      <td style="text-align:right;font-family:monospace;">{iva_por_fora}</td>
+      <td style="text-align:right;color:#9ca3af;font-size:9px;">— componente</td>
     </tr>
-    <tr style="background:#eff6ff;">
-      <td><strong>Custo total por operação</strong></td>
-      <td><strong>{custo_simples}</strong></td>
-      <td><strong>{custo_opt_total}</strong></td>
+    <tr style="background:#eff6ff;border-top:1px solid #bfdbfe;">
+      <td><strong>= Custo total mensal que sai do caixa</strong></td>
+      <td style="text-align:right;font-family:monospace;"><strong>{custo_simples}</strong></td>
+      <td style="text-align:right;font-family:monospace;"><strong>{custo_opt_total}</strong></td>
+      <td style="text-align:right;">{diff_custo_total}</td>
     </tr>
-    <tr>
-      <td><strong>Crédito gerado para comprador B2B</strong></td>
-      <td>{credito_simples} <span style="color:#9ca3af;">({pct_credito_simples})</span></td>
-      <td><strong style="color:#065f46;">{credito_opt} ({pct_credito_opt})</strong></td>
-    </tr>
+    {'' if not tem_b2b else f'''<tr>
+      <td>Crédito aproveitado por clientes B2B<br/><span style="font-size:9px;color:#9ca3af;">(ponderado por {pct_b2b_dec:.0f}% B2B)</span><br/><span style="font-size:8px;color:#6b7280;font-style:italic;">⚖ LC 214/2025, Art. 47, §II</span></td>
+      <td style="text-align:right;font-family:monospace;">{credito_simples} <span style="color:#9ca3af;font-size:9px;">({pct_credito_simples})</span></td>
+      <td style="text-align:right;font-family:monospace;"><strong style="color:#065f46;">{credito_opt} ({pct_credito_opt})</strong></td>
+      <td style="text-align:right;">{diff_credito}</td>
+    </tr>'''}
   </tbody>
+  <tfoot>
+    <tr style="background:#f1f5f9;border-top:2px solid #cbd5e1;">
+      <td style="padding-top:6px;font-weight:700;font-size:9px;text-transform:uppercase;letter-spacing:.03em;">Projeção anual (× 12 meses)</td>
+      <td style="text-align:right;font-family:monospace;font-weight:700;">{_fmt_moeda(custo_anual_simples)}</td>
+      <td style="text-align:right;font-family:monospace;font-weight:700;">{_fmt_moeda(custo_anual_opt)}</td>
+      <td style="text-align:right;">{diff_anual}</td>
+    </tr>
+  </tfoot>
 </table>
+{aviso_tabela}
+<div style="font-size:9px;color:#6b7280;margin-top:6px;margin-bottom:14px;line-height:1.6;">
+  <span style="display:inline-block;margin-right:12px;"><span style="display:inline-block;width:8px;height:8px;border:1px solid #fca5a5;background:#fee2e2;vertical-align:middle;"></span> ▲ Custo extra</span>
+  <span style="display:inline-block;margin-right:12px;"><span style="display:inline-block;width:8px;height:8px;border:1px solid #6ee7b7;background:#d1fae5;vertical-align:middle;"></span> ▼ Melhor resultado</span>
+  <span style="display:inline-block;"><span style="display:inline-block;width:8px;height:8px;border:1px solid #cbd5e1;background:#f1f5f9;vertical-align:middle;"></span> = Neutro</span>
+</div>
 
 <!-- Sub-bloco 3: Diagnóstico personalizado -->
 <div style="background:{cor_bg};border:2px solid {cor_borda};padding:14px 16px;border-radius:6px;margin-bottom:14px;">
@@ -556,6 +664,103 @@ def _secao_decisao_opt_out(diagnostico: dict) -> str:
 <p style="font-size:9px;color:#6b7280;font-style:italic;margin-top:4px;">
   ⚖ {amparo_rec or 'LC 214/2025, Arts. 41-44 | CF Art. 146, III, "d" | Resolução CGSN 183/2025'}
 </p>
+"""
+
+
+def _secao_documentos_precisao() -> str:
+    """
+    Seção 'Documentos para análise precisa' — lista os 5 documentos que o
+    contador precisa para transformar o diagnóstico de estimativa (inferência
+    por CNAE) em cálculo 100% preciso e defensável em fiscalização.
+
+    Paridade com UI/resultado.html::sec-documentos-precisao. Imprime igual
+    no PDF para que o PDF (versão para fiscalização) contenha a mesma
+    transparência sobre o que é estimativa vs cálculo real.
+
+    Base legal: LC 214/2025 Art. 47 §II (crédito equivalente ao devido) +
+    CTN Art. 142 (constituição do crédito tributário exige prova documental).
+    """
+    docs = [
+        (
+            "1",
+            "PGDAS-D mês a mês (12 meses)",
+            "Histórico de receita real de cada competência. Hoje usamos só o RPA "
+            "do mês atual — com o histórico o Fator R e a sazonalidade ficam mais "
+            "precisos.",
+            "Onde obter: Portal Simples Nacional (receita.fazenda.gov.br)",
+        ),
+        (
+            "2",
+            "EFD-Contribuições resumida",
+            "Necessário em 2027+ para detalhar a fração de CBS/IBS dentro do DAS "
+            "unificado (LC 214/2025, Art. 47, §II — cálculo do crédito equivalente "
+            "ao devido).",
+            "Onde obter: Sistema contábil (Sage, Domínio, Alterdata, etc.)",
+        ),
+        (
+            "3",
+            "Listagem de clientes B2B",
+            "CSV/Excel com <strong>CNPJ + faturamento anual + regime do cliente</strong>. "
+            "Hoje o motor <em>estima</em> o % B2B por CNAE. Com a lista real, sabemos "
+            "quem efetivamente aproveita o crédito (Lucro Real/Presumido) vs quem não "
+            "aproveita (Simples, MEI, B2C, isento).",
+            "Onde obter: Sistema do escritório, relatório de faturamento",
+        ),
+        (
+            "4",
+            "Notas fiscais emitidas (XML ou planilha)",
+            "Pelo menos do mês analisado. Valida ICMS-ST segregado, NCMs, valores "
+            "totais, devoluções e operações interestaduais (DIFAL). Essencial se o "
+            "delta contra o e-CAC for maior que 5%.",
+            "Onde obter: Sistema de emissão de NF-e do cliente",
+        ),
+        (
+            "5",
+            "Folha de pagamento detalhada",
+            "Hoje o motor usa só o total do PGDAS-D (campo 'folha de salários nos 12 "
+            "meses'). Com o detalhamento (pró-labore, encargos, 13º, férias) conseguimos "
+            "validar o Fator R com precisão e identificar se o regime é Anexo III "
+            "(serviços com folha alta) ou Anexo V.",
+            "Onde obter: Sistema de folha (Domínio Folha, Senior, SAP RH, etc.)",
+        ),
+    ]
+
+    cards = ""
+    for num, titulo, desc, fonte in docs:
+        cards += f"""
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px 12px;margin-bottom:8px;">
+      <div style="display:flex;gap:10px;align-items:flex-start;">
+        <span style="display:inline-block;flex-shrink:0;width:20px;height:20px;border-radius:50%;background:#dbeafe;color:#1e40af;font-weight:700;font-size:10px;text-align:center;line-height:20px;">{num}</span>
+        <div>
+          <div style="font-weight:700;font-size:11px;color:#1e3a5f;margin-bottom:2px;">{titulo}</div>
+          <div style="font-size:10px;color:#374151;line-height:1.5;margin-bottom:3px;">{desc}</div>
+          <div style="font-size:9px;color:#9ca3af;font-style:italic;">{fonte}</div>
+        </div>
+      </div>
+    </div>"""
+
+    return f"""
+<!-- Documentos para análise precisa (Frente 2) -->
+<h2>Documentos para análise precisa</h2>
+<p style="font-size:10px;color:#6b7280;margin-bottom:8px;">
+  O diagnóstico acima usa <strong>estimativas baseadas no CNAE</strong>
+  (perfil médio do setor) e nos dados do PGDAS-D/e-CAC. Para um cálculo
+  <strong>100% preciso</strong> do crédito que cada cliente B2B vai realmente
+  aproveitar, o escritório precisa dos documentos abaixo. Sem eles, a
+  recomendação permanece como estimativa qualificada — útil para decisão,
+  mas não para defesa em fiscalização.
+</p>
+{cards}
+<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:10px 12px;margin-bottom:14px;">
+  <div style="font-size:10px;color:#1e40af;line-height:1.5;">
+    <strong>🛡 Importante:</strong> A inferência atual por CNAE é uma
+    <strong>aproximação legítima</strong> para decisão estratégica — não usa
+    dados inventados, apenas médias setoriais publicadas. Mas em caso de
+    <strong>fiscalização ou defesa jurídica</strong>, o diagnóstico precisa
+    dos documentos acima para ser irrefutável (CTN Art. 142). Anexe-os ao
+    dossiê de prova quando for rodar a análise final do cliente.
+  </div>
+</div>
 """
 
 
@@ -687,7 +892,7 @@ def _secao_validacao_ecac(diagnostico: dict) -> str:
             "Geralmente é arredondamento, RPA aproximado ou pequeno descasamento "
             "de competência. Confira antes de usar como referência."
         )
-    else:
+    elif delta_pct < Decimal("20"):
         cor_bg, cor_borda, cor_texto = "#fef2f2", "#ef4444", "#991b1b"
         icone = "✗"
         titulo = "Diferença significativa — investigue antes de usar"
@@ -696,6 +901,24 @@ def _secao_validacao_ecac(diagnostico: dict) -> str:
             "Possíveis causas: ICMS-ST não segregado, multi-atividade não declarada, "
             "RPA real diferente do extraído, CNAE/Anexo divergente, ou Fator R com "
             "folha desatualizada. Não use este diagnóstico como referência sem revisão."
+        )
+    else:
+        # Delta ≥ 20%: ALERTA CRÍTICO — motor pode estar aplicando regime/anexo errado
+        cor_bg, cor_borda, cor_texto = "#fee2e2", "#b91c1c", "#7f1d1d"
+        icone = "🚨"
+        titulo = "ALERTA CRÍTICO — diferença acima de 20%"
+        explicacao = (
+            "O DAS calculado difere do pago no e-CAC em MAIS DE 20%. Esse delta é "
+            "incompatível com um diagnóstico confiável — há alta probabilidade de o "
+            "motor estar aplicando o Anexo errado OU de faltarem dados de entrada. "
+            "<strong>NÃO USE</strong> este diagnóstico até investigar as 5 causas "
+            "possíveis: (1) Fator R calculado sem a folha real completa → Anexo III "
+            "vs V trocado; (2) multi-atividade com anexos diferentes não declarada; "
+            "(3) ICMS-ST segregado de forma errada (receita bruta incluindo ST); "
+            "(4) redução setorial aplicável (saúde/educação/agro) não marcada; "
+            "(5) RPA do mês analisado muito distinto da média (sazonalidade). "
+            "Anexe os documentos da seção 'Documentos para análise precisa' e rode "
+            "novamente."
         )
 
     delta_str = _fmt_moeda(delta)
