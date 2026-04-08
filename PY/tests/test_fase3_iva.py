@@ -141,16 +141,28 @@ class TestCronogramaIVA:
 
 class TestCreditoB2B:
 
-    def test_credito_2026_r500(self):
+    def test_credito_2026_zero(self):
         """
-        2026: Operação R$ 50.000 × 1,0% (CBS 0,9% + IBS 0,1%) = R$ 500,00.
-        Art. 348 LC 214/2025 — período de teste.
+        2026: Operação R$ 50.000 deve gerar CRÉDITO ZERO para B2B.
+
+        CORREÇÃO LEGAL pós-pesquisa (09/04/2026):
+        LC 214/2025, Art. 348, III, "c" — em 2026, optantes do Simples
+        Nacional NÃO aplicam as alíquotas de transição, ou seja, NÃO
+        destacam CBS/IBS nas operações. Consequentemente, o cliente B2B
+        NÃO recebe crédito em operações com fornecedor do Simples em 2026.
+
+        O valor anterior (R$ 500 = 1% de R$ 50.000) estava conceitualmente
+        errado — assumia que as alíquotas-teste (0,9% + 0,1% = 1%) seriam
+        destacadas, o que não acontece para o Simples Nacional neste ano.
+
+        A partir de 2027 (primeiro ano de recolhimento efetivo), o crédito
+        passa a existir conforme Art. 47, §II da LC 214/2025 — em montante
+        equivalente ao CBS/IBS pago dentro do DAS.
         """
         motor = make_motor(ano=2026, valor="50000.00")
         credito = motor.calcular_credito_simples_para_b2b()
-        esperado = Decimal("500.00")
-        assert abs(credito - esperado) <= Decimal("0.01"), (
-            f"Crédito 2026 esperado R$ 500,00, obtido R$ {credito}"
+        assert credito == Decimal("0.00"), (
+            f"Crédito 2026 deve ser R$ 0 (Art. 348, III, 'c'), obtido R$ {credito}"
         )
 
     def test_credito_2027_r4450(self):

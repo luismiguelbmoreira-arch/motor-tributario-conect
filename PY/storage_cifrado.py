@@ -76,21 +76,16 @@ class IntegridadeViolada(StorageCifradoError):
 # DERIVAÇÃO DE CHAVE
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _master_key() -> bytes:
+def _validar_e_normalizar_key(raw: str, origem: str) -> bytes:
     """
-    Lê a master key do ambiente. Levanta MasterKeyAusente se não definida.
+    Valida uma string crua de master key (hex ou bytes literais) e
+    retorna os 32 bytes da chave. Levanta MasterKeyAusente se inválida.
 
-    A master key DEVE ter pelo menos 32 bytes de entropia (gerar via
-    `python -c 'import secrets; print(secrets.token_hex(32))'` e colocar
-    em PY/.env como MOTOR_CONECT_MASTER_KEY=<hex>).
+    `origem` é usado apenas para mensagem de erro.
     """
-    raw = os.environ.get("MOTOR_CONECT_MASTER_KEY")
+    raw = (raw or "").strip()
     if not raw:
-        raise MasterKeyAusente(
-            "MOTOR_CONECT_MASTER_KEY não definida. Gere uma com "
-            "`python -c 'import secrets; print(secrets.token_hex(32))'` "
-            "e adicione em PY/.env."
-        )
+        raise MasterKeyAusente(f"Master key vazia em {origem}")
     # Aceita hex (preferido) ou bytes literais
     try:
         key = bytes.fromhex(raw)
@@ -98,9 +93,133 @@ def _master_key() -> bytes:
         key = raw.encode("utf-8")
     if len(key) < 32:
         raise MasterKeyAusente(
-            f"MOTOR_CONECT_MASTER_KEY tem apenas {len(key)} bytes — exige ≥ 32."
+            f"Master key em {origem} tem apenas {len(key)} bytes — exige ≥ 32."
         )
     return key[:32]  # trunca se mais longa
+
+
+def _ler_key_de_arquivo(path: Path) -> bytes:
+    """Lê master key de arquivo protegido. Tipicamente mode 0600."""
+    try:
+        raw = path.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        raise MasterKeyAusente(
+            f"Nao foi possivel ler master key de '{path}': {exc}"
+        ) from exc
+    return _validar_e_normalizar_key(raw, f"arquivo {path}")
+
+
+def _ler_key_de_aws_secrets(nome_segredo: str) -> bytes:
+    """
+    Lê master key do AWS Secrets Manager.
+    boto3 é carregado sob demanda — não é dep obrigatória.
+    """
+    try:
+        import boto3  # type: ignore
+    except ImportError as exc:
+        raise MasterKeyAusente(
+            "boto3 nao instalado — nao eh possivel ler AWS Secrets Manager. "
+            "Instale 'pip install boto3' ou use outro fallback."
+        ) from exc
+
+    try:
+        client = boto3.client("secretsmanager")
+        resposta = client.get_secret_value(SecretId=nome_segredo)
+        raw = resposta.get("SecretString", "")
+    except Exception as exc:
+        raise MasterKeyAusente(
+            f"Falha ao ler secret '{nome_segredo}' do AWS Secrets Manager: {exc}"
+        ) from exc
+
+    return _validar_e_normalizar_key(raw, f"AWS Secrets Manager '{nome_segredo}'")
+
+
+def _caminhos_padrao_arquivo() -> list[Path]:
+    """
+    Caminhos padrão onde procurar arquivo de master key, por ordem:
+
+    1. $MOTOR_CONECT_MASTER_KEY_FILE — override explícito
+    2. /etc/motor-conect/master.key — convenção Linux deploy
+    3. %PROGRAMDATA%/motor-conect/master.key — convenção Windows deploy
+
+    Retorna lista de Path candidatos que EXISTEM.
+    """
+    candidatos: list[Path] = []
+
+    override = os.environ.get("MOTOR_CONECT_MASTER_KEY_FILE")
+    if override:
+        candidatos.append(Path(override))
+
+    candidatos.append(Path("/etc/motor-conect/master.key"))
+
+    programdata = os.environ.get("PROGRAMDATA")
+    if programdata:
+        candidatos.append(Path(programdata) / "motor-conect" / "master.key")
+
+    return [p for p in candidatos if p.exists()]
+
+
+def _master_key() -> bytes:
+    """
+    Lê a master key por ordem de prioridade (fallback chain):
+
+    1. env var `MOTOR_CONECT_MASTER_KEY` (dev local via .env)
+    2. arquivo `$MOTOR_CONECT_MASTER_KEY_FILE` ou convenções de path
+       (`/etc/motor-conect/master.key` ou `%PROGRAMDATA%\\motor-conect\\master.key`)
+    3. AWS Secrets Manager via `$MOTOR_CONECT_MASTER_KEY_AWS_SECRET`
+       (só tenta se boto3 estiver instalado)
+
+    A primeira fonte que fornecer uma chave válida é usada. Se nenhuma
+    funcionar, levanta `MasterKeyAusente` com mensagem descrevendo as
+    fontes tentadas.
+
+    Para produção recomenda-se:
+    - Servidor Linux: arquivo `/etc/motor-conect/master.key` mode 0600,
+      owner do usuário do serviço (não root)
+    - Servidor Windows: arquivo `%PROGRAMDATA%\\motor-conect\\master.key`
+      com ACL restrita
+    - Cloud AWS: Secrets Manager + IAM role no EC2/ECS
+    """
+    tentativas: list[str] = []
+
+    # 1. Env var (compat dev)
+    env_raw = os.environ.get("MOTOR_CONECT_MASTER_KEY")
+    if env_raw:
+        try:
+            return _validar_e_normalizar_key(env_raw, "env var MOTOR_CONECT_MASTER_KEY")
+        except MasterKeyAusente as exc:
+            tentativas.append(str(exc))
+
+    # 2. Arquivo
+    for path in _caminhos_padrao_arquivo():
+        try:
+            return _ler_key_de_arquivo(path)
+        except MasterKeyAusente as exc:
+            tentativas.append(str(exc))
+
+    # 3. AWS Secrets Manager
+    aws_secret = os.environ.get("MOTOR_CONECT_MASTER_KEY_AWS_SECRET")
+    if aws_secret:
+        try:
+            return _ler_key_de_aws_secrets(aws_secret)
+        except MasterKeyAusente as exc:
+            tentativas.append(str(exc))
+
+    # Nenhuma fonte funcionou
+    if tentativas:
+        detalhes = "\n  - ".join(tentativas)
+        raise MasterKeyAusente(
+            "Nenhuma fonte de master key funcionou. Fontes tentadas:\n  - "
+            + detalhes
+        )
+    raise MasterKeyAusente(
+        "Master key nao encontrada. Configure uma das opcoes:\n"
+        "  1. env var MOTOR_CONECT_MASTER_KEY (hex 64 chars) — dev local\n"
+        "  2. arquivo /etc/motor-conect/master.key (Linux) ou "
+        "%PROGRAMDATA%\\motor-conect\\master.key (Windows)\n"
+        "  3. env var MOTOR_CONECT_MASTER_KEY_AWS_SECRET=nome-do-secret (AWS)\n"
+        "Gere uma chave com: python -c 'import secrets; print(secrets.token_hex(32))'"
+    )
 
 
 def _derivar_chave_cnpj(cnpj: str) -> bytes:

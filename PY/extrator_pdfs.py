@@ -573,6 +573,7 @@ def processar_pdfs_bytes(
     arquivos_nomes: Optional[list[str]] = None,
     user_id: Optional[int] = None,
     persistir_auditoria: bool = False,
+    envelope: bool = False,
 ) -> dict:
     """
     Extrai dados tributários a partir de bytes de PDFs em memória.
@@ -588,10 +589,18 @@ def processar_pdfs_bytes(
                              extração. Falhas de persistência NÃO bloqueiam o
                              diagnóstico — apenas anotam status em
                              diagnostico["_extracao"]["auditoria_status"].
+        envelope: Se True, retorna {"diagnostico": {...}, "pii": {cnpj, razao_social}}
+                  separando PII do diagnóstico despersonalizado (LGPD). Se False
+                  (default, backward compat), retorna só o diagnóstico dict.
 
     Returns:
-        dict diagnóstico fiscal — mesmo formato de MotorReformaTributaria.gerar_diagnostico()
-        Se persistir_auditoria=True, inclui:
+        Sem envelope: dict diagnóstico fiscal — mesmo formato de
+                      MotorReformaTributaria.gerar_diagnostico()
+        Com envelope: dict com 2 chaves top-level:
+                      - "diagnostico": dict completo SEM PII
+                      - "pii": {"cnpj": str, "razao_social": str}
+
+        Se persistir_auditoria=True, o diagnóstico inclui:
             diagnostico["_extracao"]["documentos_auditoria"] = [
                 {"id": int, "hash_sha256": str, "nome_original": str},
                 ...
@@ -711,11 +720,29 @@ def processar_pdfs_bytes(
         receita_com_st_icms=empresa_params.get("receita_com_st_icms"),
         atividades=empresa_params.get("atividades"),
     )
+    # Inferência de perfil B2B a partir do CNAE (tabelas_simples.PERFIL_B2B_POR_CNAE):
+    # Indústria (25-33) = 90%, Contabilidade (69) = 85%, Transporte (49-53) = 70-90%,
+    # Varejo (47) = 30%, Saúde PF (86-88) = 10-20%, etc.
+    # SEM essa inferência, todo upload de PDF caía em B2C_CONSUMIDOR_FINAL por default
+    # e a recomendação de Opt-Out virava MANTER_SIMPLES mesmo para empresas 90% B2B.
+    # ⚠️ A estimativa NÃO tem base legal (LC 214/2025 Art. 47-48 exige verificação
+    # operação-a-operação) — é apenas uma pré-seleção razoável que o operador pode
+    # ajustar depois via campo editável no resultado.
+    from tabelas_simples import estimar_perfil_b2b
+    pct_b2b_sugerido = estimar_perfil_b2b(empresa_params["cnae_principal"])
+    if pct_b2b_sugerido >= 90:
+        tipo_comprador = "B2B_CONTRIBUINTE"
+    elif pct_b2b_sugerido <= 10:
+        tipo_comprador = "B2C_CONSUMIDOR_FINAL"
+    else:
+        tipo_comprador = "MISTO"
+
     # Default: uf_destino = uf_origem (operacao interna, sem DIFAL)
     # Pode ser ajustado pelo usuario no resultado.html apos o diagnostico inicial
     compradora = EmpresaCompradora(
-        tipo="B2C_CONSUMIDOR_FINAL",
+        tipo=tipo_comprador,
         uf_destino=empresa_params["uf_origem"],
+        percentual_b2b=Decimal(str(pct_b2b_sugerido)),
     )
 
     # Usar competência extraída para definir data_emissao
@@ -868,7 +895,15 @@ def processar_pdfs_bytes(
         "auditoria_status": auditoria_status,
     }
 
+    # Captura PII antes do purge — para envelope (se solicitado)
+    pii_payload = {
+        "cnpj": empresa_params.get("cnpj", ""),
+        "razao_social": empresa_params.get("razao_social", ""),
+    }
+
     # LGPD: purge após uso
     dados.purge()
 
+    if envelope:
+        return {"diagnostico": diagnostico, "pii": pii_payload}
     return diagnostico

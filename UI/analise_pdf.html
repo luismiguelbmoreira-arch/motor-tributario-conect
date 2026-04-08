@@ -261,6 +261,41 @@
       </div>
     </div>
 
+    <!-- TERMO DE ACEITE DIGITAL (CTN Art. 142 + LGPD) -->
+    <div id="termo-aceite-section" class="hidden fade-in mb-4">
+      <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-5">
+        <div class="flex items-start gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <div class="flex-1">
+            <h3 class="text-sm font-bold text-amber-900 uppercase tracking-wider mb-2">Termo de aceite — obrigatório</h3>
+            <p class="text-sm text-slate-700 leading-relaxed mb-3">
+              Antes de prosseguir, confirme que os documentos acima são os <strong>oficiais</strong> do cliente
+              e devem ser usados na análise fiscal. Seu aceite será registrado com <strong>data, hora, IP</strong> e
+              operador logado, para fins de auditoria.
+            </p>
+            <label for="termo-aceite-checkbox" class="flex items-start gap-3 cursor-pointer select-none">
+              <input type="checkbox"
+                     id="termo-aceite-checkbox"
+                     onchange="updateAcceptState()"
+                     class="mt-1 w-5 h-5 rounded border-2 border-amber-500 text-amber-600 focus:ring-2 focus:ring-amber-400 cursor-pointer flex-shrink-0">
+              <span class="text-sm text-slate-800 leading-relaxed">
+                <strong>Confirmo</strong> que estes são os documentos oficiais que devem ser analisados.
+                Entendo que o diagnóstico fiscal e seus cálculos serão <strong>baseados exclusivamente</strong>
+                no conteúdo destes arquivos, e que qualquer divergência entre os dados enviados e a realidade
+                da empresa é de responsabilidade de quem os forneceu.
+              </span>
+            </label>
+            <p class="text-xs text-slate-500 mt-3 italic">
+              ⚖ Fundamentos: CTN Art. 142 (constituição do crédito tributário exige prova documental) ·
+              LGPD Art. 37 (registro de operações de tratamento) · CFC NBC TG 1000
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- BOTÃO PRINCIPAL -->
     <div class="fade-in pb-8">
       <button id="btn-analisar"
@@ -272,7 +307,7 @@
         </svg>
         Extrair e Analisar
       </button>
-      <p class="text-xs text-center text-slate-400 mt-3">
+      <p id="btn-analisar-hint" class="text-xs text-center text-slate-400 mt-3">
         Selecione ao menos um PDF para habilitar a análise
       </p>
     </div>
@@ -502,7 +537,36 @@
 
     function updateSubmitButton() {
       var btn = document.getElementById('btn-analisar');
-      btn.disabled = selectedFiles.length === 0;
+      var hint = document.getElementById('btn-analisar-hint');
+      var termoSection = document.getElementById('termo-aceite-section');
+      var termoCheckbox = document.getElementById('termo-aceite-checkbox');
+
+      // Mostra/oculta a seção de termo conforme houver arquivos
+      if (selectedFiles.length > 0) {
+        termoSection.classList.remove('hidden');
+      } else {
+        termoSection.classList.add('hidden');
+        termoCheckbox.checked = false;  // reseta ao limpar
+      }
+
+      // Botão só habilita se há arquivo E termo aceito
+      var termoOk = termoCheckbox.checked;
+      var temArquivo = selectedFiles.length > 0;
+      btn.disabled = !(temArquivo && termoOk);
+
+      // Mensagem contextual abaixo do botão
+      if (!temArquivo) {
+        hint.textContent = 'Selecione ao menos um PDF para habilitar a análise';
+      } else if (!termoOk) {
+        hint.textContent = 'Aceite o termo acima para habilitar a análise';
+      } else {
+        hint.textContent = 'Tudo pronto — clique para processar';
+      }
+    }
+
+    function updateAcceptState() {
+      // Chamada quando o checkbox muda — apenas re-avalia o botão
+      updateSubmitButton();
     }
 
     // ─────────────────────────────────────────────
@@ -517,6 +581,15 @@
 
       if (!selectedFiles.length) return;
 
+      // Gate: termo de aceite obrigatório
+      var termoCheckbox = document.getElementById('termo-aceite-checkbox');
+      if (!termoCheckbox.checked) {
+        document.getElementById('submit-error-msg').textContent =
+          'Você precisa aceitar o termo antes de prosseguir.';
+        showElement('submit-error');
+        return;
+      }
+
       hideElement('submit-error');
       hideElement('file-list-section');
       hideElement('validation-errors');
@@ -529,6 +602,8 @@
       selectedFiles.forEach(function (file) {
         formData.append('files', file);
       });
+      // Campo obrigatório do termo de aceite (CTN Art. 142 + LGPD Art. 37)
+      formData.append('termo_aceite', 'true');
 
       try {
         var response = await fetch(window.location.origin + '/analise/pdf', {
@@ -554,12 +629,18 @@
           throw new Error(msgErro);
         }
 
-        var diagnostico = await response.json();
-        sessionStorage.setItem('diagnostico', JSON.stringify(diagnostico));
+        // Envelope: {"diagnostico": {...}, "pii": {cnpj, razao_social}}
+        // A API separa PII do diagnóstico despersonalizado (LGPD).
+        var payload = await response.json();
+        var diagnostico = payload.diagnostico || payload;
+        var pii = payload.pii || {};
 
-        // Salva nome da empresa se vier no payload
-        if (diagnostico && diagnostico.empresa && diagnostico.empresa.razao_social) {
-          sessionStorage.setItem('analise_empresa', diagnostico.empresa.razao_social);
+        sessionStorage.setItem('diagnostico', JSON.stringify(diagnostico));
+        if (pii.razao_social) {
+          sessionStorage.setItem('analise_empresa', pii.razao_social);
+        }
+        if (pii.cnpj) {
+          sessionStorage.setItem('analise_cnpj', pii.cnpj);
         }
 
         window.location.href = 'resultado.html';

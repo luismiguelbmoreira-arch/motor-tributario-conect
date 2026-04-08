@@ -35,6 +35,22 @@ htmlcov/
 # Docker
 data/*.db
 
+# Backups do DB (gerados por PY/scripts/backup_db.py)
+data/backups/
+
+# Auditoria documental cifrada (gerada em runtime)
+data/auditoria/
+
 # Logs
 *.log
 .lixeira/
+
+# PDFs reais de clientes (LGPD — nunca commitar)
+samples/doc_calculo/MOREIRA/
+samples/doc_calculo/CANAVEZI/
+samples/doc_calculo/CONFI_AR/
+samples/doc_calculo/ITANGUA/
+
+# Notas pessoais / master key em texto (raiz)
+/key.md.txt
+/key.md*.txt
