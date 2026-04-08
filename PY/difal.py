@@ -31,9 +31,8 @@ NOTA ES: Espírito Santo é Sudeste geograficamente mas EXCLUÍDO do bloco
 """
 
 from datetime import datetime
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Dict, List, Optional
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ALÍQUOTAS ICMS INTERNAS POR UF — BASE DE REFERÊNCIA 2026

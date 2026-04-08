@@ -15,11 +15,13 @@ Rode com: pytest PY/tests/test_difal.py -v
 
 import os
 import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import pytest
 from datetime import date
 from decimal import Decimal
+
+import pytest
 
 from difal import (
     ALIQUOTA_ICMS_INTERNA,
@@ -34,7 +36,6 @@ from motor_tributario import (
     MotorReformaTributaria,
     OperacaoFiscal,
 )
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TABELA DE ALÍQUOTAS INTERNAS

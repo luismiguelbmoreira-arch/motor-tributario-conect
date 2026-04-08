@@ -11,7 +11,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from relatorio_pdf import _gerar_html, _secao_glossario  # noqa: E402
 
-
 TERMOS_OBRIGATORIOS = [
     "DAS",
     "RBT12",
