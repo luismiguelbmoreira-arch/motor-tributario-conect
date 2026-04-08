@@ -63,6 +63,22 @@ jobs:
             --cov-fail-under=80 \
             -x
 
+      - name: Cobertura por módulo — motor_tributario.py (≥85%)
+        run: |
+          coverage report \
+            --include="motor_tributario.py" \
+            --fail-under=85 \
+            --show-missing
+        working-directory: PY
+
+      - name: Cobertura por módulo — regimes/ (≥90%)
+        run: |
+          coverage report \
+            --include="regimes/*.py" \
+            --fail-under=90 \
+            --show-missing
+        working-directory: PY
+
       - name: Upload cobertura para Codecov (opcional)
         uses: codecov/codecov-action@v4
         if: matrix.python-version == '3.12'
