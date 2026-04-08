@@ -877,6 +877,76 @@ class MotorReformaTributaria:
         """CBS mensal dentro do DAS (durante período transitório)."""
         return self._calcular_fracao_componente("CBS")
 
+    def _fracao_iva_no_das(self, anexo: str, faixa: int, ano: int) -> Decimal:
+        """
+        Retorna a fração (0-1) de CBS+IBS que estará embutida no DAS do Simples
+        Nacional no ano informado, conforme LC 214/2025 Art. 47 §II.
+
+        LÓGICA DA TRANSIÇÃO — por ano:
+
+          2026: 0 (Art. 348, III, "c" — optantes do Simples estão DISPENSADOS
+                de destacar CBS/IBS no período-teste; logo, cliente B2B não
+                recebe crédito).
+
+          2027-2028: fração(PIS + COFINS) do DAS — a CBS substitui INTEGRALMENTE
+                PIS e COFINS a partir de 2027 (Art. 344 + 353). ICMS e ISS
+                continuam ativos no DAS do Simples, mas não viram IBS ainda.
+
+          2029-2032: fração(PIS + COFINS) + fração(ICMS + ISS) × fase_in, onde
+                fase_in = 10% em 2029, 20% em 2030, 30% em 2031, 40% em 2032.
+                Arts. 356-360 — redução escalonada de ICMS/ISS com IBS crescendo
+                proporcionalmente.
+
+          2033+: fração(PIS + COFINS) + fração(ICMS + ISS) integral — IBS
+                substituiu completamente ICMS e ISS. Sistema IVA dual pleno.
+
+        EXEMPLO — Anexo III Faixa 5 (R$ 1,8M < RBT12 ≤ R$ 3,6M):
+          PIS = 2,96% do DAS
+          COFINS = 13,64% do DAS
+          CBS 2027 = 16,60% do DAS
+          ISS = 32,50% do DAS
+          IBS 2033 = 32,50% do DAS
+          Total 2033 (CBS + IBS) = 49,10% do DAS
+
+        NOTA: esta é a interpretação técnica do Art. 47 §II pré-regulamentação
+        definitiva do CGSN. Caso o Comitê Gestor publique resolução que altere
+        a metodologia de cálculo (ex: fator fixo ao invés de proporcional), esta
+        função deve ser revisitada. Acompanhar DOU + Receita Federal.
+
+        Returns:
+            Decimal entre 0 e ~0.60, arredondado a 4 casas.
+        """
+        if ano <= 2026:
+            return Decimal("0.0000")
+
+        partilha = DISTRIBUICAO_DAS.get(anexo, {}).get(faixa, {})
+        if not partilha:
+            return Decimal("0.0000")
+
+        # CBS substitui PIS + COFINS integralmente a partir de 2027
+        fracao_pis = partilha.get("PIS", Decimal("0"))
+        fracao_cofins = partilha.get("COFINS", Decimal("0"))
+        fracao_cbs = fracao_pis + fracao_cofins
+
+        # IBS substitui ICMS + ISS gradualmente (2029-2032), pleno em 2033
+        fracao_icms = partilha.get("ICMS", Decimal("0"))
+        fracao_iss = partilha.get("ISS", Decimal("0"))
+        fracao_icms_iss_total = fracao_icms + fracao_iss
+
+        if ano <= 2028:
+            fracao_ibs = Decimal("0")
+        elif ano >= 2033:
+            fracao_ibs = fracao_icms_iss_total
+        else:
+            # Fase-in 2029-2032: 10%, 20%, 30%, 40%
+            # 2029 → (2029-2028)×10% = 10%
+            # 2032 → (2032-2028)×10% = 40%
+            fator_fase_in = Decimal(ano - 2028) * Decimal("0.10")
+            fracao_ibs = fracao_icms_iss_total * fator_fase_in
+
+        total = fracao_cbs + fracao_ibs
+        return total.quantize(Decimal("0.0001"), ROUND_HALF_UP)
+
     def calcular_credito_simples_para_b2b(self) -> Decimal:
         """
         Crédito IBS+CBS que o comprador B2B pode apropriar quando fornecedor
@@ -888,36 +958,76 @@ class MotorReformaTributaria:
           (II) "É permitida ao contribuinte sujeito ao regime regular de IBS
                e CBS a apropriação de créditos de IBS e CBS correspondentes
                aos valores destes tributos pagos nas aquisições de optantes
-               pelo Simples Nacional, em montante equivalente ao devido por
-               meio deste regime"
+               pelo Simples Nacional, EM MONTANTE EQUIVALENTE AO DEVIDO POR
+               MEIO DESTE REGIME"
 
         REGRA DE 2026 — LC 214/2025, Art. 348, III, "c":
           Em 2026, os optantes do Simples Nacional NÃO aplicam as alíquotas
           de transição — não destacam CBS/IBS nas operações, logo NÃO geram
           crédito para clientes B2B neste ano. Retorna R$ 0.
 
-        REGRA DE 2027+:
-          O crédito do cliente B2B é proporcional ao valor de CBS+IBS
-          efetivamente embutido no DAS pago pela empresa do Simples.
-          Implementação atual: aproximação usando as alíquotas do cronograma
-          × valor_operacao. TODO: refinar para usar distribuição real
-          CBS/IBS no DAS quando DISTRIBUICAO_DAS for atualizada pós-2027.
+        REGRA DE 2027+ (CORREÇÃO ART. 47 §II):
+          O crédito é CALCULADO como:
+            credito = DAS_mensal × fração_CBS_IBS_no_DAS(anexo, faixa, ano) × fator_reducao
+
+          A fração vem de `_fracao_iva_no_das()` que consulta a tabela
+          DISTRIBUICAO_DAS real do Simples Nacional. NÃO é `valor_operacao ×
+          alíquota cheia` — essa era a aproximação errada anterior que
+          super-estimava o crédito em 3-5×.
+
+        EXEMPLO — Moreira (Anexo III Faixa 5, RPA R$ 251.303,53, DAS R$ 43.913,87):
+          2026: R$ 0,00 (dispensado)
+          2027: R$ 43.913,87 × 16,60% (PIS+COFINS) = R$ 7.289,70
+          2029: R$ 43.913,87 × (16,60% + 32,50%×10%) = R$ 8.717,00
+          2033: R$ 43.913,87 × 49,10% (CBS+IBS pleno) = R$ 21.561,71
 
         ERR-016: Aplica fator de redução conforme reducao_cbs_ibs
         (LC 214/2025, Arts. 258, 262, 264 — setores reduzidos/isentos).
         """
-        # 2026: dispensa de destaque — crédito = 0 (Art. 348, III, "c")
         ano = self.operacao.data_emissao.year
+
+        # 2026: dispensa de destaque — crédito = 0 (Art. 348, III, "c")
         if ano <= 2026:
             return Decimal("0.00")
 
-        # 2027+: aproximação conservadora (Art. 47, §II)
-        aliquotas_iva = self.get_aliquotas_iva_por_ano()
-        fator = self._fator_reducao_cbs_ibs()
-        credito = self.operacao.valor_operacao * (
-            aliquotas_iva["CBS"] + aliquotas_iva["IBS"]
-        ) * fator
-        return credito.quantize(Decimal("0.01"), ROUND_HALF_UP)
+        # 2027+: fração real CBS+IBS no DAS por anexo × faixa
+        anexo = self.determinar_anexo()
+        rbt12 = self.calcular_rbt12()
+        faixa = obter_faixa_numero(rbt12, anexo)
+        if faixa == 0:
+            return Decimal("0.00")
+
+        das_mensal = self.calcular_das_mensal()
+        fracao = self._fracao_iva_no_das(anexo, faixa, ano)
+        fator_reducao = self._fator_reducao_cbs_ibs()
+
+        credito = (das_mensal * fracao * fator_reducao).quantize(
+            Decimal("0.01"), ROUND_HALF_UP
+        )
+
+        # Trilha de auditoria — MAX_FISCAL_02 exige citação legal em cada passo
+        self._registrar_passo(
+            id="CREDITO_B2B_ART_47",
+            titulo=f"Crédito B2B cliente ({ano}) — LC 214/2025 Art. 47 §II",
+            base=f"DAS mensal R$ {das_mensal:,.2f}",
+            deducoes=(
+                f"Fração CBS+IBS no DAS Anexo {anexo} Faixa {faixa}: "
+                f"{float(fracao)*100:.2f}%"
+            ),
+            aliquota=f"Fator redução CBS/IBS: {fator_reducao}",
+            valor=f"R$ {credito:,.2f}",
+            lei=(
+                "LC 214/2025 Art. 47 §II (creditamento proporcional ao devido) | "
+                "Arts. 344 e 353 (CBS substitui PIS/COFINS em 2027) | "
+                "Arts. 356-360 (fase-in IBS 2029-2032)"
+            ),
+            detalhe=(
+                f"Anexo {anexo} Faixa {faixa}: PIS + COFINS = CBS em 2027+. "
+                f"ICMS + ISS → IBS gradualmente 2029-2032 (10%/ano), pleno em 2033. "
+                f"Interpretação pré-regulamentação do CGSN."
+            ),
+        )
+        return credito
 
     # ── FASE 4: SIMULAÇÃO OPT-OUT ─────────────────────────────────────────────
 

@@ -352,6 +352,7 @@ mv data/backups/diarios/2026-04-08.db data/motor_tributario.db
 | **MAX_03** | Declarar a data base ANTES do cálculo (regra do ano errado invalida tudo) |
 | **MAX_04** | Premissa alterada → salvar como `Cenario_Estudo_A`, nunca deletar |
 | **MAX_05** | Toda análise via `/analise/pdf` deve ter os PDFs-fonte cifrados e registrados em `auditoria_documentos` — sem isso o diagnóstico não pode ser usado em defesa jurídica. Ativado por `persistir_auditoria=True`. |
+| **MAX_06** | Crédito B2B de fornecedor do Simples Nacional é **fração do DAS** (não `valor_operacao × alíquota IVA`). Fórmula: `credito = DAS_mensal × _fracao_iva_no_das(anexo, faixa, ano)`. Usar `DISTRIBUICAO_DAS[anexo][faixa]` como fonte única. LC 214/2025 Art. 47 §II + Arts. 344, 353, 356-360. |
 
 ---
 
