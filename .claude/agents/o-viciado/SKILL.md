@@ -298,9 +298,9 @@ class CalculadoraAliquotaEfetiva:
             numerador = (empresa.rbt12 * aliquota_nominal) - parcela_deduzir
             aliquota_efetiva = numerador / empresa.rbt12
 
-            # 3. Quantize com ROUND_HALF_UP
+            # 3. Quantize com ROUND_HALF_UP (6 casas para alíquota)
             aliquota_efetiva = aliquota_efetiva.quantize(
-                Decimal("0.0001"),  # 4 casas decimais
+                Decimal("0.000001"),  # 6 casas decimais (match motor_tributario.py)
                 rounding=ROUND_HALF_UP
             )
 

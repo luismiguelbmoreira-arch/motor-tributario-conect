@@ -259,21 +259,22 @@ OUTPUT:
 ### **Cenário 3: Split Payment 2026 vs 2027**
 ```
 INPUT:
-  Empresa A: DAS Mensal = R$ 20.000
+  Empresa A: Valor_NF (operação mensal) = R$ 200.000
   Liquidação prevista: 31/12/2026 vs 02/01/2027
 
 ANÁLISE:
+  (Split Payment incide sobre Valor_NF, não sobre DAS — LC 214/2025)
 
   Cenário 2026 (CBS 0,9% + IBS 0,1%):
-    Split = 20.000 × 1,0% = R$ 200
+    Split = 200.000 × 1,0% = R$ 2.000
 
   Cenário 2027 (CBS 8,8% + IBS 0,1%):
-    Split = 20.000 × 8,9% = R$ 1.780
+    Split = 200.000 × 8,9% = R$ 17.800
 
-  Diferença: R$ 1.580 (impacto de 7,9 pontos percentuais!)
+  Diferença: R$ 15.800 (impacto de 7,9 pontos percentuais!)
 
 OUTPUT:
-  🚨 ALERTA: Empresa precisa de R$ 1.580 adicional para liquidar em 2027
+  🚨 ALERTA: Retenção salta de R$ 2.000 para R$ 17.800 se liquidar em 2027
   💡 ESTRATÉGIA: Se possível, antecipar liquidação para 31/12/2026
   📋 NOTA: Isso é CONCILIACAO_RISCO — emissão em 2026, liquidação em 2027 = confusão
 ```
