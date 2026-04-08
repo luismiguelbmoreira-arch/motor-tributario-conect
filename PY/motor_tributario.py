@@ -1311,13 +1311,14 @@ class MotorReformaTributaria:
             "data_analise": str(date.today()),
             "ano_operacao": self.operacao.data_emissao.year,
             "empresa": {
+                # LGPD: cnpj/razao_social NUNCA aparecem no diagnostico
+                # (separados via gerar_pdf(diagnostico, pii={...}))
                 "regime": "REAL",
                 "cnae": self.fornecedora.cnae_principal,
                 "uf": self.fornecedora.uf_origem,
                 "anexo_simples": None,
                 "rbt12": str(self.fornecedora.faturamento_12m),
                 "fator_r": None,
-                "razao_social": self.fornecedora.razao_social,
             },
             "comprador": {
                 "tipo": self.compradora.tipo,
@@ -1392,6 +1393,8 @@ class MotorReformaTributaria:
             "ano_operacao": self.operacao.data_emissao.year,
 
             "empresa": {
+                # LGPD: cnpj/razao_social NUNCA aparecem no diagnostico
+                # (separados via gerar_pdf(diagnostico, pii={...}))
                 "regime": self.fornecedora.regime,
                 "cnae": self.fornecedora.cnae_principal,
                 "uf": self.fornecedora.uf_origem,

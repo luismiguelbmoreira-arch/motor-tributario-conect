@@ -932,9 +932,9 @@
     // ─────────────────────────────────────────────
     async function downloadPDF() {
       const token = sessionStorage.getItem('token');
-      const diagnostico = sessionStorage.getItem('diagnostico');
+      const diagnosticoStr = sessionStorage.getItem('diagnostico');
 
-      if (!token || !diagnostico) return;
+      if (!token || !diagnosticoStr) return;
 
       const btn = document.getElementById('btn-baixar-pdf');
       const originalText = btn.innerHTML;
@@ -948,6 +948,13 @@
         Gerando PDF...
       `;
 
+      // LGPD: PII (cnpj, razao_social) trafega separado, nunca dentro do diagnostico
+      const diagnostico = JSON.parse(diagnosticoStr);
+      const pii = {
+        razao_social: sessionStorage.getItem('analise_empresa') || '',
+        cnpj: sessionStorage.getItem('analise_cnpj') || '',
+      };
+
       try {
         const response = await fetch(window.location.origin + '/relatorio/pdf', {
           method: 'POST',
@@ -955,7 +962,7 @@
             'Authorization': 'Bearer ' + token,
             'Content-Type': 'application/json',
           },
-          body: diagnostico,
+          body: JSON.stringify({ diagnostico, pii }),
         });
 
         if (response.status === 401) {

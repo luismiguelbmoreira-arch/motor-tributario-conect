@@ -913,13 +913,24 @@ def analise_manual(
     },
 )
 async def gerar_relatorio_pdf(
-    diagnostico: dict,
+    payload: dict,
     current_user: dict = Depends(get_current_user),  # noqa: ARG001 — autenticação obrigatória
 ) -> Response:
     """
-    Recebe o objeto diagnóstico no body JSON e retorna um PDF gerado via weasyprint.
+    Recebe payload {diagnostico, pii?} no body JSON e retorna PDF.
 
-    O diagnóstico é o mesmo objeto retornado por POST /analise/manual ou POST /analise/pdf.
+    Schema esperado:
+    {
+        "diagnostico": {...},     # dict despersonalizado (LGPD)
+        "pii": {                   # opcional — PII só para o PDF
+            "cnpj": "...",
+            "razao_social": "..."
+        }
+    }
+
+    Para retrocompatibilidade, ainda aceita o diagnostico direto no body
+    (caso pii esteja embutida em diagnostico.empresa, embora isso fira LGPD).
+
     Dados sensíveis trafegam no body (POST), nunca na query string (GET).
     Exige Bearer token JWT válido.
     """
@@ -931,8 +942,18 @@ async def gerar_relatorio_pdf(
                 "No Windows: instale GTK3 Runtime em https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer"
             ),
         )
+
+    # Suporte a 2 formatos: novo (com pii separado) e legado (diagnostico direto)
+    if isinstance(payload, dict) and "diagnostico" in payload:
+        diagnostico = payload["diagnostico"]
+        pii = payload.get("pii") or None
+    else:
+        # Legado: payload É o diagnóstico
+        diagnostico = payload
+        pii = None
+
     try:
-        pdf_bytes = _gerar_pdf(diagnostico)
+        pdf_bytes = _gerar_pdf(diagnostico, pii=pii)
     except RuntimeError as exc:
         if "não instalado" in str(exc):
             raise HTTPException(
@@ -943,7 +964,8 @@ async def gerar_relatorio_pdf(
         raise HTTPException(status_code=500, detail="Falha na geração do PDF.")
 
     razao = (
-        diagnostico.get("empresa", {}).get("razao_social")
+        (pii or {}).get("razao_social")
+        or diagnostico.get("empresa", {}).get("razao_social")
         or diagnostico.get("razao_social")
         or "relatorio"
     )
