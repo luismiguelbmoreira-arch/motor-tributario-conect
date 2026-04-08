@@ -36,22 +36,38 @@ from typing import Any, Dict, List, Optional
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ALÍQUOTAS ICMS INTERNAS POR UF (2026) — inclui FECP quando aplicável
-# Fonte: legislações estaduais vigentes + consolidação de mercado
-# Atualizar anualmente com publicações estaduais (DOE).
+# ALÍQUOTAS ICMS INTERNAS POR UF — BASE DE REFERÊNCIA 2026
+#
+# POLÍTICA DE FECP ADOTADA:
+#   - UFs com FECP/FECOEP/FUNCEP de aplicação GENERALIZADA por lei estadual
+#     (ex: RJ Lei 10.253/2023, PR Lei 19.385/2017, AL Lei 6.558/2004)
+#     → alíquota inclui o adicional acoplado.
+#   - UFs com FECP CONDICIONAL (só certos produtos — ex: supérfluos em BA)
+#     → usar alíquota modal base. Aplicação produto-a-produto fica fora do
+#     escopo do DIFAL genérico.
+#
+# AUDITORIA LEGAL (2026-04-08) — spot check de 4 UFs críticas:
+#   SP 18%  ✅ confere    | MA 23%   ✅ maior modal do Brasil
+#   RJ 22%  ✅ inclui FECP | BA 20,5% ✅ modal base (FECOEP condicional)
+#
+# NÃO AUDITADO CONTRA DOE (23 UFs) — valores vêm de consolidação de mercado.
+# Risco: médio. Recomendação: validar anualmente com fonte primária estadual.
+#
+# REFORMA TRIBUTÁRIA: ICMS entra em transição 2029-2032 (LC 214/2025) e é
+# extinto em 2033. Esta tabela tem vida útil garantida só para 2026-2028.
 # ─────────────────────────────────────────────────────────────────────────────
 
 ALIQUOTA_ICMS_INTERNA: Dict[str, Decimal] = {
     "AC": Decimal("0.19"),    # Acre
-    "AL": Decimal("0.20"),    # Alagoas (19% + 1% FECP)
+    "AL": Decimal("0.20"),    # Alagoas (19% + 1% FECOEP generalizado)
     "AM": Decimal("0.20"),    # Amazonas
     "AP": Decimal("0.18"),    # Amapá
-    "BA": Decimal("0.205"),   # Bahia
+    "BA": Decimal("0.205"),   # Bahia — modal base (FECOEP condicional, não somado)
     "CE": Decimal("0.20"),    # Ceará
     "DF": Decimal("0.20"),    # Distrito Federal
     "ES": Decimal("0.17"),    # Espírito Santo
     "GO": Decimal("0.19"),    # Goiás
-    "MA": Decimal("0.23"),    # Maranhão
+    "MA": Decimal("0.23"),    # Maranhão — maior modal do Brasil (auditado 2026-04-08)
     "MG": Decimal("0.18"),    # Minas Gerais
     "MS": Decimal("0.19"),    # Mato Grosso do Sul
     "MT": Decimal("0.17"),    # Mato Grosso
@@ -59,15 +75,15 @@ ALIQUOTA_ICMS_INTERNA: Dict[str, Decimal] = {
     "PB": Decimal("0.20"),    # Paraíba
     "PE": Decimal("0.205"),   # Pernambuco
     "PI": Decimal("0.225"),   # Piauí
-    "PR": Decimal("0.195"),   # Paraná (17,5% + 2% FECP)
-    "RJ": Decimal("0.22"),    # Rio de Janeiro (20% + 2% FECP)
+    "PR": Decimal("0.195"),   # Paraná (17,5% + 2% FECP Lei 19.385/2017)
+    "RJ": Decimal("0.22"),    # Rio de Janeiro (20% + 2% FECP Lei 10.253/2023, auditado 2026-04-08)
     "RN": Decimal("0.20"),    # Rio Grande do Norte
     "RO": Decimal("0.195"),   # Rondônia
     "RR": Decimal("0.20"),    # Roraima
     "RS": Decimal("0.17"),    # Rio Grande do Sul
     "SC": Decimal("0.17"),    # Santa Catarina
-    "SE": Decimal("0.20"),    # Sergipe (19% + 1% FECP)
-    "SP": Decimal("0.18"),    # São Paulo
+    "SE": Decimal("0.20"),    # Sergipe (19% + 1% FECOEP generalizado)
+    "SP": Decimal("0.18"),    # São Paulo — auditado 2026-04-08
     "TO": Decimal("0.20"),    # Tocantins
 }
 
