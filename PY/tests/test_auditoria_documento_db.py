@@ -19,13 +19,10 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 import database  # noqa: E402
 from database import (  # noqa: E402
-    AuditoriaAcessoDB,
-    AuditoriaDocumentoDB,
     aceitar_documento,
     buscar_documento_por_hash,
     buscar_documentos_por_cnpj,
     buscar_documentos_por_diagnostico,
-    criar_tabelas,
     listar_documentos_purgaveis,
     marcar_documento_purgado,
     registrar_acesso_documento,
