@@ -80,7 +80,7 @@ jobs:
         working-directory: PY
 
       - name: Upload cobertura para Codecov (opcional)
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v6
         if: matrix.python-version == '3.12'
         with:
           file: PY/coverage.xml
