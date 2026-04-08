@@ -531,6 +531,42 @@ def dados_para_motor(dados: DadosExtraidosPDF) -> dict:
 # ENTRY POINT PARA API — Recebe bytes em memória (sem disco)
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _inferir_campo_origem(passo_id: str) -> str:
+    """
+    Heurística para mapear id de passo da trilha → campo-fonte no PDF
+    original. Usado para enriquecer a trilha com rastreabilidade fina
+    quando o dossiê de prova for gerado.
+
+    IDs conhecidos do motor (motor_tributario.py::trilha_auditoria):
+      - FASE2_RBT12 / RBT12_* → "RBT12 (Receita Bruta 12m)"
+      - FATOR_R / FOLHA_* → "Folha de pagamento 12m"
+      - FASE2_ANEXO / CNAE_* → "CNAE principal + tabela de Anexo"
+      - FASE2_ALIQUOTA / DAS_* → "cálculo derivado" (não tem campo único)
+      - STRESS_R* / ALERTA_* → "cálculo derivado"
+      - CRONOGRAMA_IVA_* → "cronograma LC 214/2025" (não vem do PDF)
+      - DIFAL_* → "UF origem/destino + valor operação"
+      - Default → "dados do extrato PGDAS-D"
+    """
+    pid = (passo_id or "").upper()
+    # Ordem importa: checagens mais específicas antes das genéricas.
+    # "ALIQUOTA_EFETIVA" contém "IVA" como substring — ALIQUOTA vem primeiro.
+    if "RBT12" in pid:
+        return "RBT12 (Receita Bruta 12m)"
+    if "FATOR_R" in pid or "FOLHA" in pid:
+        return "Folha de pagamento 12m"
+    if "ANEXO" in pid or "CNAE" in pid:
+        return "CNAE principal + tabela de Anexo"
+    if "DIFAL" in pid:
+        return "UF origem/destino + valor operacao"
+    if "ALIQUOTA" in pid or "DAS" in pid or "SPLIT" in pid:
+        return "calculo derivado"
+    if "STRESS" in pid or "ALERTA" in pid:
+        return "calculo derivado"
+    if "CRONOGRAMA" in pid or "IVA" in pid or "CBS" in pid or "IBS" in pid:
+        return "Cronograma LC 214/2025 (nao vem do PDF)"
+    return "dados do extrato PGDAS-D"
+
+
 def processar_pdfs_bytes(
     conteudos: list[bytes],
     *,
@@ -799,6 +835,25 @@ def processar_pdfs_bytes(
         except Exception as exc_aud:
             logger.error("Auditoria documental falhou completamente: %s", exc_aud)
             auditoria_status = f"FALHOU: {type(exc_aud).__name__}"
+
+    # ── Enriquecer trilha de auditoria com fonte_documentos ────────────────
+    # Cada passo derivado de extração ganha a lista de doc IDs que originou
+    # os dados de entrada. Heurística pelo id do passo — extração PDF é a
+    # fonte de dados brutos (RBT12, folha, RPA, competência, anexo, CNAE).
+    # Passos de cálculo puro (fórmulas matemáticas sobre os dados) herdam
+    # implicitamente a mesma fonte, então marcamos todos os passos.
+    if documentos_auditoria:
+        doc_ids = [d["id"] for d in documentos_auditoria]
+        doc_hashes = [d["hash_sha256"] for d in documentos_auditoria]
+        for passo in diagnostico.get("trilha_auditoria", []):
+            if not isinstance(passo, dict):
+                continue
+            passo["fonte"] = {
+                "tipo": "extracao_pdf",
+                "documentos_ids": doc_ids,
+                "documentos_hashes": doc_hashes,
+                "campo_origem": _inferir_campo_origem(passo.get("id", "")),
+            }
 
     # Injeta metadados da extração no diagnóstico
     diagnostico["_extracao"] = {
