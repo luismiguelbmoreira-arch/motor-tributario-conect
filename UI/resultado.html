@@ -120,6 +120,19 @@
       </div>
     </div>
 
+    <!-- ANOMALIAS (Akita Rails) — só aparece se houver alertas -->
+    <div id="anomalias-panel" class="hidden border-l-4 border-amber-500 bg-amber-50 p-4 rounded-r">
+      <h3 class="font-bold text-amber-900">⚠ Anomalias detectadas — revisar antes de usar</h3>
+      <ul id="anomalias-lista" class="mt-2 space-y-2 text-sm"></ul>
+    </div>
+
+    <!-- SEMÁFORO DAS (calc vs pago) -->
+    <div id="semaforo-das-panel" class="hidden border-l-4 p-4 rounded-r">
+      <h3 id="semaforo-das-titulo" class="font-bold">Semáforo DAS</h3>
+      <p id="semaforo-das-interpretacao" class="text-sm mt-1"></p>
+      <p id="semaforo-das-amparo" class="text-xs mt-1 opacity-70"></p>
+    </div>
+
     <!-- LOADING STATE -->
     <div id="loading-state" class="space-y-4">
       <div class="skeleton rounded-lg h-36 w-full"></div>
@@ -712,7 +725,54 @@
     // ─────────────────────────────────────────────
     // RENDER PRINCIPAL
     // ─────────────────────────────────────────────
+    function renderAnomalias(d) {
+      const panel = document.getElementById('anomalias-panel');
+      const lista = document.getElementById('anomalias-lista');
+      const alertas = Array.isArray(d._anomalias) ? d._anomalias : [];
+      if (!alertas.length) {
+        panel.classList.add('hidden');
+        return;
+      }
+      lista.innerHTML = '';
+      alertas.forEach(a => {
+        const li = document.createElement('li');
+        li.className = 'text-amber-800';
+        const tipo = a.tipo || a.id || 'ALERTA';
+        const detalhe = a.detalhe || a.titulo || '';
+        const amparo = a.amparo_legal || '';
+        li.innerHTML =
+          '<span class="font-mono text-xs font-bold">' + tipo + '</span>' +
+          (detalhe ? ' — <span>' + detalhe + '</span>' : '') +
+          (amparo ? '<span class="block text-xs text-amber-600 ml-2 mt-0.5">' + amparo + '</span>' : '');
+        lista.appendChild(li);
+      });
+      panel.classList.remove('hidden');
+    }
+
+    function renderSemaforoDAS(d) {
+      const panel = document.getElementById('semaforo-das-panel');
+      const sem = d._semaforo_das;
+      if (!sem || !sem.semaforo) {
+        panel.classList.add('hidden');
+        return;
+      }
+      const cores = {
+        verde: 'border-emerald-500 bg-emerald-50 text-emerald-900',
+        amarelo: 'border-amber-500 bg-amber-50 text-amber-900',
+        vermelho: 'border-rose-500 bg-rose-50 text-rose-900',
+      };
+      panel.className = 'border-l-4 p-4 rounded-r ' + (cores[sem.semaforo] || cores.amarelo);
+      document.getElementById('semaforo-das-titulo').textContent =
+        '🚦 Semáforo DAS: ' + sem.semaforo.toUpperCase();
+      document.getElementById('semaforo-das-interpretacao').textContent =
+        sem.interpretacao || sem.detalhe || '';
+      document.getElementById('semaforo-das-amparo').textContent = sem.amparo_legal || '';
+      panel.classList.remove('hidden');
+    }
+
     function renderDiagnostico(d) {
+      renderAnomalias(d);
+      renderSemaforoDAS(d);
       // Header empresa
       const nomeEmpresa = sessionStorage.getItem('analise_empresa') || d.empresa?.razao_social || 'Empresa';
       document.getElementById('header-empresa').textContent = nomeEmpresa;
