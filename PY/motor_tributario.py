@@ -26,6 +26,25 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+
+def _fmt_brl(valor: Any) -> str:
+    """
+    Formata valor monetário no padrão BR: R$ X.XXX,YY (ponto milhar, vírgula decimal).
+
+    Substitui o uso de f-strings com :,.2f que produzem formato US (R$ X,XXX.YY).
+    Usar SEMPRE este helper em mensagens, justificativas e trilhas de auditoria
+    que vão para humanos (UI, PDF). NÃO usar para serialização — para isso
+    use Decimal/str(Decimal) que mantém o ponto decimal nativo do Python.
+
+    REGRA À PROVA DE ERRO: nenhuma f-string {valor:,.2f} no projeto. Sempre _fmt_brl.
+    """
+    try:
+        d = Decimal(str(valor or 0)).quantize(Decimal("0.01"), ROUND_HALF_UP)
+    except Exception:
+        return "R$ 0,00"
+    # Truque: formata em US, depois troca separadores
+    return f"R$ {d:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
 from difal import calcular_difal
 from regimes.base import BaseRegimeEngine
 from regimes.lucro_presumido import LucroPresumidoEngine
@@ -1078,51 +1097,82 @@ class MotorReformaTributaria:
             Decimal("0.01"), ROUND_HALF_UP
         )
 
+        # Threshold absoluto: custo extra acima disso exige aviso explícito
+        # de "só compensa se houver repasse ou risco real de perda de cliente"
+        # Default: R$ 6.000/ano = R$ 500/mês (impacto sensível em fluxo de caixa)
+        THRESHOLD_CUSTO_ABSOLUTO_ANUAL = Decimal("6000.00")
+        custo_alto_absoluto = abs(disparidade) > THRESHOLD_CUSTO_ABSOLUTO_ANUAL
+
+        razao_pct_str = f"{razao_disparidade:.2f}".replace(".", ",")
+        b2b_str = f"{percentual_b2b:.0f}"
+
         # ── Matriz de decisão ────────────────────────────────────────────────
+        # Lógica refinada: além de % B2B e razão disparidade/RBT12, também
+        # considera o VALOR ABSOLUTO do custo extra (que sai do caixa) vs
+        # benefício (crédito vai pro CLIENTE B2B, não pra empresa).
         if percentual_b2b >= Decimal("70") and razao_disparidade <= Decimal("5"):
-            codigo = "OPT_OUT_FORTE"
-            titulo = "OPT-OUT FORTEMENTE RECOMENDADO"
-            justificativa = (
-                f"Você tem {percentual_b2b:.0f}% de clientes B2B (empresas que precisam "
-                f"de crédito de CBS/IBS para abater dos próprios impostos). No Simples "
-                f"Puro, eles recebem apenas 1% de crédito — risco real de migrarem "
-                f"para concorrentes no regime normal. O custo anual extra do Opt-Out "
-                f"é R$ {disparidade:,.2f} ({razao_disparidade:.2f}% da receita), "
-                f"normalmente neutralizado pelo repasse no preço. "
-                f"O ganho de competitividade e retenção de clientes compensa."
-            )
+            if custo_alto_absoluto:
+                codigo = "OPT_OUT_CONDICIONAL"
+                titulo = "OPT-OUT CONDICIONAL — só com repasse de preço"
+                justificativa = (
+                    f"Você tem {b2b_str}% de clientes B2B (empresas que precisam de "
+                    f"crédito de CBS/IBS para abater dos próprios impostos). O Opt-Out "
+                    f"traria competitividade comercial, MAS o custo extra é "
+                    f"{_fmt_brl(disparidade)}/ano ({razao_pct_str}% da receita) — "
+                    f"esse valor sai DIRETO do seu caixa enquanto o crédito vai para o "
+                    f"CLIENTE, não para você. Só compensa se: (1) seus clientes B2B "
+                    f"aceitarem pagar mais para ter o crédito cheio, OU (2) houver risco "
+                    f"real de perderem para concorrentes do regime normal. Avalie com "
+                    f"seu contador antes da janela semestral."
+                )
+            else:
+                codigo = "OPT_OUT_FORTE"
+                titulo = "OPT-OUT FORTEMENTE RECOMENDADO"
+                justificativa = (
+                    f"Você tem {b2b_str}% de clientes B2B (empresas que precisam de "
+                    f"crédito de CBS/IBS para abater dos próprios impostos). No Simples "
+                    f"Puro, eles recebem apenas 1% de crédito — risco real de migrarem "
+                    f"para concorrentes no regime normal. O custo anual extra do Opt-Out "
+                    f"é {_fmt_brl(disparidade)} ({razao_pct_str}% da receita), valor baixo "
+                    f"e normalmente neutralizado pelo repasse no preço. O ganho de "
+                    f"competitividade e retenção de clientes compensa."
+                )
         elif percentual_b2b >= Decimal("50") and razao_disparidade <= Decimal("10"):
             codigo = "OPT_OUT_VANTAJOSO"
             titulo = "OPT-OUT VANTAJOSO — avaliar caixa"
+            ressalva = (
+                " IMPORTANTE: o crédito gerado vai para os clientes B2B, não para você. "
+                "Só compensa se houver poder de repasse no preço ou risco de perda de cliente."
+                if custo_alto_absoluto else ""
+            )
             justificativa = (
-                f"Você tem {percentual_b2b:.0f}% de clientes B2B. Metade ou mais do seu "
-                f"faturamento vem de empresas que podem exigir crédito IVA. O custo anual "
-                f"extra do Opt-Out é R$ {disparidade:,.2f} ({razao_disparidade:.2f}% da "
-                f"receita). Avalie se o repasse no preço é viável no seu mercado e se há "
-                f"fluxo de caixa para absorver o aumento durante a transição."
+                f"Você tem {b2b_str}% de clientes B2B. Metade ou mais do seu faturamento "
+                f"vem de empresas que podem exigir crédito IVA. O custo anual extra do "
+                f"Opt-Out é {_fmt_brl(disparidade)} ({razao_pct_str}% da receita). Avalie "
+                f"se o repasse no preço é viável no seu mercado e se há fluxo de caixa "
+                f"para absorver o aumento durante a transição.{ressalva}"
             )
         elif percentual_b2b < Decimal("30"):
             codigo = "MANTER_SIMPLES"
             titulo = "MANTENHA SIMPLES PURO"
             justificativa = (
-                f"Você tem apenas {percentual_b2b:.0f}% de clientes B2B — a maioria da sua "
-                f"receita vem de consumidores finais (pessoa física), que NÃO usam crédito "
-                f"de CBS/IBS. Sair do Simples Puro para o Opt-Out aumentaria a complexidade "
+                f"Você tem apenas {b2b_str}% de clientes B2B — a maioria da sua receita "
+                f"vem de consumidores finais (pessoa física), que NÃO usam crédito de "
+                f"CBS/IBS. Sair do Simples Puro para o Opt-Out aumentaria a complexidade "
                 f"operacional (EFD-Reinf, EFD-Contribuições) e o custo anual em "
-                f"R$ {disparidade:,.2f} sem trazer benefício comercial. Mantenha o regime "
-                f"atual e reavalie apenas se o perfil de clientes mudar."
+                f"{_fmt_brl(disparidade)} sem trazer benefício comercial. Mantenha o "
+                f"regime atual e reavalie apenas se o perfil de clientes mudar."
             )
         else:
             codigo = "ZONA_CINZA"
             titulo = "ZONA CINZA — análise individual necessária"
             justificativa = (
-                f"Seu caso está numa faixa intermediária: {percentual_b2b:.0f}% de clientes "
-                f"B2B com custo anual de Opt-Out de R$ {disparidade:,.2f} "
-                f"({razao_disparidade:.2f}% da receita). A decisão depende de fatores "
-                f"qualitativos (concentração de clientes, poder de repasse de preço, "
-                f"capacidade de absorver obrigações acessórias adicionais). "
-                f"Recomendamos análise individual com seu contador antes das janelas "
-                f"semestrais (abril e setembro)."
+                f"Seu caso está numa faixa intermediária: {b2b_str}% de clientes B2B com "
+                f"custo anual de Opt-Out de {_fmt_brl(disparidade)} ({razao_pct_str}% da "
+                f"receita). A decisão depende de fatores qualitativos (concentração de "
+                f"clientes, poder de repasse de preço, capacidade de absorver obrigações "
+                f"acessórias adicionais). Recomendamos análise individual com seu contador "
+                f"antes das janelas semestrais (abril e setembro)."
             )
 
         return {

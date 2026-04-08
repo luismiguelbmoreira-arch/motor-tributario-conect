@@ -257,9 +257,14 @@ class TestFiltroTrilhaJs:
 
 
 class TestIntegracaoRenderPrincipal:
-    def test_render_principal_chama_todos_novos(self, html):
+    def _bloco_render(self, html: str) -> str:
+        """Extrai o corpo da função renderDiagnostico (do início até a próxima função)."""
         idx = html.find("function renderDiagnostico")
-        bloco = html[idx:idx + 3000]
+        # Vai até a próxima 'function ' no nível do script — limite generoso
+        return html[idx:idx + 5000]
+
+    def test_render_principal_chama_todos_novos(self, html):
+        bloco = self._bloco_render(html)
         assert "renderValidacaoEcac" in bloco
         assert "renderDecisaoOptOut" in bloco
         assert "renderGlossario" in bloco
@@ -268,8 +273,7 @@ class TestIntegracaoRenderPrincipal:
 
     def test_ordem_das_secoes_no_render(self, html):
         """Ordem esperada: validação > alertas > ... > cenários > optout > ... > glossário > trilha."""
-        idx = html.find("function renderDiagnostico")
-        bloco = html[idx:idx + 3000]
+        bloco = self._bloco_render(html)
         pos_validacao = bloco.find("renderValidacaoEcac")
         pos_alertas = bloco.find("renderAlertas")
         pos_cenarios = bloco.find("renderCenarios")
@@ -282,3 +286,39 @@ class TestIntegracaoRenderPrincipal:
         assert pos_cenarios < pos_optout
         assert pos_optout < pos_glossario
         assert pos_glossario < pos_trilha
+
+
+class TestInvarianteDasUnico:
+    """
+    REGRA À PROVA DE ERRO (rails fiscal): o card 'DAS MENSAL ESTIMADO' do
+    header NÃO pode calcular fiscal por conta própria. Tem que usar o
+    valor JÁ calculado pelo motor (cenarios.simples_puro.custo_das_por_operacao).
+
+    Antes desta regra, o JS calculava `aliq × rbt12 / 12` que dava valores
+    DIFERENTES da tabela Opt-Out (que usa RPA real do e-CAC), gerando
+    inconsistência visual gritante para o contador.
+    """
+
+    def test_card_das_usa_simples_puro_custo(self, html):
+        # No bloco JS de renderDiagnostico, o cálculo do dasMensal deve
+        # usar cenarios.simples_puro.custo_das_por_operacao como fonte primária
+        idx = html.find("function renderDiagnostico")
+        fim = html.find("function ", idx + 100)  # próxima função
+        bloco_render = html[idx:fim]
+        assert "simples_puro" in bloco_render, "renderDiagnostico não usa cenarios.simples_puro"
+        assert "custo_das_por_operacao" in bloco_render
+        assert "card-das" in bloco_render
+
+    def test_fallback_documentado(self, html):
+        """Se não houver cenário, o fallback aliq × rbt12 / 12 é permitido mas tem comentário."""
+        idx = html.find("FONTE ÚNICA")
+        assert idx > 0, "Fix do DAS único deve ter comentário 'FONTE ÚNICA'"
+
+    def test_nenhum_outro_lugar_calcula_das_mensal(self, html):
+        """
+        Não pode haver outro 'aliqEf * rbt12 / 12' na página fora do fallback
+        do card-das.
+        """
+        # Conta ocorrências do padrão de cálculo manual de DAS
+        count = html.count("aliqEf * rbt12Val")
+        assert count <= 1, f"DAS calculado manualmente em {count} lugares — deve ser só no fallback do card-das"

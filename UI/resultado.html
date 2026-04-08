@@ -615,11 +615,19 @@
       const fatorR = fatorRVal ? 'Fator R: ' + parseFloat(fatorRVal).toFixed(2) : '';
       document.getElementById('card-fator-r').textContent = fatorR;
 
-      // DAS mensal estimado: alíquota efetiva × RBT12 / 12
+      // DAS mensal — FONTE ÚNICA: usa o mesmo valor calculado pelo motor
+      // (cenarios.simples_puro.custo_das_por_operacao). Isso garante que
+      // o card no header bata EXATAMENTE com a tabela Opt-Out e com a
+      // validação contra o e-CAC. Fallback: aliq × rbt12 / 12 só quando
+      // não há cenário (caso raro de análise sem motor).
+      // MAX_FISCAL: contador não pode ver 3 DAS diferentes na mesma página.
       const aliqEf = parseFloat(d.aliquotas?.efetiva_das_total || 0);
       const rbt12Val = parseFloat(d.empresa?.rbt12 || 0);
-      const dasMensal = aliqEf * rbt12Val / 12;
-      document.getElementById('card-das').textContent = formatBRL(dasMensal.toFixed(2));
+      const simplesPuroCustoStr = d.cenarios?.simples_puro?.custo_das_por_operacao;
+      const dasMensal = simplesPuroCustoStr
+        ? parseFloat(simplesPuroCustoStr)
+        : (aliqEf * rbt12Val / 12);
+      document.getElementById('card-das').textContent = formatBRL(dasMensal);
       const anexoSimples = d.empresa?.anexo_simples;
       document.getElementById('card-anexo').textContent = anexoSimples ? 'Anexo ' + anexoSimples : '';
 
@@ -837,10 +845,12 @@
       const amparoRec = sanitize(rec.amparo_legal || '');
 
       const coresRec = {
-        OPT_OUT_FORTE:     { border: 'border-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-900' },
-        OPT_OUT_VANTAJOSO: { border: 'border-blue-500',    bg: 'bg-blue-50',    text: 'text-blue-900' },
-        MANTER_SIMPLES:    { border: 'border-slate-400',   bg: 'bg-slate-50',   text: 'text-slate-800' },
-        ZONA_CINZA:        { border: 'border-amber-500',   bg: 'bg-amber-50',   text: 'text-amber-900' },
+        OPT_OUT_FORTE:       { border: 'border-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-900' },
+        OPT_OUT_VANTAJOSO:   { border: 'border-blue-500',    bg: 'bg-blue-50',    text: 'text-blue-900' },
+        // OPT_OUT_CONDICIONAL: alto B2B mas custo absoluto alto → laranja (cuidado)
+        OPT_OUT_CONDICIONAL: { border: 'border-orange-500',  bg: 'bg-orange-50',  text: 'text-orange-900' },
+        MANTER_SIMPLES:      { border: 'border-slate-400',   bg: 'bg-slate-50',   text: 'text-slate-800' },
+        ZONA_CINZA:          { border: 'border-amber-500',   bg: 'bg-amber-50',   text: 'text-amber-900' },
       };
       const cor = coresRec[codigo] || coresRec.ZONA_CINZA;
 
