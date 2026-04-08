@@ -16,11 +16,10 @@ from __future__ import annotations
 import csv
 import io
 import re
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Optional
 
 from pydantic import BaseModel, Field
-
 
 # ── Sinônimos de colunas por categoria ───────────────────────────────────────
 
