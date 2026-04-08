@@ -244,6 +244,59 @@ CNPJ na URL é apenas dígitos (14 chars, sem pontuação).
 
 Cron diário deve rodar `listar_documentos_purgaveis()` e executar o purge dos que passaram do prazo.
 
+### Backup diário do DB (OBRIGATÓRIO em produção)
+
+Os metadados em `auditoria_documentos` são **inúteis** sem o DB.
+Perda do banco = impossibilidade de gerar dossiê mesmo com os arquivos
+cifrados intactos. Use `PY/scripts/backup_db.py`:
+
+```bash
+# Execução manual
+python PY/scripts/backup_db.py
+
+# Dry run (só mostra o plano)
+python PY/scripts/backup_db.py --dry-run
+```
+
+**Layout gerado:**
+```
+data/backups/
+├── diarios/
+│   ├── 2026-04-08.db.gz   ← retenção 30 dias rolling
+│   ├── 2026-04-09.db.gz
+│   └── ...
+└── mensais/
+    ├── 2026-04.db.gz       ← criado automaticamente no dia 1 do mês
+    └── 2026-05.db.gz       ← permanente (purge manual apenas)
+```
+
+**Implementação:**
+- Usa `sqlite3.Connection.backup()` (transação-safe) em vez de `shutil.copy`
+- Comprime com gzip nível 9 (tipicamente 3-6× menor)
+- Escrita atômica (tmp + rename) — se falhar no meio, não corrompe backup anterior
+- Retorna exit code 0/1 para integração com cron
+
+**Setup cron (Linux):**
+```
+0 3 * * * cd /app && /usr/bin/python PY/scripts/backup_db.py >> /var/log/motor-backup.log 2>&1
+```
+
+**Setup Task Scheduler (Windows):**
+```
+schtasks /Create /SC DAILY /ST 03:00 /TN "MotorConectBackup" ^
+  /TR "python C:\app\PY\scripts\backup_db.py"
+```
+
+**Restauração:**
+```bash
+# 1. Parar API
+# 2. Descomprimir
+gzip -dk data/backups/diarios/2026-04-08.db.gz
+# 3. Mover para a posição
+mv data/backups/diarios/2026-04-08.db data/motor_tributario.db
+# 4. Reiniciar API
+```
+
 ### O que fazer se algo explodir
 
 1. **Master key perdida** → PDFs antigos **irrecuperáveis**. Dossiê de casos novos funciona com nova key, antigos só pelos hashes em DB.

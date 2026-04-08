@@ -35,6 +35,12 @@ htmlcov/
 # Docker
 data/*.db
 
+# Backups do DB (gerados por PY/scripts/backup_db.py)
+data/backups/
+
+# Auditoria documental cifrada (gerada em runtime)
+data/auditoria/
+
 # Logs
 *.log
 .lixeira/
