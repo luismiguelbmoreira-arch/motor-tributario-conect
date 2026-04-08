@@ -1,0 +1,47 @@
+# .github/workflows/schema-registry.yml
+# Gate Akita: bloqueia merge se parser for alterado sem bump de versão/checksum
+# no observability/schema_registry.py.
+name: Schema Registry Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "PY/parsers/**"
+      - "PY/observability/schema_registry.py"
+      - "PY/tests/observability/test_schema_registry.py"
+      - ".github/workflows/schema-registry.yml"
+
+jobs:
+  schema_registry:
+    name: Schema Registry Contract Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: PY
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: PY/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run schema registry gate
+        env:
+          MOTOR_CONECT_MASTER_KEY: ${{ secrets.MOTOR_CONECT_MASTER_KEY_CI || '0000000000000000000000000000000000000000000000000000000000000000' }}
+        run: |
+          python -m pytest tests/observability/test_schema_registry.py -q
+
+      - name: Report
+        if: failure()
+        run: |
+          echo "::error::Schema Registry gate falhou. Se você alterou um parser, faça bump de versão e atualize o checksum em PY/observability/schema_registry.py."
