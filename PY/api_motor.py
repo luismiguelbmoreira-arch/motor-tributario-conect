@@ -33,27 +33,51 @@ import json
 import logging
 import os
 import sys
+import warnings
 from contextlib import asynccontextmanager
-from decimal import Decimal
 from pathlib import Path
-from typing import Any, Literal, Optional
 
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic import ValidationError as PydanticValidationError
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
+# ── Fodase warnings: suprime TODO warning nao-fatal no terminal ────────────
+warnings.filterwarnings("ignore")
+os.environ.setdefault("PYTHONWARNINGS", "ignore")
+# Silencia GLib/GIO warnings do WeasyPrint (libs nativas C no Windows)
+os.environ.setdefault("GIO_USE_VFS", "local")
+os.environ.setdefault("G_MESSAGES_DEBUG", "")
+os.environ.setdefault("NO_AT_BRIDGE", "1")
+
+# ── Carrega .env (ANTHROPIC_API_KEY, JWT_SECRET_KEY, LOG_LEVEL, etc) ──────
+try:
+    from dotenv import load_dotenv
+    _here = Path(__file__).resolve().parent
+    for _candidato in (_here / ".env", _here.parent / ".env", Path.cwd() / ".env"):
+        if _candidato.exists():
+            load_dotenv(_candidato, override=True)  # override=True: forca re-leitura mesmo se env ja existe (vazia)
+            break
+except ImportError:
+    pass  # dotenv opcional
+
+# NOTA: imports abaixo ficam após o bloco de warnings/dotenv de propósito
+# (precisam que PYTHONWARNINGS e ANTHROPIC_API_KEY estejam seteados primeiro).
+# O ruff E402 é silenciado via noqa por motivo documentado.
+from decimal import Decimal  # noqa: E402
+from typing import Any, Literal, Optional  # noqa: E402
+
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.responses import JSONResponse, Response  # noqa: E402
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+from pydantic import BaseModel, ConfigDict, Field  # noqa: E402
+from pydantic import ValidationError as PydanticValidationError  # noqa: E402
+from slowapi import Limiter, _rate_limit_exceeded_handler  # noqa: E402
+from slowapi.errors import RateLimitExceeded  # noqa: E402
+from slowapi.util import get_remote_address  # noqa: E402
 
 # Adiciona PY/ ao path para imports relativos
 sys.path.insert(0, str(Path(__file__).parent))
 
-from audit_universal import auditar_empresa
-from auth import (
+from audit_universal import auditar_empresa  # noqa: E402
+from auth import (  # noqa: E402
     autenticar_usuario,
     criar_admin_default,
     criar_tabela_users,
@@ -66,7 +90,7 @@ from auth import (
     trocar_senha_proprio,
     verificar_token,
 )
-from motor_tributario import (
+from motor_tributario import (  # noqa: E402
     EmpresaCompradora,
     EmpresaFornecedora,
     MotorReformaTributaria,
@@ -101,7 +125,7 @@ class _JSONFormatter(logging.Formatter):
 
 
 def _setup_logging() -> None:
-    log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+    log_level = os.environ.get("LOG_LEVEL", "ERROR").upper()
     log_format = os.environ.get("LOG_FORMAT", "text")
     handler = logging.StreamHandler(sys.stdout)
     if log_format == "json":
@@ -113,11 +137,20 @@ def _setup_logging() -> None:
     root.handlers.clear()
     root.addHandler(handler)
 
+    # Silencia loggers chatos de libs externas
+    for noisy in (
+        "uvicorn", "uvicorn.access", "uvicorn.error",
+        "weasyprint", "fontTools", "fontTools.subset",
+        "PIL", "httpx", "httpcore", "passlib",
+        "anthropic", "multipart", "sqlalchemy",
+    ):
+        logging.getLogger(noisy).setLevel(logging.ERROR)
+
 
 _setup_logging()
 logger = logging.getLogger("motor_conect.api")
 
-TOTAL_TESTES = 288  # Atualizado 06/04/2026: Lucro Real LALUR+JCP, DIFAL, Cronograma, PDF, Stress
+TOTAL_TESTES = 327  # Atualizado 08/04/2026: + 7 testes LGPD PII separation (fix bug latente Lucro Real)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -278,6 +311,13 @@ class AnaliseManualRequest(BaseModel):
     creditos_pis_cofins: Decimal = Field(
         default=Decimal("0"), ge=Decimal("0"),
         description="Créditos PIS/COFINS não-cumulativo (R$). Padrão: 0"
+    )
+    produto_importado: bool = Field(
+        default=False,
+        description=(
+            "True se conteúdo de importação > 40% (Res. SF 13/2012). "
+            "Afeta alíquota interestadual ICMS (4%) no cálculo do DIFAL."
+        )
     )
 
 
@@ -826,6 +866,7 @@ def analise_manual(
             beneficio_fiscal_antigo=req.beneficio_fiscal_antigo,
             lucro_real_mensal=req.lucro_real_mensal,
             creditos_pis_cofins=req.creditos_pis_cofins,
+            produto_importado=req.produto_importado,
         )
 
     except PydanticValidationError as exc:
@@ -875,13 +916,24 @@ def analise_manual(
     },
 )
 async def gerar_relatorio_pdf(
-    diagnostico: dict,
+    payload: dict,
     current_user: dict = Depends(get_current_user),  # noqa: ARG001 — autenticação obrigatória
 ) -> Response:
     """
-    Recebe o objeto diagnóstico no body JSON e retorna um PDF gerado via weasyprint.
+    Recebe payload {diagnostico, pii?} no body JSON e retorna PDF.
 
-    O diagnóstico é o mesmo objeto retornado por POST /analise/manual ou POST /analise/pdf.
+    Schema esperado:
+    {
+        "diagnostico": {...},     # dict despersonalizado (LGPD)
+        "pii": {                   # opcional — PII só para o PDF
+            "cnpj": "...",
+            "razao_social": "..."
+        }
+    }
+
+    Para retrocompatibilidade, ainda aceita o diagnostico direto no body
+    (caso pii esteja embutida em diagnostico.empresa, embora isso fira LGPD).
+
     Dados sensíveis trafegam no body (POST), nunca na query string (GET).
     Exige Bearer token JWT válido.
     """
@@ -893,8 +945,18 @@ async def gerar_relatorio_pdf(
                 "No Windows: instale GTK3 Runtime em https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer"
             ),
         )
+
+    # Suporte a 2 formatos: novo (com pii separado) e legado (diagnostico direto)
+    if isinstance(payload, dict) and "diagnostico" in payload:
+        diagnostico = payload["diagnostico"]
+        pii = payload.get("pii") or None
+    else:
+        # Legado: payload É o diagnóstico
+        diagnostico = payload
+        pii = None
+
     try:
-        pdf_bytes = _gerar_pdf(diagnostico)
+        pdf_bytes = _gerar_pdf(diagnostico, pii=pii)
     except RuntimeError as exc:
         if "não instalado" in str(exc):
             raise HTTPException(
@@ -905,7 +967,8 @@ async def gerar_relatorio_pdf(
         raise HTTPException(status_code=500, detail="Falha na geração do PDF.")
 
     razao = (
-        diagnostico.get("empresa", {}).get("razao_social")
+        (pii or {}).get("razao_social")
+        or diagnostico.get("empresa", {}).get("razao_social")
         or diagnostico.get("razao_social")
         or "relatorio"
     )

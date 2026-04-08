@@ -26,6 +26,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from difal import calcular_difal
 from regimes.base import BaseRegimeEngine
 from regimes.lucro_presumido import LucroPresumidoEngine
 from regimes.lucro_real import LucroRealEngine
@@ -275,6 +276,13 @@ class OperacaoFiscal(BaseModel):
     estorno_realizado: bool = Field(
         default=False,
         description="Sinaliza se a operação sofreu devolução de mercadoria após liquidação."
+    )
+    produto_importado: bool = Field(
+        default=False,
+        description=(
+            "True se conteúdo de importação > 40% (Res. SF 13/2012). "
+            "Afeta alíquota interestadual ICMS (4%) e cálculo do DIFAL."
+        )
     )
 
     @model_validator(mode="after")
@@ -909,11 +917,9 @@ class MotorReformaTributaria:
         aliquotas_iva = self.get_aliquotas_iva_por_ano()
         aliquota_efetiva = self.calcular_aliquota_efetiva()
 
-        # Custo Simples sem as frações IBS/CBS (mantém IRPJ/CSLL/CPP/ICMS/ISS)
+        # Frações IBS/CBS que já estão dentro do DAS (serão subtraídas no Opt-Out)
         ibs_no_das = self._calcular_fracao_componente("IBS")
         cbs_no_das = self._calcular_fracao_componente("CBS")
-        das_mensal = self.calcular_das_mensal()
-        das_sem_iva = das_mensal - ibs_no_das - cbs_no_das
 
         # IVA recolhido separadamente (por operação)
         # ERR-016: aplica fator de redução CBS/IBS (Arts. 258-264 LC 214/2025)
@@ -924,12 +930,11 @@ class MotorReformaTributaria:
             * fator_reducao
         ).quantize(Decimal("0.01"), ROUND_HALF_UP)
 
-        # Custo DAS sem IVA (proporcional à operação)
-        # das_sem_iva é mensal; proporcionalizamos para a operação
+        # Custo DAS completo (proporcional à operação) antes de tirar o IVA
         custo_das_por_operacao_completo = (self.operacao.valor_operacao * aliquota_efetiva).quantize(
             Decimal("0.01"), ROUND_HALF_UP
         )
-        # Subtrai a fração IBS/CBS que já estava dentro do DAS
+        # Subtrai a fração IBS/CBS que já estava dentro do DAS (evita dupla contagem)
         fracao_iva_no_das = (ibs_no_das + cbs_no_das)
         custo_das_sem_iva = (custo_das_por_operacao_completo - fracao_iva_no_das).quantize(
             Decimal("0.01"), ROUND_HALF_UP
@@ -1035,7 +1040,155 @@ class MotorReformaTributaria:
         # Multiplica por 12 para projeção anual (simplificação: 1 operação/mês)
         return (disparidade_por_operacao * 12).quantize(Decimal("0.01"), ROUND_HALF_UP)
 
+    def _gerar_recomendacao_opt_out(self) -> Dict[str, str]:
+        """
+        Gera recomendação inteligente de Opt-Out cruzando:
+          - percentual_b2b (peso comercial: quantos clientes perderiam crédito)
+          - disparidade_anual / RBT12 (peso financeiro: custo relativo de sair)
+          - tipo do comprador (gate: B2C puro nunca recomenda Opt-Out)
+
+        Retorna dict com 4 chaves:
+          - codigo: identificador da matriz de decisão (ex: "OPT_OUT_FORTE")
+          - titulo: frase curta para header (ex: "OPT-OUT FORTEMENTE RECOMENDADO")
+          - justificativa: parágrafo explicando o porquê em linguagem de empresário
+          - amparo_legal: LC 214/2025 Arts. 41-44 + CF Art. 146, III, "d"
+
+        MATRIZ DE DECISÃO (LC 214/2025, Arts. 41-44 + Resolução CGSN 183/2025):
+          B2B ≥ 70% E disparidade/RBT12 ≤ 5%  → OPT_OUT_FORTE
+          B2B ≥ 50% E disparidade/RBT12 ≤ 10% → OPT_OUT_VANTAJOSO
+          B2B < 30%                            → MANTER_SIMPLES
+          Demais casos                         → ZONA_CINZA (análise individual)
+
+        NOTA: a disparidade real deve ser próxima de zero quando IVA é repassado
+        no preço de venda. Quando positiva, indica que o Opt-Out custa mais caixa
+        para a empresa — só vale a pena se o ganho de retenção B2B compensa.
+        """
+        percentual_b2b = self.compradora.percentual_b2b or Decimal("0")
+        # Normaliza percentual_b2b quando tipo é B2B_CONTRIBUINTE puro (100%)
+        # ou B2C puro (0%) — independente do default do Pydantic
+        if self.compradora.tipo == "B2B_CONTRIBUINTE":
+            percentual_b2b = Decimal("100")
+        elif self.compradora.tipo == "B2C_CONSUMIDOR_FINAL":
+            percentual_b2b = Decimal("0")
+
+        disparidade = self.calcular_disparidade_anual()
+        rbt12 = self.calcular_rbt12() or Decimal("1")  # evita divisão por zero
+        # Razão disparidade/RBT12 em percentual (absoluto — ganhos e perdas)
+        razao_disparidade = (abs(disparidade) / rbt12 * Decimal("100")).quantize(
+            Decimal("0.01"), ROUND_HALF_UP
+        )
+
+        # ── Matriz de decisão ────────────────────────────────────────────────
+        if percentual_b2b >= Decimal("70") and razao_disparidade <= Decimal("5"):
+            codigo = "OPT_OUT_FORTE"
+            titulo = "OPT-OUT FORTEMENTE RECOMENDADO"
+            justificativa = (
+                f"Você tem {percentual_b2b:.0f}% de clientes B2B (empresas que precisam "
+                f"de crédito de CBS/IBS para abater dos próprios impostos). No Simples "
+                f"Puro, eles recebem apenas 1% de crédito — risco real de migrarem "
+                f"para concorrentes no regime normal. O custo anual extra do Opt-Out "
+                f"é R$ {disparidade:,.2f} ({razao_disparidade:.2f}% da receita), "
+                f"normalmente neutralizado pelo repasse no preço. "
+                f"O ganho de competitividade e retenção de clientes compensa."
+            )
+        elif percentual_b2b >= Decimal("50") and razao_disparidade <= Decimal("10"):
+            codigo = "OPT_OUT_VANTAJOSO"
+            titulo = "OPT-OUT VANTAJOSO — avaliar caixa"
+            justificativa = (
+                f"Você tem {percentual_b2b:.0f}% de clientes B2B. Metade ou mais do seu "
+                f"faturamento vem de empresas que podem exigir crédito IVA. O custo anual "
+                f"extra do Opt-Out é R$ {disparidade:,.2f} ({razao_disparidade:.2f}% da "
+                f"receita). Avalie se o repasse no preço é viável no seu mercado e se há "
+                f"fluxo de caixa para absorver o aumento durante a transição."
+            )
+        elif percentual_b2b < Decimal("30"):
+            codigo = "MANTER_SIMPLES"
+            titulo = "MANTENHA SIMPLES PURO"
+            justificativa = (
+                f"Você tem apenas {percentual_b2b:.0f}% de clientes B2B — a maioria da sua "
+                f"receita vem de consumidores finais (pessoa física), que NÃO usam crédito "
+                f"de CBS/IBS. Sair do Simples Puro para o Opt-Out aumentaria a complexidade "
+                f"operacional (EFD-Reinf, EFD-Contribuições) e o custo anual em "
+                f"R$ {disparidade:,.2f} sem trazer benefício comercial. Mantenha o regime "
+                f"atual e reavalie apenas se o perfil de clientes mudar."
+            )
+        else:
+            codigo = "ZONA_CINZA"
+            titulo = "ZONA CINZA — análise individual necessária"
+            justificativa = (
+                f"Seu caso está numa faixa intermediária: {percentual_b2b:.0f}% de clientes "
+                f"B2B com custo anual de Opt-Out de R$ {disparidade:,.2f} "
+                f"({razao_disparidade:.2f}% da receita). A decisão depende de fatores "
+                f"qualitativos (concentração de clientes, poder de repasse de preço, "
+                f"capacidade de absorver obrigações acessórias adicionais). "
+                f"Recomendamos análise individual com seu contador antes das janelas "
+                f"semestrais (abril e setembro)."
+            )
+
+        return {
+            "codigo": codigo,
+            "titulo": titulo,
+            "justificativa": justificativa,
+            "amparo_legal": (
+                "LC 214/2025, Arts. 41-44 (dispositivo de Opt-Out) | "
+                "CF Art. 146, III, 'd' (regime diferenciado Simples Nacional) | "
+                "Resolução CGSN 183/2025 (janelas semestrais abr/set)"
+            ),
+        }
+
+    def _montar_cenarios_com_recomendacao(self) -> Dict[str, Any]:
+        """
+        Monta o bloco 'cenarios' do diagnóstico com recomendação inteligente.
+
+        Retorna dict com:
+          - simples_puro: cenário A
+          - opt_out: cenário B
+          - disparidade_anual_estimada: diferença financeira anual (str)
+          - recomendacao: frase curta (compat retrô — usada por testes antigos)
+          - recomendacao_inteligente: dict {codigo, titulo, justificativa, amparo_legal}
+        """
+        rec = self._gerar_recomendacao_opt_out()
+        return {
+            "simples_puro": self.cenario_simples_puro(),
+            "opt_out": self.cenario_opt_out(),
+            "disparidade_anual_estimada": str(self.calcular_disparidade_anual()),
+            # Compatibilidade com testes antigos (string curta)
+            "recomendacao": (
+                "OPT_OUT recomendado para reter cliente B2B."
+                if rec["codigo"] in ("OPT_OUT_FORTE", "OPT_OUT_VANTAJOSO")
+                else (
+                    "SIMPLES_PURO adequado — perfil majoritariamente B2C."
+                    if rec["codigo"] == "MANTER_SIMPLES"
+                    else "Análise individual recomendada — zona cinza."
+                )
+            ),
+            # Recomendação inteligente (novo contrato — Bloco A Frente 3.2)
+            "recomendacao_inteligente": rec,
+        }
+
     # ── FASE 5: DIAGNÓSTICO + ALERTAS + LGPD ─────────────────────────────────
+
+    def _calcular_difal_diagnostico(self) -> Dict[str, Any]:
+        """
+        Calcula DIFAL interestadual se UF origem != UF destino.
+        EC 87/2015 | LC 190/2022 | LC 87/1996, Art. 13.
+
+        Retorna dict com Decimals convertidos para str (JSON-safe).
+        Se operação interna, retorna dict com aplicavel=False.
+        """
+        resultado = calcular_difal(
+            valor_operacao=self.operacao.valor_operacao,
+            uf_origem=self.fornecedora.uf_origem,
+            uf_destino=self.compradora.uf_destino,
+            tipo_destinatario=self.compradora.tipo,
+            produto_importado=self.operacao.produto_importado,
+            trilha=self.trilha_auditoria,
+        )
+        # Decimal → str para serialização JSON
+        return {
+            k: (str(v) if isinstance(v, Decimal) else v)
+            for k, v in resultado.items()
+        }
 
     def _gerar_alertas(self) -> List[Dict[str, str]]:
         """
@@ -1153,7 +1306,7 @@ class MotorReformaTributaria:
         # ─────────────────────────────────────────────────────────────────────────────
         # ALERTAS FASE 5 (STRESS TEST) — R14 a R17
         # ─────────────────────────────────────────────────────────────────────────────
-        
+
         # C1 (R14) Fantasma do Ano Novo: Emissão X Liquidação em mudança de regime
         if self.operacao.data_liquidacao and self.operacao.data_liquidacao.year > self.operacao.data_emissao.year:
             # Regra: só dispara se cruzar a virada (ex: emissão 2026, pagto 2027 que inicia split payment dinâmico)
@@ -1281,13 +1434,14 @@ class MotorReformaTributaria:
             "data_analise": str(date.today()),
             "ano_operacao": self.operacao.data_emissao.year,
             "empresa": {
+                # LGPD: cnpj/razao_social NUNCA aparecem no diagnostico
+                # (separados via gerar_pdf(diagnostico, pii={...}))
                 "regime": "REAL",
                 "cnae": self.fornecedora.cnae_principal,
                 "uf": self.fornecedora.uf_origem,
                 "anexo_simples": None,
                 "rbt12": str(self.fornecedora.faturamento_12m),
                 "fator_r": None,
-                "razao_social": self.fornecedora.razao_social,
             },
             "comprador": {
                 "tipo": self.compradora.tipo,
@@ -1308,6 +1462,7 @@ class MotorReformaTributaria:
             },
             "breakdown_regime": {k: str(v) for k, v in resultado["breakdown"].items()},
             "cenarios": {},
+            "difal": self._calcular_difal_diagnostico(),
             "split_payment": self.calcular_split_payment_impacto(),
             "cronograma_iva": cronograma_iva_lista,
             "alertas": self._gerar_alertas(),
@@ -1361,6 +1516,8 @@ class MotorReformaTributaria:
             "ano_operacao": self.operacao.data_emissao.year,
 
             "empresa": {
+                # LGPD: cnpj/razao_social NUNCA aparecem no diagnostico
+                # (separados via gerar_pdf(diagnostico, pii={...}))
                 "regime": self.fornecedora.regime,
                 "cnae": self.fornecedora.cnae_principal,
                 "uf": self.fornecedora.uf_origem,
@@ -1391,16 +1548,10 @@ class MotorReformaTributaria:
                 "fracao_ibs_no_das": str(self.calcular_fracao_ibs()),
             },
 
-            "cenarios": {
-                "simples_puro": self.cenario_simples_puro(),
-                "opt_out": self.cenario_opt_out(),
-                "disparidade_anual_estimada": str(self.calcular_disparidade_anual()),
-                "recomendacao": (
-                    "OPT_OUT recomendado para reter cliente B2B."
-                    if self.compradora.tipo == "B2B_CONTRIBUINTE"
-                    else "SIMPLES_PURO adequado para B2C. Sem impacto de crédito."
-                ),
-            },
+            "cenarios": self._montar_cenarios_com_recomendacao(),
+
+            # DIFAL Interestadual (EC 87/2015 | LC 190/2022)
+            "difal": self._calcular_difal_diagnostico(),
 
             "split_payment": self.calcular_split_payment_impacto(),
 

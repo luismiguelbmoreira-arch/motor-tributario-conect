@@ -35,12 +35,14 @@ from typing import Any, Literal, Optional
 import anthropic
 from pydantic import BaseModel, Field, field_validator
 
-# Carrega .env automaticamente (busca na raiz do projeto ou no diretório pai)
+# Carrega .env automaticamente (procura em PY/.env, raiz, e cwd)
 try:
     from dotenv import load_dotenv
-    _env_path = Path(__file__).resolve().parent.parent / ".env"
-    if _env_path.exists():
-        load_dotenv(_env_path, override=True)
+    _here = Path(__file__).resolve().parent
+    for _candidato in (_here / ".env", _here.parent / ".env", Path.cwd() / ".env"):
+        if _candidato.exists():
+            load_dotenv(_candidato, override=True)
+            break
 except ImportError:
     pass  # python-dotenv opcional — variável pode vir do ambiente do SO
 
@@ -646,7 +648,12 @@ def processar_pdfs_bytes(conteudos: list[bytes]) -> dict:
         receita_com_st_icms=empresa_params.get("receita_com_st_icms"),
         atividades=empresa_params.get("atividades"),
     )
-    compradora = EmpresaCompradora(tipo="B2C_CONSUMIDOR_FINAL")
+    # Default: uf_destino = uf_origem (operacao interna, sem DIFAL)
+    # Pode ser ajustado pelo usuario no resultado.html apos o diagnostico inicial
+    compradora = EmpresaCompradora(
+        tipo="B2C_CONSUMIDOR_FINAL",
+        uf_destino=empresa_params["uf_origem"],
+    )
 
     # Usar competência extraída para definir data_emissao
     competencia = auditoria_params.get("competencia", "")
@@ -660,6 +667,7 @@ def processar_pdfs_bytes(conteudos: list[bytes]) -> dict:
         data_emissao=data_emissao,
         valor_operacao=auditoria_params.get("rpa") or fornecedora.faturamento_12m / 12,
         rpa_mensal=auditoria_params.get("rpa"),
+        ncm_nbs="00000000",  # NCM generico — PDF do e-CAC nao traz NCM da operacao
     )
 
     motor = MotorReformaTributaria(

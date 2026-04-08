@@ -10,8 +10,8 @@ FROZEN: Não alterar sem citação de artigo de lei + aprovação de Luiz.
 """
 
 import json
-from pathlib import Path
 from decimal import Decimal
+from pathlib import Path
 
 # Load complete CNAE dataset (1,332 mapped correctly)
 _CNAE_MAP_FILE = Path(__file__).resolve().parent.parent / "data" / "cnae_completo.json"

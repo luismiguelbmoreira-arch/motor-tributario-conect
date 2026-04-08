@@ -189,6 +189,12 @@
           class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" oninput="checkReset()">
         <p class="text-xs text-slate-400 mt-1">O usuário deverá usar esta senha no próximo login.</p>
       </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Confirmar nova senha <span class="text-red-500">*</span></label>
+        <input id="reset-confirmar-senha" type="password" placeholder="Digite novamente"
+          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" oninput="checkReset()">
+        <p id="reset-mismatch" class="text-xs text-red-600 mt-1 hidden">As senhas não coincidem.</p>
+      </div>
       <p id="reset-api-err" class="msg-error hidden"></p>
       <div class="flex gap-3 justify-end pt-2">
         <button class="btn-ghost text-sm" onclick="closeReset()">Cancelar</button>
@@ -358,6 +364,8 @@
     pendingReset = id;
     document.getElementById('reset-msg').textContent = `Definir nova senha para o usuário "${nome}".`;
     document.getElementById('reset-nova-senha').value = '';
+    document.getElementById('reset-confirmar-senha').value = '';
+    document.getElementById('reset-mismatch').classList.add('hidden');
     document.getElementById('reset-api-err').classList.add('hidden');
     document.getElementById('btn-confirmar-reset').disabled = true;
     document.getElementById('btn-confirmar-reset').textContent = 'Redefinir senha';
@@ -372,7 +380,22 @@
 
   function checkReset() {
     const p = document.getElementById('reset-nova-senha').value;
-    document.getElementById('btn-confirmar-reset').disabled = p.length < 8;
+    const c = document.getElementById('reset-confirmar-senha').value;
+    const mismatchEl = document.getElementById('reset-mismatch');
+    const btn = document.getElementById('btn-confirmar-reset');
+
+    if (p.length < 8) {
+      mismatchEl.classList.add('hidden');
+      btn.disabled = true;
+      return;
+    }
+    if (c.length > 0 && p !== c) {
+      mismatchEl.classList.remove('hidden');
+      btn.disabled = true;
+      return;
+    }
+    mismatchEl.classList.add('hidden');
+    btn.disabled = !(p.length >= 8 && p === c);
   }
 
   async function confirmarReset() {
