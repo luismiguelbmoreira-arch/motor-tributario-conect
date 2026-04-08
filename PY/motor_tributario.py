@@ -26,25 +26,6 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-
-def _fmt_brl(valor: Any) -> str:
-    """
-    Formata valor monetário no padrão BR: R$ X.XXX,YY (ponto milhar, vírgula decimal).
-
-    Substitui o uso de f-strings com :,.2f que produzem formato US (R$ X,XXX.YY).
-    Usar SEMPRE este helper em mensagens, justificativas e trilhas de auditoria
-    que vão para humanos (UI, PDF). NÃO usar para serialização — para isso
-    use Decimal/str(Decimal) que mantém o ponto decimal nativo do Python.
-
-    REGRA À PROVA DE ERRO: nenhuma f-string {valor:,.2f} no projeto. Sempre _fmt_brl.
-    """
-    try:
-        d = Decimal(str(valor or 0)).quantize(Decimal("0.01"), ROUND_HALF_UP)
-    except Exception:
-        return "R$ 0,00"
-    # Truque: formata em US, depois troca separadores
-    return f"R$ {d:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
 from difal import calcular_difal
 from regimes.base import BaseRegimeEngine
 from regimes.lucro_presumido import LucroPresumidoEngine
@@ -65,6 +46,25 @@ from tabelas_simples import (
 from validadores import validar_cnae, validar_cnpj, validar_ncm, validar_uf
 
 logger = logging.getLogger("motor_conect.motor")
+
+
+def _fmt_brl(valor: Any) -> str:
+    """
+    Formata valor monetário no padrão BR: R$ X.XXX,YY (ponto milhar, vírgula decimal).
+
+    Substitui o uso de f-strings com :,.2f que produzem formato US (R$ X,XXX.YY).
+    Usar SEMPRE este helper em mensagens, justificativas e trilhas de auditoria
+    que vão para humanos (UI, PDF). NÃO usar para serialização — para isso
+    use Decimal/str(Decimal) que mantém o ponto decimal nativo do Python.
+
+    REGRA À PROVA DE ERRO: nenhuma f-string {valor:,.2f} no projeto. Sempre _fmt_brl.
+    """
+    try:
+        d = Decimal(str(valor or 0)).quantize(Decimal("0.01"), ROUND_HALF_UP)
+    except Exception:
+        return "R$ 0,00"
+    # Truque: formata em US, depois troca separadores
+    return f"R$ {d:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 # Fator R: limiar para migração Anexo V → Anexo III (LC 123/2006, Art. 18, § 24)
 FATOR_R_LIMIAR = Decimal("0.28")
@@ -879,14 +879,41 @@ class MotorReformaTributaria:
 
     def calcular_credito_simples_para_b2b(self) -> Decimal:
         """
-        Crédito IBS+CBS que o comprador B2B pode apropriar quando fornecedor está no Simples.
-        No Simples puro: crédito limitado ao cobrado na guia (fração mínima do DAS).
-        ERR-016: Aplica fator de redução conforme reducao_cbs_ibs.
-        LC 214/2025, Art. X (regra de creditamento para Simples Nacional).
+        Crédito IBS+CBS que o comprador B2B pode apropriar quando fornecedor
+        está no Simples Nacional (SEM exercício da opção pelo regime regular).
+
+        BASE LEGAL — LC 214/2025, Art. 47, §§ I e II:
+          (I)  "Não é permitida a apropriação de créditos de IBS e CBS pelo
+               optante do Simples Nacional"
+          (II) "É permitida ao contribuinte sujeito ao regime regular de IBS
+               e CBS a apropriação de créditos de IBS e CBS correspondentes
+               aos valores destes tributos pagos nas aquisições de optantes
+               pelo Simples Nacional, em montante equivalente ao devido por
+               meio deste regime"
+
+        REGRA DE 2026 — LC 214/2025, Art. 348, III, "c":
+          Em 2026, os optantes do Simples Nacional NÃO aplicam as alíquotas
+          de transição — não destacam CBS/IBS nas operações, logo NÃO geram
+          crédito para clientes B2B neste ano. Retorna R$ 0.
+
+        REGRA DE 2027+:
+          O crédito do cliente B2B é proporcional ao valor de CBS+IBS
+          efetivamente embutido no DAS pago pela empresa do Simples.
+          Implementação atual: aproximação usando as alíquotas do cronograma
+          × valor_operacao. TODO: refinar para usar distribuição real
+          CBS/IBS no DAS quando DISTRIBUICAO_DAS for atualizada pós-2027.
+
+        ERR-016: Aplica fator de redução conforme reducao_cbs_ibs
+        (LC 214/2025, Arts. 258, 262, 264 — setores reduzidos/isentos).
         """
+        # 2026: dispensa de destaque — crédito = 0 (Art. 348, III, "c")
+        ano = self.operacao.data_emissao.year
+        if ano <= 2026:
+            return Decimal("0.00")
+
+        # 2027+: aproximação conservadora (Art. 47, §II)
         aliquotas_iva = self.get_aliquotas_iva_por_ano()
         fator = self._fator_reducao_cbs_ibs()
-        # Crédito = valor_operacao × (CBS + IBS) × fator_reducao
         credito = self.operacao.valor_operacao * (
             aliquotas_iva["CBS"] + aliquotas_iva["IBS"]
         ) * fator

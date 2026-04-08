@@ -447,6 +447,103 @@
         <p id="optout-amparo-legal" class="text-xs text-slate-400 italic mt-3">⚖ LC 214/2025, Arts. 41-44 | CF Art. 146, III, "d" | Resolução CGSN 183/2025</p>
       </section>
 
+      <!-- SEÇÃO: DOCUMENTOS PARA ANÁLISE PRECISA -->
+      <section id="sec-documentos-precisao" class="fade-in">
+        <h2 class="text-xl font-semibold text-slate-900 mb-3">Documentos para análise precisa</h2>
+        <p class="text-sm text-slate-600 mb-4">
+          O diagnóstico acima usa <strong>estimativas baseadas no CNAE</strong> (perfil médio do setor) e nos
+          dados do PGDAS-D/e-CAC. Para um cálculo <strong>100% preciso</strong> do crédito que cada cliente B2B
+          vai realmente aproveitar, o escritório precisa dos documentos abaixo. Sem eles, a recomendação
+          permanece como estimativa qualificada — útil para decisão, mas não para defesa em fiscalização.
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+          <div class="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-300 transition-colors">
+            <div class="flex items-start gap-3">
+              <span class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold text-sm flex items-center justify-center">1</span>
+              <div>
+                <h3 class="text-sm font-bold text-slate-900 mb-1">PGDAS-D mês a mês (12 meses)</h3>
+                <p class="text-xs text-slate-600 leading-relaxed">
+                  Histórico de receita real de cada competência. Hoje usamos só o RPA do mês atual —
+                  com o histórico o Fator R e a sazonalidade ficam mais precisos.
+                </p>
+                <p class="text-xs text-slate-400 italic mt-1">Onde obter: Portal Simples Nacional (receita.fazenda.gov.br)</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-300 transition-colors">
+            <div class="flex items-start gap-3">
+              <span class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold text-sm flex items-center justify-center">2</span>
+              <div>
+                <h3 class="text-sm font-bold text-slate-900 mb-1">EFD-Contribuições resumida</h3>
+                <p class="text-xs text-slate-600 leading-relaxed">
+                  Necessário em 2027+ para detalhar a fração de CBS/IBS dentro do DAS unificado
+                  (LC 214/2025, Art. 47, §II — cálculo do crédito equivalente ao devido).
+                </p>
+                <p class="text-xs text-slate-400 italic mt-1">Onde obter: Sistema contábil (Sage, Domínio, Alterdata, etc.)</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-300 transition-colors">
+            <div class="flex items-start gap-3">
+              <span class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold text-sm flex items-center justify-center">3</span>
+              <div>
+                <h3 class="text-sm font-bold text-slate-900 mb-1">Listagem de clientes B2B</h3>
+                <p class="text-xs text-slate-600 leading-relaxed">
+                  CSV/Excel com <strong>CNPJ + faturamento anual + regime do cliente</strong>.
+                  Hoje o motor <em>estima</em> o % B2B por CNAE. Com a lista real, sabemos quem
+                  efetivamente aproveita o crédito (Lucro Real/Presumido) vs quem não aproveita
+                  (Simples, MEI, B2C, isento).
+                </p>
+                <p class="text-xs text-slate-400 italic mt-1">Onde obter: Sistema do escritório, relatório de faturamento</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-300 transition-colors">
+            <div class="flex items-start gap-3">
+              <span class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold text-sm flex items-center justify-center">4</span>
+              <div>
+                <h3 class="text-sm font-bold text-slate-900 mb-1">Notas fiscais emitidas (XML ou planilha)</h3>
+                <p class="text-xs text-slate-600 leading-relaxed">
+                  Pelo menos do mês analisado. Valida ICMS-ST segregado, NCMs, valores totais,
+                  devoluções e operações interestaduais (DIFAL). Essencial se o delta contra o
+                  e-CAC for maior que 5%.
+                </p>
+                <p class="text-xs text-slate-400 italic mt-1">Onde obter: Sistema de emissão de NF-e do cliente</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white border border-slate-200 rounded-xl p-4 hover:border-blue-300 transition-colors md:col-span-2">
+            <div class="flex items-start gap-3">
+              <span class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 text-blue-700 font-bold text-sm flex items-center justify-center">5</span>
+              <div>
+                <h3 class="text-sm font-bold text-slate-900 mb-1">Folha de pagamento detalhada</h3>
+                <p class="text-xs text-slate-600 leading-relaxed">
+                  Hoje o motor usa só o total do PGDAS-D (campo "folha de salários nos 12 meses").
+                  Com o detalhamento (pró-labore, encargos, 13º, férias) conseguimos validar o Fator R
+                  com precisão e identificar se o regime é Anexo III (serviços com folha alta) ou Anexo V.
+                </p>
+                <p class="text-xs text-slate-400 italic mt-1">Onde obter: Sistema de folha (Domínio Folha, Senior, SAP RH, etc.)</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+          <p class="text-xs text-slate-700 leading-relaxed">
+            <strong class="text-slate-900">🛡 Importante:</strong> A inferência atual por CNAE é uma
+            <strong>aproximação legítima</strong> para decisão estratégica — não usa dados inventados,
+            apenas médias setoriais publicadas. Mas em caso de <strong>fiscalização ou defesa jurídica</strong>,
+            o diagnóstico precisa dos documentos acima para ser irrefutável. Anexe-os ao dossiê de prova
+            quando for rodar a análise final do cliente.
+          </p>
+        </div>
+      </section>
+
       <!-- SEÇÃO 5: SERVIÇOS RECOMENDADOS -->
       <section aria-labelledby="sec-servicos-titulo" class="fade-in">
         <h2 id="sec-servicos-titulo" class="text-xl font-semibold text-slate-900 mb-4">Serviços Recomendados</h2>
@@ -679,11 +776,17 @@
         icone = '⚠';
         titulo = 'Diferença pequena — revisar antes de pagar';
         explicacao = 'O DAS calculado difere do pago no e-CAC em menos de 5%. Geralmente é arredondamento, RPA aproximado ou pequeno descasamento de competência. Confira antes de usar como referência.';
-      } else {
+      } else if (deltaPct < 20) {
         corBg = 'bg-red-50'; corBorda = 'border-red-500'; corTexto = 'text-red-900';
         icone = '✗';
         titulo = 'Diferença significativa — investigue antes de usar';
         explicacao = 'O DAS calculado difere do pago no e-CAC em mais de 5%. Possíveis causas: ICMS-ST não segregado, multi-atividade não declarada, RPA real diferente do extraído, CNAE/Anexo divergente, ou Fator R com folha desatualizada. Não use este diagnóstico como referência sem revisão.';
+      } else {
+        // Delta ≥ 20%: ALERTA CRÍTICO — motor pode estar aplicando regime/anexo errado
+        corBg = 'bg-red-100'; corBorda = 'border-red-700'; corTexto = 'text-red-950';
+        icone = '🚨';
+        titulo = 'ALERTA CRÍTICO — diferença acima de 20%';
+        explicacao = 'O DAS calculado difere do pago no e-CAC em MAIS DE 20%. Esse delta é incompatível com um diagnóstico confiável — há alta probabilidade de o motor estar aplicando o Anexo errado OU de faltarem dados de entrada. **NÃO USE** este diagnóstico até investigar as 5 causas possíveis: (1) Fator R calculado sem a folha real completa → Anexo III vs V trocado; (2) multi-atividade com anexos diferentes não declarada; (3) ICMS-ST segregado de forma errada (receita bruta incluindo ST); (4) redução setorial aplicável (saúde/educação/agro) não marcada; (5) RPA do mês analisado muito distinto da média (sazonalidade). Anexe os documentos da seção "Documentos para análise precisa" abaixo e rode novamente.';
       }
 
       const card = document.getElementById('validacao-ecac-card');
@@ -797,9 +900,13 @@
       });
 
       // Linha 4: Crédito B2B — só quando há clientes B2B
+      // Citação legal conforme Art. 47 LC 214/2025:
+      //   Simples Puro: Art. 47 §II — crédito em montante equivalente ao CBS/IBS
+      //                  no DAS (zero em 2026 por Art. 348, III, "c")
+      //   Opt-Out:      Art. 47 caput + Art. 41 — regime regular, crédito cheio
       if (pctB2B > 0) {
         linhas.push({
-          label: `Crédito aproveitado por clientes B2B <span class="text-xs text-slate-500">(ponderado por ${pctB2B.toFixed(0)}%)</span>`,
+          label: `Crédito aproveitado por clientes B2B <span class="text-xs text-slate-500">(ponderado por ${pctB2B.toFixed(0)}%)</span><br/><span class="text-xs text-slate-400 italic">⚖ LC 214/2025, Art. 47, §II</span>`,
           simples: formatBRL(credEfetivoSimples) + ' <span class="text-slate-400 text-xs">(' + sanitize(simples.percentual_credito_nf || '1%') + ' × ' + pctB2B.toFixed(0) + '% B2B)</span>',
           optout: '<strong class="text-emerald-700">' + formatBRL(credEfetivoOptOut) + ' (' + sanitize(optOut.percentual_credito_nf || '100%') + ' × ' + pctB2B.toFixed(0) + '% B2B)</strong>',
           diff: formatDiferenca(credEfetivoSimples, credEfetivoOptOut, 'beneficio'),

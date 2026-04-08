@@ -351,6 +351,8 @@ def _gerar_html(diagnostico: dict, pii: dict | None = None) -> str:
 
 {_secao_decisao_opt_out(diagnostico)}
 
+{_secao_documentos_precisao()}
+
 <!-- Serviços recomendados -->
 <h2>Serviços Recomendados</h2>
 <table>
@@ -555,7 +557,7 @@ def _secao_decisao_opt_out(diagnostico: dict) -> str:
       <td style="text-align:right;">{diff_custo_total}</td>
     </tr>
     {'' if not tem_b2b else f'''<tr>
-      <td>Crédito aproveitado por clientes B2B<br/><span style="font-size:9px;color:#9ca3af;">(ponderado por {pct_b2b_dec:.0f}% B2B)</span></td>
+      <td>Crédito aproveitado por clientes B2B<br/><span style="font-size:9px;color:#9ca3af;">(ponderado por {pct_b2b_dec:.0f}% B2B)</span><br/><span style="font-size:8px;color:#6b7280;font-style:italic;">⚖ LC 214/2025, Art. 47, §II</span></td>
       <td style="text-align:right;font-family:monospace;">{credito_simples} <span style="color:#9ca3af;font-size:9px;">({pct_credito_simples})</span></td>
       <td style="text-align:right;font-family:monospace;"><strong style="color:#065f46;">{credito_opt} ({pct_credito_opt})</strong></td>
       <td style="text-align:right;">{diff_credito}</td>
@@ -662,6 +664,103 @@ def _secao_decisao_opt_out(diagnostico: dict) -> str:
 <p style="font-size:9px;color:#6b7280;font-style:italic;margin-top:4px;">
   ⚖ {amparo_rec or 'LC 214/2025, Arts. 41-44 | CF Art. 146, III, "d" | Resolução CGSN 183/2025'}
 </p>
+"""
+
+
+def _secao_documentos_precisao() -> str:
+    """
+    Seção 'Documentos para análise precisa' — lista os 5 documentos que o
+    contador precisa para transformar o diagnóstico de estimativa (inferência
+    por CNAE) em cálculo 100% preciso e defensável em fiscalização.
+
+    Paridade com UI/resultado.html::sec-documentos-precisao. Imprime igual
+    no PDF para que o PDF (versão para fiscalização) contenha a mesma
+    transparência sobre o que é estimativa vs cálculo real.
+
+    Base legal: LC 214/2025 Art. 47 §II (crédito equivalente ao devido) +
+    CTN Art. 142 (constituição do crédito tributário exige prova documental).
+    """
+    docs = [
+        (
+            "1",
+            "PGDAS-D mês a mês (12 meses)",
+            "Histórico de receita real de cada competência. Hoje usamos só o RPA "
+            "do mês atual — com o histórico o Fator R e a sazonalidade ficam mais "
+            "precisos.",
+            "Onde obter: Portal Simples Nacional (receita.fazenda.gov.br)",
+        ),
+        (
+            "2",
+            "EFD-Contribuições resumida",
+            "Necessário em 2027+ para detalhar a fração de CBS/IBS dentro do DAS "
+            "unificado (LC 214/2025, Art. 47, §II — cálculo do crédito equivalente "
+            "ao devido).",
+            "Onde obter: Sistema contábil (Sage, Domínio, Alterdata, etc.)",
+        ),
+        (
+            "3",
+            "Listagem de clientes B2B",
+            "CSV/Excel com <strong>CNPJ + faturamento anual + regime do cliente</strong>. "
+            "Hoje o motor <em>estima</em> o % B2B por CNAE. Com a lista real, sabemos "
+            "quem efetivamente aproveita o crédito (Lucro Real/Presumido) vs quem não "
+            "aproveita (Simples, MEI, B2C, isento).",
+            "Onde obter: Sistema do escritório, relatório de faturamento",
+        ),
+        (
+            "4",
+            "Notas fiscais emitidas (XML ou planilha)",
+            "Pelo menos do mês analisado. Valida ICMS-ST segregado, NCMs, valores "
+            "totais, devoluções e operações interestaduais (DIFAL). Essencial se o "
+            "delta contra o e-CAC for maior que 5%.",
+            "Onde obter: Sistema de emissão de NF-e do cliente",
+        ),
+        (
+            "5",
+            "Folha de pagamento detalhada",
+            "Hoje o motor usa só o total do PGDAS-D (campo 'folha de salários nos 12 "
+            "meses'). Com o detalhamento (pró-labore, encargos, 13º, férias) conseguimos "
+            "validar o Fator R com precisão e identificar se o regime é Anexo III "
+            "(serviços com folha alta) ou Anexo V.",
+            "Onde obter: Sistema de folha (Domínio Folha, Senior, SAP RH, etc.)",
+        ),
+    ]
+
+    cards = ""
+    for num, titulo, desc, fonte in docs:
+        cards += f"""
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px 12px;margin-bottom:8px;">
+      <div style="display:flex;gap:10px;align-items:flex-start;">
+        <span style="display:inline-block;flex-shrink:0;width:20px;height:20px;border-radius:50%;background:#dbeafe;color:#1e40af;font-weight:700;font-size:10px;text-align:center;line-height:20px;">{num}</span>
+        <div>
+          <div style="font-weight:700;font-size:11px;color:#1e3a5f;margin-bottom:2px;">{titulo}</div>
+          <div style="font-size:10px;color:#374151;line-height:1.5;margin-bottom:3px;">{desc}</div>
+          <div style="font-size:9px;color:#9ca3af;font-style:italic;">{fonte}</div>
+        </div>
+      </div>
+    </div>"""
+
+    return f"""
+<!-- Documentos para análise precisa (Frente 2) -->
+<h2>Documentos para análise precisa</h2>
+<p style="font-size:10px;color:#6b7280;margin-bottom:8px;">
+  O diagnóstico acima usa <strong>estimativas baseadas no CNAE</strong>
+  (perfil médio do setor) e nos dados do PGDAS-D/e-CAC. Para um cálculo
+  <strong>100% preciso</strong> do crédito que cada cliente B2B vai realmente
+  aproveitar, o escritório precisa dos documentos abaixo. Sem eles, a
+  recomendação permanece como estimativa qualificada — útil para decisão,
+  mas não para defesa em fiscalização.
+</p>
+{cards}
+<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:10px 12px;margin-bottom:14px;">
+  <div style="font-size:10px;color:#1e40af;line-height:1.5;">
+    <strong>🛡 Importante:</strong> A inferência atual por CNAE é uma
+    <strong>aproximação legítima</strong> para decisão estratégica — não usa
+    dados inventados, apenas médias setoriais publicadas. Mas em caso de
+    <strong>fiscalização ou defesa jurídica</strong>, o diagnóstico precisa
+    dos documentos acima para ser irrefutável (CTN Art. 142). Anexe-os ao
+    dossiê de prova quando for rodar a análise final do cliente.
+  </div>
+</div>
 """
 
 
@@ -793,7 +892,7 @@ def _secao_validacao_ecac(diagnostico: dict) -> str:
             "Geralmente é arredondamento, RPA aproximado ou pequeno descasamento "
             "de competência. Confira antes de usar como referência."
         )
-    else:
+    elif delta_pct < Decimal("20"):
         cor_bg, cor_borda, cor_texto = "#fef2f2", "#ef4444", "#991b1b"
         icone = "✗"
         titulo = "Diferença significativa — investigue antes de usar"
@@ -802,6 +901,24 @@ def _secao_validacao_ecac(diagnostico: dict) -> str:
             "Possíveis causas: ICMS-ST não segregado, multi-atividade não declarada, "
             "RPA real diferente do extraído, CNAE/Anexo divergente, ou Fator R com "
             "folha desatualizada. Não use este diagnóstico como referência sem revisão."
+        )
+    else:
+        # Delta ≥ 20%: ALERTA CRÍTICO — motor pode estar aplicando regime/anexo errado
+        cor_bg, cor_borda, cor_texto = "#fee2e2", "#b91c1c", "#7f1d1d"
+        icone = "🚨"
+        titulo = "ALERTA CRÍTICO — diferença acima de 20%"
+        explicacao = (
+            "O DAS calculado difere do pago no e-CAC em MAIS DE 20%. Esse delta é "
+            "incompatível com um diagnóstico confiável — há alta probabilidade de o "
+            "motor estar aplicando o Anexo errado OU de faltarem dados de entrada. "
+            "<strong>NÃO USE</strong> este diagnóstico até investigar as 5 causas "
+            "possíveis: (1) Fator R calculado sem a folha real completa → Anexo III "
+            "vs V trocado; (2) multi-atividade com anexos diferentes não declarada; "
+            "(3) ICMS-ST segregado de forma errada (receita bruta incluindo ST); "
+            "(4) redução setorial aplicável (saúde/educação/agro) não marcada; "
+            "(5) RPA do mês analisado muito distinto da média (sazonalidade). "
+            "Anexe os documentos da seção 'Documentos para análise precisa' e rode "
+            "novamente."
         )
 
     delta_str = _fmt_moeda(delta)
