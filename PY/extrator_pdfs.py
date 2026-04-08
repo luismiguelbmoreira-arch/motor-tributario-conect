@@ -800,9 +800,8 @@ def processar_pdfs_bytes(
     auditoria_status = "DESATIVADO"
     if persistir_auditoria:
         try:
-            from storage_cifrado import cifrar_e_persistir, hash_documento
-
             from database import registrar_documento_auditoria
+            from storage_cifrado import cifrar_e_persistir, hash_documento
 
             cnpj_cliente = empresa_params["cnpj"]
             for i, pdf_bytes in enumerate(conteudos):

@@ -14,6 +14,7 @@ python-multipart>=0.0.9     # Dependência runtime do FastAPI
 
 # ── Segurança ────────────────────────────────────────────────────────────────
 slowapi>=0.1.9                      # Rate limiting FastAPI — protege login contra brute force
+cryptography>=42.0.0                # AES-256-GCM + HKDF para auditoria documental (storage_cifrado.py)
 
 # ── Autenticação ──────────────────────────────────────────────────────────────
 passlib[bcrypt]>=1.7.4              # Hash de senhas bcrypt
