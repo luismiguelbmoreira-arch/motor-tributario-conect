@@ -1021,10 +1021,31 @@ def _sniff_xml_mod(conteudo: bytes) -> str:
     return m.group(1) if m else ""
 
 
+def _sniff_sped_tipo(conteudo: bytes) -> str:
+    """
+    Detecta qual SPED o arquivo é, olhando os primeiros ~2 KB:
+      - "sped_ecd"          → contém '|0000|LECD|' (ECD Domínio Contábil)
+      - "sped_efd_contrib"  → contém '|0110|' e cabeçalho 14 campos estilo EFD-Contribuições
+      - ""                  → não é SPED (folha CSV/TXT comum)
+    """
+    trecho = conteudo[:4096].decode("latin-1", errors="replace")
+    if "|0000|LECD|" in trecho:
+        return "sped_ecd"
+    # EFD-Contribuições: bloco 0000 com 13+ campos separados por | e presença de 0110
+    if "|0000|" in trecho and "|0110|" in trecho:
+        return "sped_efd_contrib"
+    return ""
+
+
 def _detectar_tipo_documento(filename: str, conteudo: bytes) -> str:
     """
-    Classifica um arquivo em: "pgdas_d" | "nfe_saida" | "nfce" | "folha_csv" | "desconhecido".
-    Usado para validar documentos mínimos por regime (bloqueio 422).
+    Classifica um arquivo em:
+      "pgdas_d" | "nfe_saida" | "nfce" | "folha_csv" |
+      "sped_ecd" | "sped_efd_contrib" | "desconhecido"
+
+    Usado para validar documentos mínimos por regime (bloqueio 422) e para
+    rotear para o parser correto. SPED é identificado por sniff do conteúdo
+    (header |0000|) porque compartilha extensão .txt com folha Domínio.
     """
     nome = (filename or "").lower()
     if nome.endswith(".pdf"):
@@ -1037,6 +1058,10 @@ def _detectar_tipo_documento(filename: str, conteudo: bytes) -> str:
             return "nfce"
         return "xml_desconhecido"
     if nome.endswith((".csv", ".txt")):
+        # SPED tem precedência se o header bater — senão cai como folha CSV
+        tipo_sped = _sniff_sped_tipo(conteudo)
+        if tipo_sped:
+            return tipo_sped
         return "folha_csv"
     return "desconhecido"
 
@@ -1135,6 +1160,8 @@ async def analise_pdf(
     conteudos_xml_nfe: list[bytes] = []
     conteudos_xml_nfce: list[bytes] = []
     conteudos_csv: list[bytes] = []
+    conteudos_sped_ecd: list[bytes] = []
+    conteudos_sped_efd_contrib: list[bytes] = []
     tipos_presentes: set[str] = set()
 
     for f in files:
@@ -1167,6 +1194,10 @@ async def analise_pdf(
             conteudos_xml_nfce.append(conteudo)
         elif tipo == "folha_csv":
             conteudos_csv.append(conteudo)
+        elif tipo == "sped_ecd":
+            conteudos_sped_ecd.append(conteudo)
+        elif tipo == "sped_efd_contrib":
+            conteudos_sped_efd_contrib.append(conteudo)
         else:
             raise HTTPException(
                 status_code=422,
@@ -1238,11 +1269,32 @@ async def analise_pdf(
             except Exception as exc_csv:
                 logger.warning("Falha ao parsear CSV folha: %s", exc_csv)
 
-        # Auditoria: persistir XMLs e CSVs também (cifrar + registrar)
+        # SPED Domínio Contábil — ECD (lançamentos) e EFD-Contribuições (PIS/COFINS)
+        ecd_data = None
+        efd_contrib_data = None
+
+        if conteudos_sped_ecd:
+            try:
+                from parsers.sped_ecd import parsear_sped_ecd
+                # Parse só o primeiro — múltiplos ECDs em um request é improvável
+                ecd_data = parsear_sped_ecd(conteudos_sped_ecd[0])
+            except Exception as exc_ecd:
+                logger.warning("Falha ao parsear SPED ECD: %s", exc_ecd)
+
+        if conteudos_sped_efd_contrib:
+            try:
+                from parsers.sped_efd_contrib import parsear_sped_efd_contrib
+                efd_contrib_data = parsear_sped_efd_contrib(conteudos_sped_efd_contrib[0])
+            except Exception as exc_efd:
+                logger.warning("Falha ao parsear SPED EFD-Contrib: %s", exc_efd)
+
+        # Auditoria: persistir XMLs, CSVs e SPEDs também (cifrar + registrar)
         for conteudo_extra, nome_extra, mime_extra in (
             [(c, f"nfe_{i}.xml", "text/xml") for i, c in enumerate(conteudos_xml_nfe)]
             + [(c, f"nfce_{i}.xml", "text/xml") for i, c in enumerate(conteudos_xml_nfce)]
             + [(c, f"folha_{i}.csv", "text/csv") for i, c in enumerate(conteudos_csv)]
+            + [(c, f"sped_ecd_{i}.txt", "text/plain") for i, c in enumerate(conteudos_sped_ecd)]
+            + [(c, f"sped_efd_contrib_{i}.txt", "text/plain") for i, c in enumerate(conteudos_sped_efd_contrib)]
         ):
             try:
                 from database import aceitar_documento, registrar_documento_auditoria
@@ -1296,7 +1348,69 @@ async def analise_pdf(
             "folha_meses": folha_data.meses_encontrados if folha_data else 0,
             "folha_estimativa": folha_data.fonte_estimativa if folha_data else None,
             "tipo_comprador": tipo_comprador,
+            "sped_ecd_lancamentos": len(ecd_data.lancamentos) if ecd_data else 0,
+            "sped_efd_contrib_regime": efd_contrib_data.regime if efd_contrib_data else None,
+            "sped_efd_pis_devido": str(efd_contrib_data.pis_valor_devido) if efd_contrib_data else None,
+            "sped_efd_cofins_devido": str(efd_contrib_data.cofins_valor_devido) if efd_contrib_data else None,
         }
+
+        # ─── Observability layer (Akita Rails) ──────────────────────────────
+        try:
+            from decimal import Decimal as _D
+
+            from observability import anomalias, hmac_trilha, semaforo_das
+
+            trilha = diagnostico.get("trilha_auditoria") or []
+
+            # 1. Anomaly detection
+            rbt12_raw = diagnostico.get("rbt12") or diagnostico.get("_extracao", {}).get("rbt12")
+            confianca_raw = (diagnostico.get("_extracao", {}) or {}).get("confianca")
+            folha_raw = (diagnostico.get("_extracao", {}) or {}).get("folha_12m")
+
+            rbt12_dec = _D(str(rbt12_raw)) if rbt12_raw not in (None, "") else None
+            folha_dec = _D(str(folha_raw)) if folha_raw not in (None, "") else None
+            rpa_dec = (rbt12_dec / _D("12")) if rbt12_dec else None
+            conf_float = float(confianca_raw) if confianca_raw is not None else None
+
+            pis_nfe = None
+            cofins_nfe = None
+            if nfe_data is not None:
+                pis_nfe = getattr(nfe_data, "pis_total", None) or getattr(nfe_data, "total_pis", None)
+                cofins_nfe = getattr(nfe_data, "cofins_total", None) or getattr(nfe_data, "total_cofins", None)
+
+            alertas = anomalias.detectar(
+                rbt12=rbt12_dec,
+                rpa_mensal=rpa_dec,
+                confianca_extracao=conf_float,
+                folha_12m=folha_dec,
+                pis_sped=efd_contrib_data.pis_valor_devido if efd_contrib_data else None,
+                pis_nfe=pis_nfe,
+                cofins_sped=efd_contrib_data.cofins_valor_devido if efd_contrib_data else None,
+                cofins_nfe=cofins_nfe,
+            )
+            diagnostico["_anomalias"] = alertas
+            for alerta in alertas:
+                trilha.append(alerta)
+
+            # 2. Semáforo DAS (quando calc e pago presentes)
+            das_calc_raw = diagnostico.get("das_calculado") or diagnostico.get("valor_das")
+            das_pago_raw = (diagnostico.get("_extracao", {}) or {}).get("das_pago_e_cac")
+            if das_calc_raw and das_pago_raw:
+                try:
+                    semaforo = semaforo_das.avaliar(
+                        _D(str(das_calc_raw)),
+                        _D(str(das_pago_raw)),
+                    )
+                    diagnostico["_semaforo_das"] = semaforo
+                    trilha.append(semaforo)
+                except Exception as exc_sem:
+                    logger.warning("Falha ao avaliar semáforo DAS: %s", exc_sem)
+
+            # 3. HMAC trilha signing (integridade de prova fiscal)
+            if trilha:
+                diagnostico["trilha_auditoria"] = hmac_trilha.assinar_trilha(trilha)
+        except Exception as exc_obs:
+            logger.warning("Falha na camada de observability: %s", exc_obs)
 
         return JSONResponse(content=_serializar_decimal(payload))
 
