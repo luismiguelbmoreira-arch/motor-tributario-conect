@@ -6,11 +6,9 @@ Testa _validar_docs_por_regime() + _detectar_tipo_documento() em isolamento.
 import os
 import sys
 
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from api_motor import _validar_docs_por_regime, _detectar_tipo_documento, _sniff_xml_mod
-
+from api_motor import _detectar_tipo_documento, _sniff_xml_mod, _validar_docs_por_regime
 
 # ── Testes de detecção de tipo ────────────────────────────────────────────────
 
