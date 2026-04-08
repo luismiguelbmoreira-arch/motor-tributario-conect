@@ -13,8 +13,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from parsers.xml_nfe import (
     NFeParsedData,
     NFeParserError,
-    MODELO_NFE,
-    MODELO_NFCE,
     parsear_xml_nfe,
     parsear_lote_nfe,
 )

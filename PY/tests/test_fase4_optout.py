@@ -15,11 +15,9 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-import gc
 from datetime import date
 from decimal import Decimal
 
-import pytest
 
 from motor_tributario import (
     EmpresaCompradora,

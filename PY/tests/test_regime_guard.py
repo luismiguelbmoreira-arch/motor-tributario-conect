@@ -15,9 +15,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
 from decimal import Decimal
-from datetime import date
 
-from motor_tributario import EmpresaFornecedora, EmpresaCompradora, OperacaoFiscal
+from motor_tributario import EmpresaFornecedora
 from regimes.base import RegimeMismatchError
 from regimes.lucro_presumido import LucroPresumidoEngine
 
