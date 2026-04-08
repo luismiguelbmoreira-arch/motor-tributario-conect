@@ -1,14 +1,14 @@
 """
-jettax_adapter.py — Jettax (exports XML NFe via API ou ZIP).
+sieg_adapter.py — Sieg (exports XML NFe via API ou ZIP).
 
 Responsabilidades:
-    - OAuth2 ou bearer token para API Jettax
+    - OAuth2 ou bearer token para API Sieg
     - Fetch de lotes de XMLs NFe
     - Normalização de export ZIP (CSV/JSON/XML misturados)
     - Idempotência via checksum SHA-256
 
 Uso esperado (Fase 2):
-    adapter = JettaxAdapter(api_base="https://api.jettax.com.br", api_token="...")
+    adapter = SiegAdapter(api_base="https://api.sieg.com.br", api_token="...")
     for export in adapter.fetch_exports(since="2026-01-01"):
         dados = adapter.normalize_export(export["conteudo"])
         # alimenta parser xml_nfe
@@ -28,13 +28,13 @@ import requests
 logger = logging.getLogger(__name__)
 
 
-class JettaxError(RuntimeError):
-    """Falha de comunicação ou contrato com Jettax."""
+class SiegError(RuntimeError):
+    """Falha de comunicação ou contrato com Sieg."""
 
 
-class JettaxAdapter:
+class SiegAdapter:
     """
-    Cliente Jettax — suporta modo API (online) e modo ZIP (fallback offline).
+    Cliente Sieg — suporta modo API (online) e modo ZIP (fallback offline).
 
     Modo API: passe api_base + api_token.
     Modo ZIP: chame `normalize_export(bytes)` diretamente com um ZIP local.
@@ -64,7 +64,7 @@ class JettaxAdapter:
         params: Optional[dict] = None,
     ) -> requests.Response:
         if not self.api_token:
-            raise JettaxError("api_token é obrigatório em modo API.")
+            raise SiegError("api_token é obrigatório em modo API.")
 
         last_exc: Optional[Exception] = None
         for tentativa in range(self.max_retries):
@@ -75,7 +75,7 @@ class JettaxAdapter:
                 )
                 if resp.status_code == 429:
                     wait = int(resp.headers.get("Retry-After", 2 ** tentativa))
-                    logger.warning("Jettax 429 rate limit — aguardando %ss", wait)
+                    logger.warning("Sieg 429 rate limit — aguardando %ss", wait)
                     time.sleep(wait)
                     continue
                 resp.raise_for_status()
@@ -84,11 +84,11 @@ class JettaxAdapter:
                 last_exc = exc
                 backoff = 2 ** tentativa
                 logger.warning(
-                    "Jettax %s %s falhou (%d/%d): %s — backoff %ds",
+                    "Sieg %s %s falhou (%d/%d): %s — backoff %ds",
                     method, url, tentativa + 1, self.max_retries, exc, backoff,
                 )
                 time.sleep(backoff)
-        raise JettaxError(f"Jettax {method} {url} falhou após {self.max_retries} tentativas: {last_exc}")
+        raise SiegError(f"Sieg {method} {url} falhou após {self.max_retries} tentativas: {last_exc}")
 
     def fetch_exports(
         self,
@@ -96,13 +96,13 @@ class JettaxAdapter:
         since: Optional[str] = None,
     ) -> Iterator[dict[str, Any]]:
         """
-        Lista exports Jettax disponíveis.
+        Lista exports Sieg disponíveis.
 
         Yields:
             dict com {id, cnpj, periodo, checksum, download_url}
         """
         if not self.api_base:
-            raise JettaxError("api_base é obrigatório em modo API.")
+            raise SiegError("api_base é obrigatório em modo API.")
 
         url = f"{self.api_base}/exports"
         params = {"since": since} if since else None
@@ -113,7 +113,7 @@ class JettaxAdapter:
 
     def download_export(self, export_id: str) -> bytes:
         if not self.api_base:
-            raise JettaxError("api_base é obrigatório em modo API.")
+            raise SiegError("api_base é obrigatório em modo API.")
         url = f"{self.api_base}/exports/{export_id}/download"
         return self._request("GET", url).content
 
@@ -121,7 +121,7 @@ class JettaxAdapter:
 
     def normalize_export(self, export_bytes: bytes) -> dict[str, Any]:
         """
-        Normaliza um export Jettax para o schema interno.
+        Normaliza um export Sieg para o schema interno.
 
         Aceita:
             - ZIP com múltiplos arquivos (CSV/JSON/XML)
@@ -150,7 +150,7 @@ class JettaxAdapter:
                                     parsed.get("livros", [])
                                 )
                         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-                            logger.warning("Jettax JSON inválido em %s: %s", name, exc)
+                            logger.warning("Sieg JSON inválido em %s: %s", name, exc)
                     elif nome_lower.endswith(".csv"):
                         normalized["livros"].extend(self._parse_csv(conteudo))
                     elif nome_lower.endswith(".xml"):
@@ -178,7 +178,7 @@ class JettaxAdapter:
     @staticmethod
     def _parse_csv(conteudo: bytes) -> list[list[str]]:
         """
-        Parser CSV tolerante — latin-1 é padrão Jettax.
+        Parser CSV tolerante — latin-1 é padrão Sieg.
         TODO Fase 2: usar `csv.DictReader` com sniff de dialeto.
         """
         try:
