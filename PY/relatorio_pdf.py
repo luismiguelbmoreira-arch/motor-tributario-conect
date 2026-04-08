@@ -267,6 +267,8 @@ def _gerar_html(diagnostico: dict, pii: dict | None = None) -> str:
   </div>
 </div>
 
+{_secao_decisao_opt_out(diagnostico)}
+
 <!-- Serviços recomendados -->
 <h2>Serviços Recomendados</h2>
 <table>
@@ -292,6 +294,185 @@ def _gerar_html(diagnostico: dict, pii: dict | None = None) -> str:
 
 </body>
 </html>"""
+
+
+def _secao_decisao_opt_out(diagnostico: dict) -> str:
+    """
+    Gera a seção 'Decisão Estratégica: Opt-Out IVA' do PDF cliente.
+
+    Frente 3.3 (Bloco B): converte os números crus de cenarios em uma narrativa
+    educativa estruturada em 6 sub-blocos:
+      1. O que é (definição em linguagem de empresário)
+      2. Sua situação (tabela 2 colunas Simples × Opt-Out)
+      3. Diagnóstico personalizado (recomendacao_inteligente do Bloco A)
+      4. Datas-chave 2026 (janelas semestrais + irretratabilidade)
+      5. Como fazer (checklist 3 passos)
+      6. Riscos (cards vermelhos)
+
+    Base legal: LC 214/2025 Arts. 41-44 + Resolução CGSN 183/2025.
+    """
+    cenarios = diagnostico.get("cenarios", {})
+    simples_puro = cenarios.get("simples_puro", {})
+    opt_out = cenarios.get("opt_out", {})
+    rec = cenarios.get("recomendacao_inteligente") or {}
+
+    # Fallback se Bloco A não rodou (compatibilidade)
+    codigo = rec.get("codigo", "ZONA_CINZA")
+    titulo_rec = _esc(rec.get("titulo", "Análise individual recomendada"))
+    justificativa = _esc(rec.get("justificativa", ""))
+    amparo_rec = _esc(rec.get("amparo_legal", ""))
+
+    # Cores da recomendação por código (semâforo)
+    cor_map = {
+        "OPT_OUT_FORTE":     ("#065f46", "#d1fae5", "#10b981"),  # verde forte
+        "OPT_OUT_VANTAJOSO": ("#0c4a6e", "#dbeafe", "#3b82f6"),  # azul
+        "MANTER_SIMPLES":    ("#1f2937", "#f3f4f6", "#6b7280"),  # cinza neutro
+        "ZONA_CINZA":        ("#92400e", "#fef3c7", "#f59e0b"),  # amarelo
+    }
+    cor_texto, cor_bg, cor_borda = cor_map.get(codigo, cor_map["ZONA_CINZA"])
+
+    # Tabela Sua Situação
+    custo_simples = _fmt_moeda(simples_puro.get("custo_das_por_operacao", 0))
+    custo_opt_das = _fmt_moeda(opt_out.get("custo_das_por_operacao", 0))
+    iva_por_fora = _fmt_moeda(opt_out.get("iva_recolhido_por_fora", 0))
+    custo_opt_total = _fmt_moeda(opt_out.get("custo_total", 0))
+    credito_simples = _fmt_moeda(simples_puro.get("credito_gerado_para_comprador", 0))
+    credito_opt = _fmt_moeda(opt_out.get("credito_gerado_para_comprador", 0))
+    pct_credito_simples = _esc(simples_puro.get("percentual_credito_nf", "1%"))
+    pct_credito_opt = _esc(opt_out.get("percentual_credito_nf", "100%"))
+
+    return f"""
+<!-- Decisão Estratégica: Opt-Out IVA -->
+<h2>Decisão Estratégica: Opt-Out IVA</h2>
+
+<!-- Sub-bloco 1: O que é -->
+<div style="background:#f8fafc;border-left:4px solid #1e40af;padding:10px 14px;margin-bottom:12px;border-radius:0 4px 4px 0;">
+  <div style="font-weight:700;font-size:11px;color:#1e3a5f;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;">O que é</div>
+  <div style="font-size:11px;color:#374151;line-height:1.5;">
+    Opt-Out é a opção do Simples Nacional de <strong>sair do recolhimento unificado</strong>
+    de CBS/IBS, recolhendo esses dois tributos separadamente. O resto continua no DAS
+    (IRPJ, CSLL, CPP, ICMS, ISS). A grande diferença é que, com Opt-Out, seu cliente B2B
+    recebe <strong>100% de crédito de CBS/IBS</strong> em vez de 1% — o que pode ser
+    decisivo para reter clientes corporativos depois de 2027.
+  </div>
+</div>
+
+<!-- Sub-bloco 2: Sua situação (tabela comparativa) -->
+<h3 style="margin-top:14px;">Sua Situação Específica</h3>
+<table style="margin-bottom:12px;">
+  <thead>
+    <tr><th>Item</th><th>Simples Puro</th><th>Opt-Out IVA</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>DAS por operação</strong></td>
+      <td>{custo_simples}</td>
+      <td>{custo_opt_das}</td>
+    </tr>
+    <tr>
+      <td><strong>IVA recolhido por fora</strong></td>
+      <td style="color:#9ca3af;">—</td>
+      <td>{iva_por_fora}</td>
+    </tr>
+    <tr style="background:#eff6ff;">
+      <td><strong>Custo total por operação</strong></td>
+      <td><strong>{custo_simples}</strong></td>
+      <td><strong>{custo_opt_total}</strong></td>
+    </tr>
+    <tr>
+      <td><strong>Crédito gerado para comprador B2B</strong></td>
+      <td>{credito_simples} <span style="color:#9ca3af;">({pct_credito_simples})</span></td>
+      <td><strong style="color:#065f46;">{credito_opt} ({pct_credito_opt})</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- Sub-bloco 3: Diagnóstico personalizado -->
+<div style="background:{cor_bg};border:2px solid {cor_borda};padding:14px 16px;border-radius:6px;margin-bottom:14px;">
+  <div style="font-weight:800;font-size:13px;color:{cor_texto};margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em;">
+    📋 Diagnóstico Personalizado: {titulo_rec}
+  </div>
+  <div style="font-size:11px;color:#1f2937;line-height:1.6;">
+    {justificativa}
+  </div>
+</div>
+
+<!-- Sub-bloco 4: Datas-chave 2026 -->
+<h3 style="margin-top:14px;">Datas-Chave 2026 — Janelas de Decisão</h3>
+<table style="margin-bottom:8px;">
+  <thead>
+    <tr><th style="width:110px;">Data Limite</th><th>Decisão</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>30/04/2026</strong></td>
+      <td>Janela do <strong>1º semestre</strong> — opção válida de Jul/2026 em diante</td>
+    </tr>
+    <tr>
+      <td><strong>30/09/2026</strong></td>
+      <td>Janela do <strong>2º semestre</strong> — opção válida de Jan/2027 em diante (CBS sobe para 8,8%)</td>
+    </tr>
+  </tbody>
+</table>
+<div style="background:#fef2f2;border-left:4px solid #dc2626;padding:10px 14px;margin-bottom:14px;border-radius:0 4px 4px 0;">
+  <div style="font-weight:700;font-size:11px;color:#991b1b;margin-bottom:3px;">⚠ ATENÇÃO — IRRETRATABILIDADE</div>
+  <div style="font-size:10px;color:#7f1d1d;">
+    A decisão pelo Opt-Out é <strong>irretratável por 5 anos-calendário</strong>
+    (LC 214/2025, Art. 43). Avalie com seu contador antes de optar.
+  </div>
+</div>
+
+<!-- Sub-bloco 5: Como fazer (checklist) -->
+<h3 style="margin-top:14px;">Como Fazer o Opt-Out na Prática</h3>
+<table style="margin-bottom:14px;">
+  <thead>
+    <tr><th style="width:40px;">Passo</th><th>Ação</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align:center;font-weight:700;color:#1e40af;">1</td>
+      <td>Acessar o <strong>portal do Simples Nacional</strong> (gov.br/receitafederal) com certificado digital ou código de acesso</td>
+    </tr>
+    <tr>
+      <td style="text-align:center;font-weight:700;color:#1e40af;">2</td>
+      <td>No menu PGDAS-D, marcar a opção <strong>"Recolhimento de CBS/IBS fora do DAS"</strong> dentro da janela semestral aberta</td>
+    </tr>
+    <tr>
+      <td style="text-align:center;font-weight:700;color:#1e40af;">3</td>
+      <td>Confirmar e <strong>imprimir o protocolo</strong>. A partir do semestre seguinte, recolher CBS/IBS via DARF (códigos a serem definidos por ato da RFB)</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- Sub-bloco 6: Riscos -->
+<h3 style="margin-top:14px;">Riscos do Opt-Out</h3>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
+  <div style="background:#fef2f2;border-left:3px solid #dc2626;padding:8px 10px;border-radius:0 4px 4px 0;">
+    <div style="font-weight:700;font-size:10px;color:#991b1b;margin-bottom:2px;">5 ANOS SEM VOLTA</div>
+    <div style="font-size:9px;color:#7f1d1d;line-height:1.4;">
+      Decisão irretratável por 5 anos-calendário. LC 214/2025, Art. 43.
+    </div>
+  </div>
+  <div style="background:#fffbeb;border-left:3px solid #f59e0b;padding:8px 10px;border-radius:0 4px 4px 0;">
+    <div style="font-weight:700;font-size:10px;color:#92400e;margin-bottom:2px;">OBRIGAÇÕES EXTRAS</div>
+    <div style="font-size:9px;color:#78350f;line-height:1.4;">
+      EFD-Reinf e EFD-Contribuições passam a ser obrigatórias mensalmente.
+    </div>
+  </div>
+  <div style="background:#fef2f2;border-left:3px solid #dc2626;padding:8px 10px;border-radius:0 4px 4px 0;">
+    <div style="font-weight:700;font-size:10px;color:#991b1b;margin-bottom:2px;">MULTA DE OFÍCIO</div>
+    <div style="font-size:9px;color:#7f1d1d;line-height:1.4;">
+      Multa de <strong>75%</strong> sobre o tributo não recolhido (Lei 9.430/1996,
+      Art. 44, I). Majorada para 100% em sonegação e 150% em reincidência
+      (Lei 14.689/2023).
+    </div>
+  </div>
+</div>
+
+<p style="font-size:9px;color:#6b7280;font-style:italic;margin-top:4px;">
+  ⚖ {amparo_rec or 'LC 214/2025, Arts. 41-44 | CF Art. 146, III, "d" | Resolução CGSN 183/2025'}
+</p>
+"""
 
 
 def _servicos_recomendados(diagnostico: dict) -> str:
