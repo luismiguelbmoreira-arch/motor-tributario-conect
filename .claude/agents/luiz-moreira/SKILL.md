@@ -70,9 +70,9 @@ CERTO:   RBT12 = 1.800.000 (Decimal) → AN = Decimal('0.107') → Multiplicaç�
 IF empresa.cnae IN [TI, Advocacia, Contabilidade, Engenharia, P&D]:
    Calcular: Fator R = Folha Salários (12m) / RBT12
    IF Fator R ≥ 0.28:
-      Anexo = III (obrigatório, alíquota maior)
+      Anexo = III (obrigatório, alíquota MENOR — benefício para o contribuinte)
    ELSE:
-      Anexo = V (serviços intelectuais, alíquota menor)
+      Anexo = V (serviços intelectuais, alíquota MAIOR)
    REPORT Fator R + Decisão + Impacto de Caixa
 ELSE:
    Anexo já definido por CNAE (Comércio = I, Indústria = II, etc)
@@ -175,7 +175,7 @@ AE_formatted = f"R$ {AE * RBT12 / 100:,.2f}"  # Formatar ÚLTIMO
 
 ### **Gatilhos de Alerta para O Viciado**
 ```
-ALERT_SUBLIMITE: IF RBT12 ≥ 4.56M THEN "BLOQUEIO CND IMINENTE"
+ALERT_TETO_GERAL_95: IF RBT12 ≥ 4.56M THEN "BLOQUEIO CND IMINENTE (95% do teto R$4.8M)"
 ALERT_FATOR_R_ZONA: IF 0.27 ≤ Fator R ≤ 0.29 THEN "MONITORAR MENSALMENTE"
 ALERT_YEAR_CHANGE: IF data_emissão.year ≠ data_liquidação.year THEN "CONCILIAÇÃO RISCO"
 ALERT_ESTORNO_SPLIT: IF operação = "ESTORNO" AND split_anterior THEN "CONFIRMAR COM CONTADOR"
@@ -183,7 +183,7 @@ ALERT_ESTORNO_SPLIT: IF operação = "ESTORNO" AND split_anterior THEN "CONFIRMA
 
 ### **Fórmulas com Deduções Completas**
 ```
-RBT12 = ΣFaturamento_12m (puro, Decimal, 12 casas decimais)
+RBT12 = ΣFaturamento_12m (puro, Decimal, quantize 2 casas para monetário)
 
 Alíquota Nominal = Tabela[Anexo][Faixa_RBT12]  — Art. 18, LC 123
 Parcela Deduzir = Tabela[Anexo][Faixa_RBT12]   — Art. 18, LC 123
@@ -192,8 +192,8 @@ Alíquota Efetiva = ((RBT12 × AN) - PD) / RBT12
 
 DAS Mensal = (RBT12 × AE) / 12  — valor exato
 
-Split Payment 2026 = DAS × 1,0% (CBS 0.9% + IBS 0.1%)  — EC 132/2023
-Split Payment 2027+ = DAS × 8,9% (CBS 8.8% + IBS 0.1%)  — LC 214/2025
+Split Payment 2026 = Valor_NF × 1,0% (CBS 0,9% + IBS 0,1%)  — EC 132/2023
+Split Payment 2027+ = Valor_NF × 8,9% (CBS 8,8% + IBS 0,1%)  — LC 214/2025
 ```
 
 ---
@@ -238,16 +238,21 @@ ANÁLISE:
   Validação: Fator R ≥ 0,28? → SIM
   Decisão: Anexo III obrigatório (não Anexo V)
 
-  AN (Anexo III) = 17.5% (Art. 18, Anexo III, LC 123)
-  PD = R$ 123.800
-  AE = ((2.000.000 × 0.175) - 123.800) / 2.000.000 = 0,1693 = 16.93%
+  RBT12 R$ 2.000.000 → Faixa 5 (até R$ 3.600.000)
+  AN (Anexo III, Faixa 5) = 21,00% (Art. 18, Anexo III, LC 123)
+  PD = R$ 125.640
+  AE = ((2.000.000 × 0,21) - 125.640) / 2.000.000 = 294.360 / 2.000.000 = 0,14718 = 14,72%
 
-  DAS Mensal = 2.000.000 × 0.1693 / 12 = R$ 28.217
+  DAS Mensal = 2.000.000 × 0,14718 / 12 = R$ 24.530
+
+  Comparativo Anexo V (hipotético, se Fator R < 0,28):
+  AN (Anexo V, Faixa 5) = 23,00%, PD = R$ 62.100
+  AE_V = ((2.000.000 × 0,23) - 62.100) / 2.000.000 = 19,90%
 
 OUTPUT:
   ✅ Fator R: 0,30 (Anexo III obrigatório)
-  ✅ Alíquota: 16.93% (validado)
-  ⚠️ Carga tributária 33% MAIOR que se fosse Anexo V (hipotético)
+  ✅ Alíquota Efetiva: 14,72% (validado)
+  ✅ Economia de 5,18 p.p. vs Anexo V (14,72% vs 19,90% — benefício do Fator R)
   💡 SUGESTÃO: Avaliar Opt-Out se cliente exigir crédito (montadora B2B)
 ```
 
@@ -349,7 +354,7 @@ Antes de entregar análise, valide:
 
 - **O Viciado:** Você dita as regras; ele programa blindado (Decimal, Pydantic V2, Zero-Trust)
 - **Master Zen:** Você ignora a UI; ele cuida dela. Foco: dinheiro e lei
-- **Chefe:** Você supervisiona ambos; você é a voz final
+- **Chefe:** Ele toma decisões macro e resolve conflitos; você valida a matemática fiscal
 
 ---
 

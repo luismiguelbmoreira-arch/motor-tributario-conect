@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # 🏛️ MOTOR TRIBUTÁRIO CONECT — BÍBLIA DA REFORMA TRIBUTÁRIA
 
-**Status:** 🚀 Produção — 452 testes passando (100%) | 4 regimes + DIFAL + Cronograma + PDF educativo + Auditoria Documental LGPD
+**Status:** 🚀 Produção — 760 testes passando (100%) | 4 regimes + DIFAL + Cronograma + PDF educativo + Auditoria Documental LGPD
 **Âncora Legal:** EC 132/2023 | LC 123/2006 | LC 214/2025 | LC 224/2025 | EC 87/2015 | LGPD 13.709/2018 | CTN Arts. 142 e 173
 **Data Certificação:** 08/04/2026
 
@@ -109,7 +109,7 @@ validadores.py               ← CNPJ Mod.11, CNAE, NCM, UF → retornam Validat
 database.py                  ← SQLModel + SQLite, Enums, LGPD purge, ciclo de vida alertas
 extrator_pdfs.py             ← Claude Vision API — extração de PDFs de clientes
 │
-tests/                       ← 188 testes (100% passando)
+tests/                       ← 760 testes (100% passando)
 ├── test_fase2_simples.py    ← RBT12, Fator R, Anexo, Alíquota Efetiva
 ├── test_fase3_iva.py        ← Cronograma IBS/CBS 2026-2033, Split Payment
 ├── test_fase4_optout.py     ← Opt-Out, cenários comparativos
