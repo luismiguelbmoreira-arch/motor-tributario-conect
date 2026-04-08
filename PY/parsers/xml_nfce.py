@@ -17,14 +17,14 @@ from __future__ import annotations
 from decimal import Decimal
 
 from .xml_nfe import (
+    MODELO_NFCE,
     NFeParsedData,
     NFeParserError,
-    MODELO_NFCE,
-    _get_lxml,
-    _strip_ns,
-    _get_raiz_nfe,
-    _text,
     _decimal,
+    _get_lxml,
+    _get_raiz_nfe,
+    _strip_ns,
+    _text,
 )
 
 
@@ -113,7 +113,6 @@ def parsear_lote_nfce(conteudos: list[bytes]) -> NFeParsedData:
 
     notas = [parsear_xml_nfce(c) for c in conteudos]
 
-    import re
     cnpjs = {n.cnpj_emitente for n in notas}
     if len(cnpjs) > 1:
         raise NFeParserError(
@@ -125,7 +124,6 @@ def parsear_lote_nfce(conteudos: list[bytes]) -> NFeParsedData:
             f"XMLs NFCe de meses diferentes no mesmo lote: {competencias}"
         )
 
-    from decimal import ROUND_HALF_UP
     valor_total = sum(n.valor_total_mes for n in notas)
     receita_st = sum(n.receita_st_icms for n in notas)
     chaves = [c for n in notas for c in n.chaves_nfe]
