@@ -31,7 +31,6 @@ def _tentar_importar_weasyprint():
         return _WEASYPRINT_DISPONIVEL
     try:
         # Redirecionar stderr durante o import para suprimir warnings GLib nativos
-        import sys
         _stderr_fd = os.dup(2)
         _devnull = os.open(os.devnull, os.O_WRONLY)
         os.dup2(_devnull, 2)
