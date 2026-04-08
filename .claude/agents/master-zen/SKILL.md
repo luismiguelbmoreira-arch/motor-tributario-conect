@@ -21,8 +21,6 @@ compatibility: |
   - JavaScript vanilla (ES6+)
   - WCAG 2.1 AA compliance
   - FastAPI (backend Python)
-  - NOTA: Exemplos abaixo usam React/JSX para ilustração de padrões.
-    O projeto atual usa HTML/Tailwind/Chart.js. Adaptar ao implementar.
 
 ---
 
@@ -220,340 +218,422 @@ TIPOGRAFIA
 
 ---
 
-## 📱 Componentes Zenistas (React)
+## 📱 Componentes Zenistas (HTML/Tailwind/Chart.js)
 
 ### 1. **Card — A Unidade Básica**
-```jsx
-// Card.jsx — Encapsula informação com respiração visual
-export function Card({
-  title,
-  subtitle,
-  children,
-  variant = "default",
-  icon,
-  stress = false // Red para risco, Green para segurança
-}) {
-  const stressColor = stress === "risk" ? "border-orange-200" :
-                      stress === "safe" ? "border-green-200" :
-                      "border-gray-200";
-
-  return (
-    <div className={`
-      bg-white rounded-lg border ${stressColor}
-      p-6 shadow-sm hover:shadow-md transition-shadow
-      focus-within:ring-2 focus-within:ring-amber-400
-    `}>
-      <div className="flex items-start gap-3">
-        {icon && <span className="text-2xl mt-1">{icon}</span>}
-        <div className="flex-1">
-          {title && <h3 className="text-lg font-semibold text-gray-900">{title}</h3>}
-          {subtitle && <p className="text-sm text-gray-600 mt-1">{subtitle}</p>}
-        </div>
-      </div>
-      {children && <div className="mt-4">{children}</div>}
+```html
+<!-- card.html — Encapsula informação com respiração visual -->
+<!-- Variantes: stress="risk" (border-orange-200), stress="safe" (border-green-200) -->
+<div class="bg-white rounded-lg border border-gray-200 p-6 shadow-sm
+            hover:shadow-md transition-shadow duration-300
+            focus-within:ring-2 focus-within:ring-amber-400"
+     id="card-rbt12">
+  <div class="flex items-start gap-3">
+    <span class="text-2xl mt-1">💰</span>
+    <div class="flex-1">
+      <h3 class="text-lg font-semibold text-gray-900">Receita Bruta (RBT12)</h3>
+      <p class="text-sm text-gray-600 mt-1">Últimos 12 meses</p>
     </div>
-  );
+  </div>
+  <div class="mt-4" id="card-rbt12-content">
+    <!-- Conteúdo dinâmico via JS -->
+  </div>
+</div>
+
+<script>
+// Função utilitária para criar cards dinamicamente
+function criarCard(containerId, { title, subtitle, icon, stress, content }) {
+  const borderClass = stress === 'risk' ? 'border-orange-200' :
+                      stress === 'safe' ? 'border-green-200' : 'border-gray-200';
+  const container = document.getElementById(containerId);
+  container.className = `bg-white rounded-lg border ${borderClass} p-6 shadow-sm
+                         hover:shadow-md transition-shadow duration-300
+                         focus-within:ring-2 focus-within:ring-amber-400`;
+  container.innerHTML = `
+    <div class="flex items-start gap-3">
+      ${icon ? `<span class="text-2xl mt-1">${icon}</span>` : ''}
+      <div class="flex-1">
+        <h3 class="text-lg font-semibold text-gray-900">${title}</h3>
+        ${subtitle ? `<p class="text-sm text-gray-600 mt-1">${subtitle}</p>` : ''}
+      </div>
+    </div>
+    ${content ? `<div class="mt-4">${content}</div>` : ''}
+  `;
 }
+</script>
 ```
 
 ### 2. **Skeleton — Respira com Esperança**
-```jsx
-// Skeleton.jsx — Placeholder enquanto dados chegam
-export function Skeleton({ width = "100%", height = "2rem", count = 1 }) {
-  return (
-    <div className="space-y-3">
-      {Array.from({ length: count }).map((_, i) => (
-        <div
-          key={i}
-          className="bg-gray-200 animate-pulse rounded"
-          style={{ width, height }}
-        />
-      ))}
-    </div>
-  );
+```html
+<!-- skeleton.html — Placeholder enquanto dados carregam -->
+<div id="skeleton-rbt12" class="space-y-3">
+  <div class="bg-gray-200 animate-pulse rounded h-8 w-full"></div>
+  <div class="bg-gray-200 animate-pulse rounded h-8 w-full"></div>
+  <div class="bg-gray-200 animate-pulse rounded h-8 w-3/4"></div>
+</div>
+
+<script>
+// Cria N linhas de skeleton
+function criarSkeleton(containerId, count = 3, height = '2rem') {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  container.className = 'space-y-3';
+  for (let i = 0; i < count; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'bg-gray-200 animate-pulse rounded';
+    bar.style.height = height;
+    bar.style.width = i === count - 1 ? '75%' : '100%';
+    container.appendChild(bar);
+  }
 }
 
-// Uso:
-<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-  {loading ? (
-    <Skeleton height="4rem" count={3} />
-  ) : (
-    <Card title="RBT12" stress="safe">
-      <p className="text-2xl font-bold">R$ {rbt12?.toLocaleString()}</p>
-    </Card>
-  )}
-</motion.div>
+// Troca skeleton por conteúdo real com fade-in
+function substituirSkeleton(containerId, htmlContent) {
+  const container = document.getElementById(containerId);
+  container.style.opacity = '0';
+  container.innerHTML = htmlContent;
+  container.style.transition = 'opacity 300ms ease-in-out';
+  requestAnimationFrame(() => { container.style.opacity = '1'; });
+}
+</script>
 ```
 
 ### 3. **Stepper — Guia o Caos**
-```jsx
-// Stepper.jsx — Fracciona jornada tributária em passos
-export function Stepper({ steps, currentStep }) {
-  return (
-    <div className="space-y-6">
-      {steps.map((step, idx) => (
-        <motion.div
-          key={idx}
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: idx * 0.1 }}
-          className={`
-            border-l-4 pl-4 py-2 transition-colors
-            ${idx < currentStep ? "border-green-500 text-gray-600" :
-              idx === currentStep ? "border-amber-500 text-gray-900" :
-              "border-gray-300 text-gray-400"}
-          `}
-        >
-          <h4 className="font-semibold">{step.title}</h4>
-          <p className="text-sm text-gray-600 mt-1">{step.description}</p>
-        </motion.div>
-      ))}
-    </div>
-  );
+```html
+<!-- stepper.html — Fracciona jornada tributária em passos -->
+<div id="stepper-analise" class="space-y-4"></div>
+
+<script>
+function renderizarStepper(containerId, steps, currentStep) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  steps.forEach((step, idx) => {
+    const borderClass = idx < currentStep ? 'border-green-500 text-gray-600' :
+                        idx === currentStep ? 'border-amber-500 text-gray-900' :
+                        'border-gray-300 text-gray-400';
+    const div = document.createElement('div');
+    div.className = `border-l-4 pl-4 py-2 transition-colors duration-300 ${borderClass}`;
+    div.style.opacity = '0';
+    div.style.transform = 'translateX(-20px)';
+    div.innerHTML = `
+      <h4 class="font-semibold">${step.title}</h4>
+      <p class="text-sm text-gray-600 mt-1">${step.description}</p>
+    `;
+    container.appendChild(div);
+    // Animação escalonada
+    setTimeout(() => {
+      div.style.transition = 'opacity 300ms ease-out, transform 300ms ease-out';
+      div.style.opacity = '1';
+      div.style.transform = 'translateX(0)';
+    }, idx * 100);
+  });
 }
+
+// Uso:
+const steps = [
+  { title: 'Analisar RBT12', description: 'Receita bruta dos últimos 12 meses' },
+  { title: 'Verificar Anexo', description: 'Simples ou Opt-Out?' },
+  { title: 'Simular Impacto', description: 'Economia vs. retenção' },
+  { title: 'Decidir', description: 'Melhor caminho para sua empresa' },
+];
+renderizarStepper('stepper-analise', steps, 1);
+</script>
 ```
 
 ### 4. **Alert Elegante — Erro sem Pânico**
-```jsx
-// Alert.jsx — Comunica problema humanamente
-export function Alert({ type = "info", title, message, action, onClose }) {
-  const colors = {
-    error: "bg-red-50 border-red-200 text-red-900",
-    warning: "bg-amber-50 border-amber-200 text-amber-900",
-    success: "bg-green-50 border-green-200 text-green-900",
-    info: "bg-blue-50 border-blue-200 text-blue-900",
-  };
+```html
+<!-- alert.html — Comunica problema humanamente -->
+<div id="alert-container"></div>
 
-  const icons = {
-    error: "⚠️",
-    warning: "⏱️",
-    success: "✓",
-    info: "ℹ️",
+<script>
+function mostrarAlerta(containerId, { type = 'info', title, message, actionLabel, actionHandler }) {
+  const cores = {
+    error:   'bg-red-50 border-red-200 text-red-900',
+    warning: 'bg-amber-50 border-amber-200 text-amber-900',
+    success: 'bg-green-50 border-green-200 text-green-900',
+    info:    'bg-blue-50 border-blue-200 text-blue-900',
   };
+  const icones = { error: '⚠️', warning: '⏱️', success: '✓', info: 'ℹ️' };
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0 }}
-      className={`border rounded-lg p-4 ${colors[type]}`}
-      role="alert"
-      aria-live="polite"
-    >
-      <div className="flex items-start gap-3">
-        <span className="text-xl">{icons[type]}</span>
-        <div className="flex-1">
-          {title && <h4 className="font-semibold">{title}</h4>}
-          <p className="text-sm mt-1">{message}</p>
-          {action && (
-            <button onClick={action.handler} className="mt-2 underline text-sm font-medium">
-              {action.label}
-            </button>
-          )}
-        </div>
-        {onClose && (
-          <button onClick={onClose} aria-label="Fechar" className="text-lg">
-            ✕
-          </button>
-        )}
+  const container = document.getElementById(containerId);
+  const alertDiv = document.createElement('div');
+  alertDiv.className = `border rounded-lg p-4 ${cores[type]}`;
+  alertDiv.setAttribute('role', 'alert');
+  alertDiv.setAttribute('aria-live', 'polite');
+  alertDiv.style.opacity = '0';
+  alertDiv.style.transform = 'translateY(-10px)';
+
+  alertDiv.innerHTML = `
+    <div class="flex items-start gap-3">
+      <span class="text-xl">${icones[type]}</span>
+      <div class="flex-1">
+        ${title ? `<h4 class="font-semibold">${title}</h4>` : ''}
+        <p class="text-sm mt-1">${message}</p>
+        ${actionLabel ? `<button class="mt-2 underline text-sm font-medium alert-action">${actionLabel}</button>` : ''}
       </div>
-    </motion.div>
-  );
+      <button aria-label="Fechar" class="text-lg alert-close">✕</button>
+    </div>
+  `;
+
+  container.appendChild(alertDiv);
+
+  // Animação de entrada
+  requestAnimationFrame(() => {
+    alertDiv.style.transition = 'opacity 300ms ease-out, transform 300ms ease-out';
+    alertDiv.style.opacity = '1';
+    alertDiv.style.transform = 'translateY(0)';
+  });
+
+  // Event listeners
+  alertDiv.querySelector('.alert-close')?.addEventListener('click', () => {
+    alertDiv.style.opacity = '0';
+    setTimeout(() => alertDiv.remove(), 300);
+  });
+  if (actionHandler) {
+    alertDiv.querySelector('.alert-action')?.addEventListener('click', actionHandler);
+  }
 }
+</script>
 ```
 
-### 5. **DataViz — Gráfico Ameno**
-```jsx
-// RBT12Chart.jsx — Visualiza RBT12 vs teto de forma suave
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+### 5. **DataViz — Gráfico RBT12 (Chart.js)**
+```html
+<!-- rbt12-chart.html — Visualiza RBT12 vs teto com Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-export function RBT12Chart({ data }) {
-  return (
-    <div className="w-full h-64 bg-gradient-to-b from-blue-50 to-white rounded-lg p-4">
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data}>
-          <defs>
-            <linearGradient id="colorRBT12" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#0284C7" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#0284C7" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-          <XAxis dataKey="mes" />
-          <YAxis />
-          <Tooltip
-            contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb" }}
-            formatter={(value) => `R$ ${value.toLocaleString()}`}
-          />
-          <Area
-            type="monotone"
-            dataKey="rbt12"
-            stroke="#0284C7"
-            fillOpacity={1}
-            fill="url(#colorRBT12)"
-            isAnimationActive={true}
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  );
+<div class="w-full bg-gradient-to-b from-blue-50 to-white rounded-lg p-4">
+  <canvas id="chart-rbt12" height="256"></canvas>
+</div>
+
+<script>
+function renderizarGraficoRBT12(canvasId, dados) {
+  // dados = [{ mes: 'Jan', rbt12: 1500000 }, ...]
+  const ctx = document.getElementById(canvasId).getContext('2d');
+
+  // Gradiente azul suave
+  const gradient = ctx.createLinearGradient(0, 0, 0, 256);
+  gradient.addColorStop(0, 'rgba(2, 132, 199, 0.3)');   // #0284C7 30%
+  gradient.addColorStop(1, 'rgba(2, 132, 199, 0.0)');   // transparente
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: dados.map(d => d.mes),
+      datasets: [{
+        label: 'RBT12',
+        data: dados.map(d => d.rbt12),
+        borderColor: '#0284C7',
+        backgroundColor: gradient,
+        fill: true,
+        tension: 0.4,  // curva suave (monotone)
+        pointRadius: 3,
+        pointHoverRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: (ctx) => `R$ ${ctx.parsed.y.toLocaleString('pt-BR')}`
+          }
+        },
+        legend: { display: false }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: {
+          ticks: {
+            callback: (v) => `R$ ${(v / 1000).toFixed(0)}k`
+          },
+          grid: { color: '#E5E7EB', borderDash: [3, 3] }
+        }
+      }
+    }
+  });
 }
+
+// Uso:
+renderizarGraficoRBT12('chart-rbt12', [
+  { mes: 'Jan', rbt12: 1200000 },
+  { mes: 'Fev', rbt12: 1350000 },
+  { mes: 'Mar', rbt12: 1500000 },
+  // ...
+]);
+</script>
 ```
 
 ---
 
 ## 🧘 Padrão: Página Completa Zenista
 
-```jsx
-// Dashboard.jsx — Exemplo de fluxo total
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Card, Skeleton, Stepper, Alert } from "@/components";
+```html
+<!-- dashboard.html — Exemplo de fluxo completo (HTML/Tailwind/Chart.js) -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seu Cenário Tributário</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .font-playfair { font-family: 'Playfair Display', serif; }
+    body { font-family: 'Inter', sans-serif; }
+    .fade-in { animation: fadeIn 500ms ease-out forwards; opacity: 0; }
+    @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
+    .fade-in { transform: translateY(-10px); }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 p-6">
+  <div class="max-w-4xl mx-auto space-y-8">
 
-export function Dashboard({ cnpj }) {
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState(null);
-  const [currentStep, setCurrentStep] = useState(0);
+    <!-- Header -->
+    <div class="fade-in">
+      <h1 class="text-4xl font-semibold text-gray-900 font-playfair">
+        Seu Cenário Tributário
+      </h1>
+      <p class="text-gray-600 mt-2">
+        Análise da Reforma Tributária 2026-2033 para sua empresa.
+      </p>
+    </div>
 
-  useEffect(() => {
-    // Chama backend (confia em O VICIADO)
-    fetch(`/api/tributario/analise/${cnpj}`)
-      .then(r => r.json())
-      .then(payload => {
-        setData(payload);
-        setLoading(false);
-      })
-      .catch(err => {
-        setError("Não conseguimos analisar seu cenário. Tente novamente.");
-        setLoading(false);
-      });
-  }, [cnpj]);
+    <!-- Alert (container dinâmico) -->
+    <div id="alert-principal"></div>
 
-  const steps = [
-    { title: "Analisar RBT12", description: "Receita bruta dos últimos 12 meses" },
-    { title: "Verificar Anexo", description: "Simples ou Opt-Out?" },
-    { title: "Simular Impacto", description: "Economia vs. retenção" },
-    { title: "Decidir", description: "Melhor caminho para sua empresa" },
-  ];
+    <!-- Stepper -->
+    <div class="bg-white rounded-lg border border-green-200 p-6 shadow-sm fade-in"
+         style="animation-delay: 100ms">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Jornada de Análise</h3>
+      <div id="stepper-jornada"></div>
+    </div>
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50 p-6">
-      <div className="max-w-4xl mx-auto space-y-8">
-
-        {/* Header */}
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-4xl font-semibold text-gray-900 font-playfair">
-            Seu Cenário Tributário
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Análise da Reforma Tributária 2026-2033 para sua empresa.
-          </p>
-        </motion.div>
-
-        {/* Erro */}
-        <AnimatePresence>
-          {error && (
-            <Alert
-              type="error"
-              title="Algo não saiu como esperado"
-              message={error}
-              action={{ label: "Tentar Novamente", handler: () => window.location.reload() }}
-              onClose={() => setError(null)}
-            />
-          )}
-        </AnimatePresence>
-
-        {/* Stepper */}
-        <Card title="Jornada de Análise" stress="safe">
-          {loading ? (
-            <Skeleton height="2rem" count={4} />
-          ) : (
-            <Stepper steps={steps} currentStep={currentStep} />
-          )}
-        </Card>
-
-        {/* RBT12 */}
-        {loading ? (
-          <Skeleton height="6rem" />
-        ) : (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
-            <Card
-              title="Receita Bruta (RBT12)"
-              subtitle="Últimos 12 meses"
-              icon="💰"
-              stress={data.rbt12_percentual > 0.95 ? "risk" : "safe"}
-            >
-              <div className="flex items-baseline gap-4">
-                <p className="text-3xl font-bold text-gray-900">
-                  {data.rbt12.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                </p>
-                <p className={`text-sm font-semibold ${
-                  data.rbt12_percentual > 0.95 ? "text-orange-600" : "text-green-600"
-                }`}>
-                  {(data.rbt12_percentual * 100).toFixed(1)}% do teto
-                </p>
-              </div>
-              {data.rbt12_percentual > 0.90 && (
-                <Alert
-                  type="warning"
-                  message="Você está perto do teto. Considere Opt-Out."
-                  onClose={() => {}}
-                />
-              )}
-            </Card>
-          </motion.div>
-        )}
-
-        {/* Simulação */}
-        {loading ? (
-          <Skeleton height="12rem" />
-        ) : (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
-            <Card
-              title="Simulação Opt-Out vs Simples"
-              icon="⚖️"
-              stress={data.economia > 0 ? "safe" : "risk"}
-            >
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gradient-to-br from-blue-50 to-transparent p-4 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-600 uppercase">Simples Nacional</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-2">
-                    {data.imposto_simples.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                  </p>
-                </div>
-                <div className="bg-gradient-to-br from-green-50 to-transparent p-4 rounded-lg">
-                  <p className="text-xs font-semibold text-gray-600 uppercase">Opt-Out</p>
-                  <p className="text-2xl font-bold text-green-700 mt-2">
-                    {data.imposto_optout.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                  </p>
-                </div>
-              </div>
-              {data.economia > 0 && (
-                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="text-sm font-semibold text-green-900">
-                    💡 Você economiza {data.economia.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} ao ano!
-                  </p>
-                </div>
-              )}
-            </Card>
-          </motion.div>
-        )}
-
-        {/* CTA */}
-        {!loading && (
-          <motion.button
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
-            className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 rounded-lg transition-colors"
-            onClick={() => setCurrentStep(steps.length)}
-          >
-            Solicitar Análise Completa
-          </motion.button>
-        )}
+    <!-- Card RBT12 (skeleton → conteúdo) -->
+    <div id="card-rbt12-wrapper" class="fade-in" style="animation-delay: 200ms">
+      <!-- Skeleton inicial -->
+      <div class="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+        <div class="space-y-3">
+          <div class="bg-gray-200 animate-pulse rounded h-6 w-1/3"></div>
+          <div class="bg-gray-200 animate-pulse rounded h-10 w-1/2"></div>
+        </div>
       </div>
     </div>
-  );
-}
+
+    <!-- Card Simulação (skeleton → conteúdo) -->
+    <div id="card-simulacao-wrapper" class="fade-in" style="animation-delay: 400ms">
+      <div class="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+        <div class="space-y-3">
+          <div class="bg-gray-200 animate-pulse rounded h-6 w-1/3"></div>
+          <div class="bg-gray-200 animate-pulse rounded h-16 w-full"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <button id="cta-analise" class="hidden w-full bg-amber-500 hover:bg-amber-600
+            text-white font-semibold py-3 rounded-lg transition-colors duration-300
+            focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2"
+            style="min-height: 44px">
+      Solicitar Análise Completa
+    </button>
+  </div>
+
+  <script>
+  // Formata valor em BRL
+  function formatBRL(valor) {
+    return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+
+  // Carrega dados do backend (confia em O VICIADO)
+  async function carregarDashboard(cnpj) {
+    try {
+      const resp = await fetch(`/api/tributario/analise/${cnpj}`);
+      if (!resp.ok) throw new Error('Erro na API');
+      const data = await resp.json();
+
+      // Stepper
+      renderizarStepper('stepper-jornada', [
+        { title: 'Analisar RBT12', description: 'Receita bruta dos últimos 12 meses' },
+        { title: 'Verificar Anexo', description: 'Simples ou Opt-Out?' },
+        { title: 'Simular Impacto', description: 'Economia vs. retenção' },
+        { title: 'Decidir', description: 'Melhor caminho para sua empresa' },
+      ], 2);
+
+      // Card RBT12
+      const stressRBT12 = data.rbt12_percentual > 0.95 ? 'risk' : 'safe';
+      const borderRBT12 = stressRBT12 === 'risk' ? 'border-orange-200' : 'border-green-200';
+      const corPct = data.rbt12_percentual > 0.95 ? 'text-orange-600' : 'text-green-600';
+      document.getElementById('card-rbt12-wrapper').innerHTML = `
+        <div class="bg-white rounded-lg border ${borderRBT12} p-6 shadow-sm">
+          <div class="flex items-start gap-3">
+            <span class="text-2xl mt-1">💰</span>
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">Receita Bruta (RBT12)</h3>
+              <p class="text-sm text-gray-600 mt-1">Últimos 12 meses</p>
+            </div>
+          </div>
+          <div class="mt-4 flex items-baseline gap-4">
+            <p class="text-3xl font-bold text-gray-900">${formatBRL(data.rbt12)}</p>
+            <p class="text-sm font-semibold ${corPct}">
+              ${(data.rbt12_percentual * 100).toFixed(1)}% do teto
+            </p>
+          </div>
+        </div>
+      `;
+
+      // Card Simulação
+      const stressSim = data.economia > 0 ? 'safe' : 'risk';
+      const borderSim = stressSim === 'safe' ? 'border-green-200' : 'border-orange-200';
+      document.getElementById('card-simulacao-wrapper').innerHTML = `
+        <div class="bg-white rounded-lg border ${borderSim} p-6 shadow-sm">
+          <div class="flex items-start gap-3">
+            <span class="text-2xl mt-1">⚖️</span>
+            <h3 class="text-lg font-semibold text-gray-900">Simulação Opt-Out vs Simples</h3>
+          </div>
+          <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="bg-gradient-to-br from-blue-50 to-transparent p-4 rounded-lg">
+              <p class="text-xs font-semibold text-gray-600 uppercase">Simples Nacional</p>
+              <p class="text-2xl font-bold text-gray-900 mt-2">${formatBRL(data.imposto_simples)}</p>
+            </div>
+            <div class="bg-gradient-to-br from-green-50 to-transparent p-4 rounded-lg">
+              <p class="text-xs font-semibold text-gray-600 uppercase">Opt-Out</p>
+              <p class="text-2xl font-bold text-green-700 mt-2">${formatBRL(data.imposto_optout)}</p>
+            </div>
+          </div>
+          ${data.economia > 0 ? `
+            <div class="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p class="text-sm font-semibold text-green-900">
+                💡 Você economiza ${formatBRL(data.economia)} ao ano!
+              </p>
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      // CTA
+      document.getElementById('cta-analise').classList.remove('hidden');
+
+    } catch (err) {
+      mostrarAlerta('alert-principal', {
+        type: 'error',
+        title: 'Algo não saiu como esperado',
+        message: 'Não conseguimos analisar seu cenário. Tente novamente.',
+        actionLabel: 'Tentar Novamente',
+        actionHandler: () => window.location.reload()
+      });
+    }
+  }
+
+  // Inicialização
+  document.addEventListener('DOMContentLoaded', () => {
+    const cnpj = new URLSearchParams(window.location.search).get('cnpj');
+    if (cnpj) carregarDashboard(cnpj);
+  });
+  </script>
+</body>
+</html>
 ```
 
 ---
@@ -563,15 +643,15 @@ export function Dashboard({ cnpj }) {
 - [ ] Responsivo em 375px (mobile) até 2560px (ultrawide)
 - [ ] Navegação por teclado (Tab, Enter, Setas) funciona
 - [ ] Contraste ≥ 4.5:1 (WCAG AA)
-- [ ] Todos os inputs têm <label> associado
+- [ ] Todos os inputs têm `<label>` associado
 - [ ] Loading, Success, Error, Empty states implementados
-- [ ] Transições suaves (300-500ms)
+- [ ] Transições suaves (300-500ms via CSS transitions)
 - [ ] Sem jargão técnico visível (RBT12 → "Receita Bruta dos Últimos 12 Meses")
 - [ ] Cores seguem semântica (risco=laranja, segurança=verde)
-- [ ] Componentes reutilizáveis (Card, Button, Alert)
-- [ ] Testes de acessibilidade (axe-core, jest-axe)
+- [ ] Funções JS reutilizáveis (criarCard, mostrarAlerta, renderizarStepper)
+- [ ] `role="alert"` e `aria-live` em alertas dinâmicos
 - [ ] Sem scroll horizontal em mobile
-- [ ] Touch targets ≥ 44px
+- [ ] Touch targets ≥ 44px (`min-height: 44px` em botões)
 
 ---
 
