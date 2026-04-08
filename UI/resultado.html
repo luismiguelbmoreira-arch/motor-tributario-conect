@@ -183,6 +183,28 @@
                 </div>
               </dl>
               <p id="validacao-ecac-explicacao" class="text-sm text-slate-700 leading-relaxed">--</p>
+              <!-- Diagnóstico técnico — visível quando delta >= 5% -->
+              <div id="validacao-ecac-diagnostico" class="hidden mt-4 bg-white/60 rounded-lg p-3 border border-current/20">
+                <p class="text-xs font-semibold uppercase tracking-wider mb-2 opacity-70">O que o motor usou</p>
+                <dl class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <dt class="text-slate-500 uppercase tracking-wider">RBT12</dt>
+                    <dd id="diag-rbt12" class="font-mono font-semibold mt-0.5">--</dd>
+                  </div>
+                  <div>
+                    <dt class="text-slate-500 uppercase tracking-wider">Anexo</dt>
+                    <dd id="diag-anexo" class="font-mono font-semibold mt-0.5">--</dd>
+                  </div>
+                  <div>
+                    <dt class="text-slate-500 uppercase tracking-wider">Fator R</dt>
+                    <dd id="diag-fator-r" class="font-mono font-semibold mt-0.5">--</dd>
+                  </div>
+                  <div>
+                    <dt class="text-slate-500 uppercase tracking-wider">Alíq. efetiva</dt>
+                    <dd id="diag-aliquota" class="font-mono font-semibold mt-0.5">--</dd>
+                  </div>
+                </dl>
+              </div>
               <p class="text-xs text-slate-400 italic mt-3">⚖ LC 123/2006, Art. 18 — DAS = alíquota efetiva × receita do período</p>
             </div>
           </div>
@@ -805,6 +827,22 @@
       const deltaEl = document.getElementById('validacao-ecac-delta');
       deltaEl.className = `text-sm font-mono font-bold mt-1 ${corTexto}`;
       deltaEl.textContent = formatBRL(delta) + ' (' + deltaPct.toFixed(2).replace('.', ',') + '%)';
+
+      // Painel de diagnóstico técnico — visível quando delta >= 5%
+      const diagPanel = document.getElementById('validacao-ecac-diagnostico');
+      if (deltaPct >= 5 && diagPanel) {
+        diagPanel.classList.remove('hidden');
+        const rbt12Raw = parseFloat(item.rbt12_utilizado || 0);
+        document.getElementById('diag-rbt12').textContent = rbt12Raw ? formatBRL(rbt12Raw) : '—';
+        document.getElementById('diag-anexo').textContent = item.anexo_utilizado || '—';
+        const fatorR = item.fator_r_utilizado;
+        document.getElementById('diag-fator-r').textContent = fatorR
+          ? (parseFloat(fatorR) * 100).toFixed(1) + '%'
+          : 'Folha ausente';
+        document.getElementById('diag-aliquota').textContent = item.aliquota_efetiva || '—';
+      } else if (diagPanel) {
+        diagPanel.classList.add('hidden');
+      }
 
       document.getElementById('validacao-ecac-explicacao').textContent = explicacao;
 

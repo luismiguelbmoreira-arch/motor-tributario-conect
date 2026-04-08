@@ -770,37 +770,76 @@ def processar_pdfs_bytes(
     # ── Validação cruzada: DAS calculado vs DAS e-CAC ──────────────────────
     validacao_cruzada = []
     das_ecac = auditoria_params.get("das_ecac")
-    aliquota_efetiva_str = diagnostico.get("aliquotas", {}).get("efetiva_das_total")
 
-    if das_ecac and aliquota_efetiva_str:
-        rpa_val = auditoria_params.get("rpa") or fornecedora.faturamento_12m / 12
-        # DAS = alíquota efetiva × receita mensal (LC 123/2006, Art. 18)
-        das_calculado = Decimal(aliquota_efetiva_str) * rpa_val
+    if das_ecac:
+        # Usa o DAS já calculado pelo motor (cenario_simples_puro) como fonte
+        # de verdade — evita recomputar com rpa_val que pode diferir de
+        # operacao.rpa_mensal e criar divergência artificial.
+        # Fallback: aliquota_efetiva × rpa_val (legado, menos preciso).
+        das_motor_raw = (
+            diagnostico.get("cenarios", {})
+            .get("simples_puro", {})
+            .get("custo_das_por_operacao")
+        )
+        if das_motor_raw is not None:
+            das_calculado = Decimal(str(das_motor_raw)).quantize(Decimal("0.01"), ROUND_HALF_UP)
+        else:
+            aliquota_efetiva_str = diagnostico.get("aliquotas", {}).get("efetiva_das_total")
+            if not aliquota_efetiva_str:
+                aliquota_efetiva_str = "0"
+            rpa_val = auditoria_params.get("rpa") or fornecedora.faturamento_12m / 12
+            das_calculado = (Decimal(aliquota_efetiva_str) * rpa_val).quantize(
+                Decimal("0.01"), ROUND_HALF_UP
+            )
+
         delta = abs(das_calculado - das_ecac)
         pct_delta = (delta / das_ecac * 100) if das_ecac > 0 else Decimal("0")
 
+        # Campos de diagnóstico — expostos para que o contador identifique a causa
+        empresa_info = diagnostico.get("empresa", {})
+        rbt12_utilizado = empresa_info.get("rbt12", "")
+        anexo_utilizado = empresa_info.get("anexo_simples", "")
+        fator_r_utilizado = empresa_info.get("fator_r")  # None se folha ausente
+        aliquota_efetiva_pct = diagnostico.get("aliquotas", {}).get("efetiva_percentual", "")
+
         validacao_cruzada.append({
             "tipo": "DAS_CALCULADO_VS_ECAC",
-            "das_calculado": str(das_calculado.quantize(Decimal("0.01"), ROUND_HALF_UP)),
+            "das_calculado": str(das_calculado),
             "das_ecac": str(das_ecac),
             "delta": str(delta.quantize(Decimal("0.01"), ROUND_HALF_UP)),
             "delta_pct": str(pct_delta.quantize(Decimal("0.01"), ROUND_HALF_UP)),
             "status": "OK" if pct_delta < 5 else "DIVERGENTE",
+            # Diagnóstico interno — auxilia contador a identificar input errado
+            "rbt12_utilizado": rbt12_utilizado,
+            "anexo_utilizado": anexo_utilizado,
+            "fator_r_utilizado": fator_r_utilizado,
+            "aliquota_efetiva": aliquota_efetiva_pct,
         })
 
         if pct_delta >= 5:
+            causas_detalhadas = (
+                f"Motor usou: RBT12 R$ {Decimal(rbt12_utilizado):,.2f}, "
+                f"Anexo {anexo_utilizado}, "
+                f"Fator R {fator_r_utilizado if fator_r_utilizado else 'não calculado (folha ausente)'}, "
+                f"Alíq.ef. {aliquota_efetiva_pct}. "
+                f"Investigue: (1) RBT12 lido pelo extrator é o campo correto do PGDAS-D? "
+                f"(2) Folha de salários está disponível para Fator R? "
+                f"(3) Empresa tem multi-atividade não declarada? "
+                f"(4) ISS ou ICMS-ST retidos fora do DAS?"
+            )
             diagnostico.setdefault("alertas", []).append({
                 "nivel": "ALTO",
                 "codigo": "DELTA_DAS_DIVERGENTE",
                 "mensagem": (
                     f"DAS calculado (R$ {das_calculado:,.2f}) difere do DAS pago no e-CAC "
-                    f"(R$ {das_ecac:,.2f}) em {pct_delta:.1f}%. "
-                    f"Possíveis causas: CNAE incorreto, Anexo divergente, ou erro na extração."
+                    f"(R$ {das_ecac:,.2f}) em {pct_delta:.1f}%. {causas_detalhadas}"
                 ),
             })
             logger.warning(
-                "DELTA_DAS | calculado=%s | ecac=%s | delta_pct=%s%%",
+                "DELTA_DAS | calculado=%s | ecac=%s | delta_pct=%s%% | "
+                "rbt12=%s | anexo=%s | fator_r=%s",
                 das_calculado, das_ecac, pct_delta,
+                rbt12_utilizado, anexo_utilizado, fator_r_utilizado,
             )
 
     # Validação cruzada: breakdown deve somar = DAS total
