@@ -10,22 +10,23 @@ Testa: cenario_simples_puro, cenario_opt_out, calcular_split_payment_impacto, ge
 Executar: python -m pytest PY/tests/test_fase4_optout.py -v
 """
 
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-import pytest
 import gc
-from decimal import Decimal
 from datetime import date
+from decimal import Decimal
+
+import pytest
 
 from motor_tributario import (
-    EmpresaFornecedora,
     EmpresaCompradora,
-    OperacaoFiscal,
+    EmpresaFornecedora,
     MotorReformaTributaria,
+    OperacaoFiscal,
 )
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
