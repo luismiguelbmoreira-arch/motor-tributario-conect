@@ -11,7 +11,7 @@ Amparo legal:
 from __future__ import annotations
 
 import re
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -68,7 +68,7 @@ def _strip_ns(tag: str) -> str:
 
 def _find(element, *path_parts):
     """Busca elemento por partes do path (ignora namespace)."""
-    etree = _get_lxml()
+    _get_lxml()
     current = element
     for part in path_parts:
         found = None
@@ -129,7 +129,7 @@ def _extrair_uma_nota(root_element) -> dict:
     Extrai campos relevantes de um único XML NFe (<nfeProc> ou <NFe>).
     Retorna dict com: cnpj_emit, competencia, vNF, vICMSST, indIEDest, mod, chave.
     """
-    etree = _get_lxml()
+    _get_lxml()
     inf = _get_raiz_nfe(root_element)
 
     # Modelo (55=NFe, 65=NFCe)
