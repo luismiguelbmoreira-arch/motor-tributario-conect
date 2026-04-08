@@ -76,7 +76,8 @@
 
       <div class="flex items-center gap-2 flex-wrap">
         <button id="btn-nova-analise"
-                onclick="window.location.href='analise.html'"
+                onclick="confirmarNovaAnalise()"
+                title="Iniciar uma nova análise (a atual será descartada)"
                 class="focus-ring inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors">
           Nova Análise
         </button>
@@ -154,7 +155,7 @@
       </section>
 
       <!-- SEÇÃO 3: CRONOGRAMA IVA -->
-      <section aria-labelledby="sec-iva-titulo" class="fade-in">
+      <section id="sec-iva" aria-labelledby="sec-iva-titulo" class="fade-in">
         <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
           <div class="flex items-start justify-between flex-wrap gap-4 mb-6">
             <div>
@@ -910,13 +911,30 @@
     }
 
     // ─────────────────────────────────────────────
+    // NOVA ANALISE (com confirmacao)
+    // ─────────────────────────────────────────────
+    function confirmarNovaAnalise() {
+      const ok = window.confirm(
+        'Iniciar uma nova análise?\n\n' +
+        'A análise atual será descartada. ' +
+        'Se precisar consultá-la, baixe o PDF antes de continuar.'
+      );
+      if (ok) {
+        sessionStorage.removeItem('diagnostico');
+        sessionStorage.removeItem('analise_empresa');
+        sessionStorage.removeItem('analise_cnpj');
+        window.location.href = 'analise.html';
+      }
+    }
+
+    // ─────────────────────────────────────────────
     // DOWNLOAD PDF
     // ─────────────────────────────────────────────
     async function downloadPDF() {
       const token = sessionStorage.getItem('token');
-      const diagnostico = sessionStorage.getItem('diagnostico');
+      const diagnosticoStr = sessionStorage.getItem('diagnostico');
 
-      if (!token || !diagnostico) return;
+      if (!token || !diagnosticoStr) return;
 
       const btn = document.getElementById('btn-baixar-pdf');
       const originalText = btn.innerHTML;
@@ -930,6 +948,13 @@
         Gerando PDF...
       `;
 
+      // LGPD: PII (cnpj, razao_social) trafega separado, nunca dentro do diagnostico
+      const diagnostico = JSON.parse(diagnosticoStr);
+      const pii = {
+        razao_social: sessionStorage.getItem('analise_empresa') || '',
+        cnpj: sessionStorage.getItem('analise_cnpj') || '',
+      };
+
       try {
         const response = await fetch(window.location.origin + '/relatorio/pdf', {
           method: 'POST',
@@ -937,10 +962,11 @@
             'Authorization': 'Bearer ' + token,
             'Content-Type': 'application/json',
           },
-          body: diagnostico,
+          body: JSON.stringify({ diagnostico, pii }),
         });
 
         if (response.status === 401) {
+          alert('Sua sessão expirou. Faça login novamente para continuar.');
           sessionStorage.clear();
           window.location.href = 'login.html';
           return;

@@ -20,11 +20,11 @@ Fase 2: PostgreSQL (mudar DATABASE_URL, Alembic migra schema)
 import json
 import logging
 import os
-from pathlib import Path
 import re
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import event

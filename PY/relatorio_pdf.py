@@ -6,25 +6,46 @@ Motor Tributário Conect 2026-2033 · FASE 5
 from __future__ import annotations
 
 import logging
+import os
 from decimal import Decimal
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# ── Importação defensiva de weasyprint ─────────────────────────────────────
-try:
-    from weasyprint import HTML as WeasyprintHTML  # type: ignore
-    _WEASYPRINT_DISPONIVEL = True
-except Exception:
-    # ImportError: weasyprint não instalado
-    # OSError: bibliotecas nativas (GTK/Cairo) ausentes — comum no Windows sem GTK3
-    _WEASYPRINT_DISPONIVEL = False
-    WeasyprintHTML = None  # type: ignore
-    logger.warning(
-        "weasyprint indisponível (bibliotecas nativas GTK/Cairo ausentes). "
-        "Geração de PDF desativada. No Windows instale GTK3: "
-        "https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer"
-    )
+# Silencia warnings GLib/GIO das libs nativas C do WeasyPrint ANTES de qualquer import
+os.environ.setdefault("GIO_USE_VFS", "local")
+os.environ.setdefault("G_MESSAGES_DEBUG", "")
+os.environ.setdefault("NO_AT_BRIDGE", "1")
+os.environ.setdefault("GIO_MODULE_DIR", "")
+
+# ── LAZY IMPORT de weasyprint ─────────────────────────────────────────────
+# Import adiado para dentro de gerar_pdf() — evita carregar libs GTK/GIO no
+# startup da API (que disparam GLib-GIO-WARNING no Windows mesmo sem usar PDF).
+_WeasyprintHTML = None
+_WEASYPRINT_DISPONIVEL = None  # None = ainda nao tentou importar
+
+def _tentar_importar_weasyprint():
+    """Importa weasyprint sob demanda. Idempotente."""
+    global _WeasyprintHTML, _WEASYPRINT_DISPONIVEL
+    if _WEASYPRINT_DISPONIVEL is not None:
+        return _WEASYPRINT_DISPONIVEL
+    try:
+        # Redirecionar stderr durante o import para suprimir warnings GLib nativos
+        _stderr_fd = os.dup(2)
+        _devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(_devnull, 2)
+        try:
+            from weasyprint import HTML as WeasyprintHTML  # type: ignore
+            _WeasyprintHTML = WeasyprintHTML
+            _WEASYPRINT_DISPONIVEL = True
+        finally:
+            os.dup2(_stderr_fd, 2)
+            os.close(_devnull)
+            os.close(_stderr_fd)
+    except Exception:
+        _WEASYPRINT_DISPONIVEL = False
+        _WeasyprintHTML = None
+    return _WEASYPRINT_DISPONIVEL
 
 
 def _fmt_moeda(valor: Any) -> str:
@@ -48,13 +69,22 @@ def _esc(s: Any) -> str:
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
-def _gerar_html(diagnostico: dict) -> str:
-    """Gera string HTML completo do relatório — CSS inline, sem CDN."""
+def _gerar_html(diagnostico: dict, pii: dict | None = None) -> str:
+    """
+    Gera string HTML completo do relatório — CSS inline, sem CDN.
 
+    Args:
+        diagnostico: dict despersonalizado retornado por gerar_diagnostico() (LGPD).
+        pii: dict opcional com {cnpj, razao_social} entregues separadamente
+             apenas no momento de gerar o PDF para o cliente.
+             Se None, header mostra "—".
+    """
+    pii = pii or {}
     empresa   = diagnostico.get("empresa", {})
     aliquotas = diagnostico.get("aliquotas", {})
-    razao   = _esc(empresa.get("razao_social") or "—")
-    cnpj    = _esc(empresa.get("cnpj") or "—")
+    # PII vem do parâmetro separado (LGPD: nunca do diagnostico)
+    razao   = _esc(pii.get("razao_social") or empresa.get("razao_social") or "—")
+    cnpj    = _esc(pii.get("cnpj") or empresa.get("cnpj") or "—")
     regime  = _esc(empresa.get("regime") or "—")
     anexo   = _esc(empresa.get("anexo_simples") or "—")
     rbt12   = _fmt_moeda(empresa.get("rbt12", 0))
@@ -204,6 +234,8 @@ def _gerar_html(diagnostico: dict) -> str:
   </div>
 </div>
 
+{_secao_validacao_ecac(diagnostico)}
+
 <!-- Alertas -->
 <h2>Alertas de Risco</h2>
 {alertas_html}
@@ -236,6 +268,8 @@ def _gerar_html(diagnostico: dict) -> str:
   </div>
 </div>
 
+{_secao_decisao_opt_out(diagnostico)}
+
 <!-- Serviços recomendados -->
 <h2>Serviços Recomendados</h2>
 <table>
@@ -252,6 +286,8 @@ def _gerar_html(diagnostico: dict) -> str:
 <p style="font-size:10px;color:#6b7280;margin-bottom:10px;">Todos os cálculos abaixo citam base legal explícita — MAX_02 Motor Tributário Conect.</p>
 {trilha_html}
 
+{_secao_glossario()}
+
 <!-- Rodapé -->
 <div class="footer">
   Calculado em {data_c} · LC 123/2006 + LC 214/2025 (vigente 01/01/2026) ·
@@ -261,6 +297,361 @@ def _gerar_html(diagnostico: dict) -> str:
 
 </body>
 </html>"""
+
+
+def _secao_decisao_opt_out(diagnostico: dict) -> str:
+    """
+    Gera a seção 'Decisão Estratégica: Opt-Out IVA' do PDF cliente.
+
+    Frente 3.3 (Bloco B): converte os números crus de cenarios em uma narrativa
+    educativa estruturada em 6 sub-blocos:
+      1. O que é (definição em linguagem de empresário)
+      2. Sua situação (tabela 2 colunas Simples × Opt-Out)
+      3. Diagnóstico personalizado (recomendacao_inteligente do Bloco A)
+      4. Datas-chave 2026 (janelas semestrais + irretratabilidade)
+      5. Como fazer (checklist 3 passos)
+      6. Riscos (cards vermelhos)
+
+    Base legal: LC 214/2025 Arts. 41-44 + Resolução CGSN 183/2025.
+    """
+    cenarios = diagnostico.get("cenarios", {})
+    simples_puro = cenarios.get("simples_puro", {})
+    opt_out = cenarios.get("opt_out", {})
+    rec = cenarios.get("recomendacao_inteligente") or {}
+
+    # Fallback se Bloco A não rodou (compatibilidade)
+    codigo = rec.get("codigo", "ZONA_CINZA")
+    titulo_rec = _esc(rec.get("titulo", "Análise individual recomendada"))
+    justificativa = _esc(rec.get("justificativa", ""))
+    amparo_rec = _esc(rec.get("amparo_legal", ""))
+
+    # Cores da recomendação por código (semâforo)
+    cor_map = {
+        "OPT_OUT_FORTE":     ("#065f46", "#d1fae5", "#10b981"),  # verde forte
+        "OPT_OUT_VANTAJOSO": ("#0c4a6e", "#dbeafe", "#3b82f6"),  # azul
+        "MANTER_SIMPLES":    ("#1f2937", "#f3f4f6", "#6b7280"),  # cinza neutro
+        "ZONA_CINZA":        ("#92400e", "#fef3c7", "#f59e0b"),  # amarelo
+    }
+    cor_texto, cor_bg, cor_borda = cor_map.get(codigo, cor_map["ZONA_CINZA"])
+
+    # Tabela Sua Situação
+    custo_simples = _fmt_moeda(simples_puro.get("custo_das_por_operacao", 0))
+    custo_opt_das = _fmt_moeda(opt_out.get("custo_das_por_operacao", 0))
+    iva_por_fora = _fmt_moeda(opt_out.get("iva_recolhido_por_fora", 0))
+    custo_opt_total = _fmt_moeda(opt_out.get("custo_total", 0))
+    credito_simples = _fmt_moeda(simples_puro.get("credito_gerado_para_comprador", 0))
+    credito_opt = _fmt_moeda(opt_out.get("credito_gerado_para_comprador", 0))
+    pct_credito_simples = _esc(simples_puro.get("percentual_credito_nf", "1%"))
+    pct_credito_opt = _esc(opt_out.get("percentual_credito_nf", "100%"))
+
+    return f"""
+<!-- Decisão Estratégica: Opt-Out IVA -->
+<h2>Decisão Estratégica: Opt-Out IVA</h2>
+
+<!-- Sub-bloco 1: O que é -->
+<div style="background:#f8fafc;border-left:4px solid #1e40af;padding:10px 14px;margin-bottom:12px;border-radius:0 4px 4px 0;">
+  <div style="font-weight:700;font-size:11px;color:#1e3a5f;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;">O que é</div>
+  <div style="font-size:11px;color:#374151;line-height:1.5;">
+    Opt-Out é a opção do Simples Nacional de <strong>sair do recolhimento unificado</strong>
+    de CBS/IBS, recolhendo esses dois tributos separadamente. O resto continua no DAS
+    (IRPJ, CSLL, CPP, ICMS, ISS). A grande diferença é que, com Opt-Out, seu cliente B2B
+    recebe <strong>100% de crédito de CBS/IBS</strong> em vez de 1% — o que pode ser
+    decisivo para reter clientes corporativos depois de 2027.
+  </div>
+</div>
+
+<!-- Sub-bloco 2: Sua situação (tabela comparativa) -->
+<h3 style="margin-top:14px;">Sua Situação Específica</h3>
+<table style="margin-bottom:12px;">
+  <thead>
+    <tr><th>Item</th><th>Simples Puro</th><th>Opt-Out IVA</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>DAS por operação</strong></td>
+      <td>{custo_simples}</td>
+      <td>{custo_opt_das}</td>
+    </tr>
+    <tr>
+      <td><strong>IVA recolhido por fora</strong></td>
+      <td style="color:#9ca3af;">—</td>
+      <td>{iva_por_fora}</td>
+    </tr>
+    <tr style="background:#eff6ff;">
+      <td><strong>Custo total por operação</strong></td>
+      <td><strong>{custo_simples}</strong></td>
+      <td><strong>{custo_opt_total}</strong></td>
+    </tr>
+    <tr>
+      <td><strong>Crédito gerado para comprador B2B</strong></td>
+      <td>{credito_simples} <span style="color:#9ca3af;">({pct_credito_simples})</span></td>
+      <td><strong style="color:#065f46;">{credito_opt} ({pct_credito_opt})</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- Sub-bloco 3: Diagnóstico personalizado -->
+<div style="background:{cor_bg};border:2px solid {cor_borda};padding:14px 16px;border-radius:6px;margin-bottom:14px;">
+  <div style="font-weight:800;font-size:13px;color:{cor_texto};margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em;">
+    📋 Diagnóstico Personalizado: {titulo_rec}
+  </div>
+  <div style="font-size:11px;color:#1f2937;line-height:1.6;">
+    {justificativa}
+  </div>
+</div>
+
+<!-- Sub-bloco 4: Datas-chave 2026 -->
+<h3 style="margin-top:14px;">Datas-Chave 2026 — Janelas de Decisão</h3>
+<table style="margin-bottom:8px;">
+  <thead>
+    <tr><th style="width:110px;">Data Limite</th><th>Decisão</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>30/04/2026</strong></td>
+      <td>Janela do <strong>1º semestre</strong> — opção válida de Jul/2026 em diante</td>
+    </tr>
+    <tr>
+      <td><strong>30/09/2026</strong></td>
+      <td>Janela do <strong>2º semestre</strong> — opção válida de Jan/2027 em diante (CBS sobe para 8,8%)</td>
+    </tr>
+  </tbody>
+</table>
+<div style="background:#fef2f2;border-left:4px solid #dc2626;padding:10px 14px;margin-bottom:14px;border-radius:0 4px 4px 0;">
+  <div style="font-weight:700;font-size:11px;color:#991b1b;margin-bottom:3px;">⚠ ATENÇÃO — IRRETRATABILIDADE</div>
+  <div style="font-size:10px;color:#7f1d1d;">
+    A decisão pelo Opt-Out é <strong>irretratável por 5 anos-calendário</strong>
+    (LC 214/2025, Art. 43). Avalie com seu contador antes de optar.
+  </div>
+</div>
+
+<!-- Sub-bloco 5: Como fazer (checklist) -->
+<h3 style="margin-top:14px;">Como Fazer o Opt-Out na Prática</h3>
+<table style="margin-bottom:14px;">
+  <thead>
+    <tr><th style="width:40px;">Passo</th><th>Ação</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align:center;font-weight:700;color:#1e40af;">1</td>
+      <td>Acessar o <strong>portal do Simples Nacional</strong> (gov.br/receitafederal) com certificado digital ou código de acesso</td>
+    </tr>
+    <tr>
+      <td style="text-align:center;font-weight:700;color:#1e40af;">2</td>
+      <td>No menu PGDAS-D, marcar a opção <strong>"Recolhimento de CBS/IBS fora do DAS"</strong> dentro da janela semestral aberta</td>
+    </tr>
+    <tr>
+      <td style="text-align:center;font-weight:700;color:#1e40af;">3</td>
+      <td>Confirmar e <strong>imprimir o protocolo</strong>. A partir do semestre seguinte, recolher CBS/IBS via DARF (códigos a serem definidos por ato da RFB)</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- Sub-bloco 6: Riscos -->
+<h3 style="margin-top:14px;">Riscos do Opt-Out</h3>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
+  <div style="background:#fef2f2;border-left:3px solid #dc2626;padding:8px 10px;border-radius:0 4px 4px 0;">
+    <div style="font-weight:700;font-size:10px;color:#991b1b;margin-bottom:2px;">5 ANOS SEM VOLTA</div>
+    <div style="font-size:9px;color:#7f1d1d;line-height:1.4;">
+      Decisão irretratável por 5 anos-calendário. LC 214/2025, Art. 43.
+    </div>
+  </div>
+  <div style="background:#fffbeb;border-left:3px solid #f59e0b;padding:8px 10px;border-radius:0 4px 4px 0;">
+    <div style="font-weight:700;font-size:10px;color:#92400e;margin-bottom:2px;">OBRIGAÇÕES EXTRAS</div>
+    <div style="font-size:9px;color:#78350f;line-height:1.4;">
+      EFD-Reinf e EFD-Contribuições passam a ser obrigatórias mensalmente.
+    </div>
+  </div>
+  <div style="background:#fef2f2;border-left:3px solid #dc2626;padding:8px 10px;border-radius:0 4px 4px 0;">
+    <div style="font-weight:700;font-size:10px;color:#991b1b;margin-bottom:2px;">MULTA DE OFÍCIO</div>
+    <div style="font-size:9px;color:#7f1d1d;line-height:1.4;">
+      Multa de <strong>75%</strong> sobre o tributo não recolhido (Lei 9.430/1996,
+      Art. 44, I). Majorada para 100% em sonegação e 150% em reincidência
+      (Lei 14.689/2023).
+    </div>
+  </div>
+</div>
+
+<p style="font-size:9px;color:#6b7280;font-style:italic;margin-top:4px;">
+  ⚖ {amparo_rec or 'LC 214/2025, Arts. 41-44 | CF Art. 146, III, "d" | Resolução CGSN 183/2025'}
+</p>
+"""
+
+
+def _secao_glossario() -> str:
+    """
+    Gera o glossário micro de termos tributários no fim do PDF.
+
+    Frente 3.4 / Bloco C: empresário não conhece "Anexo III", "Sublimite",
+    "Fator R", "DIFAL". 11 termos curtos antes do rodapé resolvem.
+
+    Termos estáveis (não dependem do diagnóstico) — função sem argumentos,
+    fácil de cachear se necessário.
+    """
+    termos = [
+        ("DAS",
+         "Documento de Arrecadação do Simples Nacional. Guia única mensal que "
+         "unifica 8 tributos (IRPJ, CSLL, PIS, COFINS, CPP, ICMS, ISS, IPI)."),
+        ("RBT12",
+         "Receita Bruta dos últimos 12 meses. É o que define em qual faixa e "
+         "anexo do Simples sua empresa paga (LC 123/2006, Art. 18)."),
+        ("Anexo I a V",
+         "Tabelas do Simples Nacional por tipo de atividade. I=Comércio, "
+         "II=Indústria, III/V=Serviços (Fator R decide), IV=Serviços s/ CPP."),
+        ("Fator R",
+         "Folha de pagamento ÷ RBT12. Se ≥ 28%, serviços vão no Anexo III "
+         "(menor carga); se &lt; 28%, vão no Anexo V (maior carga)."),
+        ("Sublimite",
+         "Teto de R$ 3.600.000/ano. Acima disso, ICMS e ISS saem do DAS e "
+         "passam a ser recolhidos fora do Simples (LC 123/2006, Art. 13 §1º)."),
+        ("CBS",
+         "Contribuição sobre Bens e Serviços. Tributo federal que substitui "
+         "PIS e COFINS a partir de 2027 (LC 214/2025, EC 132/2023)."),
+        ("IBS",
+         "Imposto sobre Bens e Serviços. Tributo estadual+municipal que "
+         "substitui ICMS e ISS gradualmente entre 2029 e 2033."),
+        ("IVA Dual",
+         "Nome informal do sistema CBS+IBS. \"Dual\" porque são dois tributos "
+         "sobre a mesma base (um federal, outro subnacional)."),
+        ("Opt-Out",
+         "Opção do Simples Nacional de sair do recolhimento unificado de "
+         "CBS/IBS, passando a recolher esses dois separadamente. Libera "
+         "crédito 100% para clientes B2B (LC 214/2025, Arts. 41-44)."),
+        ("B2B / B2C",
+         "B2B (Business-to-Business) = venda para outra empresa contribuinte. "
+         "B2C (Business-to-Consumer) = venda para consumidor final."),
+        ("Crédito IVA",
+         "Valor de CBS/IBS que o comprador pode abater dos tributos que ele "
+         "próprio vai recolher. Empresas no Simples geram crédito de apenas "
+         "1%; com Opt-Out, geram 100%."),
+        ("DIFAL",
+         "Diferencial de Alíquota do ICMS. Devido quando se vende para outro "
+         "estado — compensa a diferença entre alíquotas interna e "
+         "interestadual (EC 87/2015, LC 190/2022)."),
+    ]
+
+    linhas = ""
+    for termo, definicao in termos:
+        linhas += (
+            f"<tr>"
+            f"<td style='font-weight:700;color:#1e3a5f;width:110px;vertical-align:top;'>{termo}</td>"
+            f"<td style='color:#374151;line-height:1.5;'>{definicao}</td>"
+            f"</tr>"
+        )
+
+    return f"""
+<!-- Glossário (Frente 3.4 / Bloco C) -->
+<h2>Glossário</h2>
+<p style="font-size:10px;color:#6b7280;margin-bottom:8px;">
+  Termos técnicos citados neste relatório em linguagem de empresário.
+</p>
+<table style="font-size:10px;margin-bottom:10px;">
+  <tbody>
+    {linhas}
+  </tbody>
+</table>
+"""
+
+
+def _secao_validacao_ecac(diagnostico: dict) -> str:
+    """
+    Gera a seção 'Validação contra e-CAC' do PDF.
+
+    Frente 3.5 (Bloco D): expõe a validação cruzada DAS calculado × DAS pago no
+    e-CAC que hoje fica escondida em `_extracao.validacao_cruzada`. Só aparece
+    em PDFs gerados a partir de extração (upload de PDFs do e-CAC); em análise
+    manual o bloco fica oculto.
+
+    Semáforo:
+      🟢 delta < 0,5%   → verde  "Aprovado — confere com o e-CAC"
+      🟡 0,5% ≤ Δ < 5% → amarelo "Diferença pequena — revisar antes de pagar"
+      🔴 delta ≥ 5%     → vermelho "Diferença significativa — investigar"
+
+    Base legal: LC 123/2006, Art. 18 (DAS = alíquota efetiva × receita do PA).
+    """
+    extracao = diagnostico.get("_extracao") or {}
+    validacoes = extracao.get("validacao_cruzada") or []
+
+    # Encontra o item DAS_CALCULADO_VS_ECAC (pode haver outros tipos como BREAKDOWN)
+    item = next(
+        (v for v in validacoes if v.get("tipo") == "DAS_CALCULADO_VS_ECAC"),
+        None,
+    )
+    if not item:
+        return ""  # PDF de análise manual — sem validação cruzada
+
+    try:
+        das_calc = Decimal(str(item.get("das_calculado", "0")))
+        das_ecac = Decimal(str(item.get("das_ecac", "0")))
+        delta = Decimal(str(item.get("delta", "0")))
+        delta_pct = Decimal(str(item.get("delta_pct", "0")))
+    except Exception:
+        return ""
+
+    # Semáforo de cor por delta percentual
+    if delta_pct < Decimal("0.5"):
+        cor_bg, cor_borda, cor_texto = "#f0fdf4", "#10b981", "#065f46"
+        icone = "✓"
+        titulo = "Aprovado — confere com o e-CAC"
+        explicacao = (
+            "O DAS calculado pelo motor está alinhado com o valor pago no e-CAC. "
+            "Diferença dentro da margem aceitável (< 0,5%)."
+        )
+    elif delta_pct < Decimal("5"):
+        cor_bg, cor_borda, cor_texto = "#fffbeb", "#f59e0b", "#92400e"
+        icone = "⚠"
+        titulo = "Diferença pequena — revisar antes de pagar"
+        explicacao = (
+            "O DAS calculado difere do pago no e-CAC em menos de 5%. "
+            "Geralmente é arredondamento, RPA aproximado ou pequeno descasamento "
+            "de competência. Confira antes de usar como referência."
+        )
+    else:
+        cor_bg, cor_borda, cor_texto = "#fef2f2", "#ef4444", "#991b1b"
+        icone = "✗"
+        titulo = "Diferença significativa — investigue antes de usar"
+        explicacao = (
+            "O DAS calculado difere do pago no e-CAC em mais de 5%. "
+            "Possíveis causas: ICMS-ST não segregado, multi-atividade não declarada, "
+            "RPA real diferente do extraído, CNAE/Anexo divergente, ou Fator R com "
+            "folha desatualizada. Não use este diagnóstico como referência sem revisão."
+        )
+
+    delta_str = _fmt_moeda(delta)
+    delta_pct_str = f"{delta_pct:.2f}%".replace(".", ",")
+    das_calc_str = _fmt_moeda(das_calc)
+    das_ecac_str = _fmt_moeda(das_ecac)
+
+    return f"""
+<!-- Validação contra e-CAC (Frente 3.5 / Bloco D) -->
+<h2>Validação contra o e-CAC</h2>
+<div style="background:{cor_bg};border:2px solid {cor_borda};border-radius:6px;padding:12px 14px;margin-bottom:12px;">
+  <div style="font-weight:800;font-size:13px;color:{cor_texto};margin-bottom:8px;">
+    {icone} {titulo}
+  </div>
+  <table style="margin-bottom:8px;">
+    <thead>
+      <tr><th>Origem</th><th style="text-align:right;">Valor</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>DAS calculado pelo motor</strong></td><td style="text-align:right;font-family:monospace;">{das_calc_str}</td></tr>
+      <tr><td><strong>DAS pago no e-CAC</strong></td><td style="text-align:right;font-family:monospace;">{das_ecac_str}</td></tr>
+      <tr style="background:{cor_bg};">
+        <td><strong>Diferença</strong></td>
+        <td style="text-align:right;font-family:monospace;font-weight:700;color:{cor_texto};">
+          {delta_str} ({delta_pct_str})
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <div style="font-size:10px;color:#374151;line-height:1.5;">
+    {explicacao}
+  </div>
+  <div style="font-size:9px;color:#6b7280;margin-top:6px;font-style:italic;">
+    ⚖ LC 123/2006, Art. 18 — DAS = alíquota efetiva × receita do período de apuração
+  </div>
+</div>
+"""
 
 
 def _servicos_recomendados(diagnostico: dict) -> str:
@@ -290,12 +681,15 @@ def _servicos_recomendados(diagnostico: dict) -> str:
     return rows
 
 
-def gerar_pdf(diagnostico: dict) -> bytes:
+def gerar_pdf(diagnostico: dict, pii: dict | None = None) -> bytes:
     """
     Gera bytes do PDF do diagnóstico fiscal.
 
     Args:
         diagnostico: dict retornado por MotorReformaTributaria.gerar_diagnostico()
+                     (despersonalizado por LGPD — sem cnpj/razao_social)
+        pii: dict opcional {cnpj, razao_social} entregue separadamente
+             apenas no momento de gerar PDF para o cliente. Não persistido.
 
     Returns:
         bytes do PDF gerado
@@ -303,18 +697,19 @@ def gerar_pdf(diagnostico: dict) -> bytes:
     Raises:
         RuntimeError: se weasyprint não estiver instalado ou falhar
     """
-    if not _WEASYPRINT_DISPONIVEL:
+    # Lazy import: só carrega weasyprint na primeira chamada
+    if not _tentar_importar_weasyprint() or _WeasyprintHTML is None:
         raise RuntimeError(
-            "weasyprint não instalado. Execute: pip install weasyprint>=61.0"
+            "weasyprint não instalado ou GTK ausente. "
+            "Execute: pip install weasyprint>=61.0 (Windows: precisa GTK3 Runtime)"
         )
 
-    html_str = _gerar_html(diagnostico)
+    html_str = _gerar_html(diagnostico, pii=pii)
     try:
-        pdf_bytes: bytes = WeasyprintHTML(string=html_str).write_pdf()
+        pdf_bytes: bytes = _WeasyprintHTML(string=html_str).write_pdf()
         logger.info(
-            "PDF gerado com sucesso — %d bytes · empresa: %s",
+            "PDF gerado com sucesso — %d bytes",  # sem PII no log
             len(pdf_bytes),
-            diagnostico.get("empresa", {}).get("razao_social") or "desconhecida",
         )
         return pdf_bytes
     except Exception as exc:

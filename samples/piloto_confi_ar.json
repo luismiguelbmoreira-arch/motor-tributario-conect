@@ -1,0 +1,518 @@
+{
+  "versao_schema": "1.0",
+  "versao_lei": "LC123_2006_LC214_2025",
+  "data_analise": "2026-04-08",
+  "ano_operacao": 2026,
+  "empresa": {
+    "regime": "SIMPLES",
+    "cnae": "4753900",
+    "uf": "SP",
+    "anexo_simples": "I",
+    "rbt12": "1158950.86",
+    "fator_r": null,
+    "proxima_faixa_em": "641049.14"
+  },
+  "comprador": {
+    "tipo": "B2C_CONSUMIDOR_FINAL",
+    "uf_destino": "SP",
+    "exige_credito_iva": false
+  },
+  "operacao": {
+    "valor": "139144.08",
+    "ncm": "00000000",
+    "forma_recebimento": "PIX_BOLETO"
+  },
+  "aliquotas": {
+    "efetiva_das_total": "0.087586",
+    "efetiva_percentual": "8.7586%",
+    "cbs_vigente_ano": "0.009",
+    "ibs_vigente_ano": "0.001",
+    "fracao_cbs_no_das": "0.00",
+    "fracao_ibs_no_das": "0.00"
+  },
+  "cenarios": {
+    "simples_puro": {
+      "cenario": "SIMPLES_PURO",
+      "descricao": "Empresa mantém regime Simples Nacional sem alteração",
+      "custo_das_por_operacao": "12187.07",
+      "aliquota_efetiva": "0.087586",
+      "credito_gerado_para_comprador": "1391.44",
+      "percentual_credito_nf": "1.00%",
+      "risco_b2b": false,
+      "observacao": "Comprador B2C: crédito irrelevante."
+    },
+    "opt_out": {
+      "cenario": "OPT_OUT",
+      "descricao": "Empresa recolhe IBS/CBS separadamente, mantém Simples para demais tributos",
+      "custo_das_por_operacao": "12187.07",
+      "iva_recolhido_por_fora": "1391.44",
+      "custo_total": "13578.51",
+      "credito_gerado_para_comprador": "1391.44",
+      "percentual_credito_nf": "100%",
+      "risco_b2b": false,
+      "impacto_caixa": "NEUTRO se IVA repassado no preço de venda",
+      "observacao": "100% do IBS/CBS é creditável pelo comprador B2B. Empresa mantém competitividade no polo industrial."
+    },
+    "disparidade_anual_estimada": "16697.28",
+    "recomendacao": "SIMPLES_PURO adequado para B2C. Sem impacto de crédito."
+  },
+  "difal": {
+    "aplicavel": false,
+    "uf_origem": "SP",
+    "uf_destino": "SP",
+    "metodo": "N/A",
+    "responsavel": null,
+    "produto_importado": false,
+    "aliquota_interestadual": "0",
+    "aliquota_interna_destino": "0",
+    "difal_valor": "0.00",
+    "base_legal": "Operação interna — sem DIFAL (CF Art. 155, §2º, VII)"
+  },
+  "split_payment": {
+    "ativo": false,
+    "motivo": "Ano 2026 < 2027 (Split Payment ainda não ativo).",
+    "retencao_imediata": "0.00",
+    "impacto_liquidez": "ZERO"
+  },
+  "cronograma_iva": [
+    {
+      "ano": 2026,
+      "cbs": "0.009",
+      "ibs": "0.001",
+      "total": "0.010"
+    },
+    {
+      "ano": 2027,
+      "cbs": "0.088",
+      "ibs": "0.001",
+      "total": "0.089"
+    },
+    {
+      "ano": 2028,
+      "cbs": "0.088",
+      "ibs": "0.001",
+      "total": "0.089"
+    },
+    {
+      "ano": 2029,
+      "cbs": "0.088",
+      "ibs": "0.035",
+      "total": "0.123"
+    },
+    {
+      "ano": 2030,
+      "cbs": "0.088",
+      "ibs": "0.071",
+      "total": "0.159"
+    },
+    {
+      "ano": 2031,
+      "cbs": "0.088",
+      "ibs": "0.106",
+      "total": "0.194"
+    },
+    {
+      "ano": 2032,
+      "cbs": "0.088",
+      "ibs": "0.142",
+      "total": "0.230"
+    },
+    {
+      "ano": 2033,
+      "cbs": "0.088",
+      "ibs": "0.177",
+      "total": "0.265"
+    }
+  ],
+  "alertas": [
+    {
+      "nivel": "ALTO",
+      "codigo": "DELTA_DAS_DIVERGENTE",
+      "mensagem": "DAS calculado (R$ 12,187.07) difere do DAS pago no e-CAC (R$ 15,200.39) em 19.8%. Possíveis causas: CNAE incorreto, Anexo divergente, ou erro na extração."
+    }
+  ],
+  "trilha_auditoria": [
+    {
+      "tipo": "CALCULO",
+      "id": "MAX_FISCAL_03",
+      "titulo": "Validação de Cronograma de Transição",
+      "formula": "Base [Ano 2026] - Deduções [N/A] * Alíquota [Configurada por Data] = Status: TESTE",
+      "memoria": {
+        "base": "Ano 2026",
+        "deducoes": "N/A",
+        "aliquota": "Configurada por Data",
+        "valor_final": "Status: TESTE"
+      },
+      "amparo_legal": "LC 214/2025, Art. 360",
+      "vigente_desde": "",
+      "detalhe": "Ano de operação 2026 validado para motor transicional.",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "DECISAO_ANEXO",
+      "titulo": "Anexo Simples Nacional: I (por CNAE 4753900 — fonte: EXPLICITO)",
+      "formula": "Base [CNAE 4753900] - Deduções [N/A] * Alíquota [N/A] = I",
+      "memoria": {
+        "base": "CNAE 4753900",
+        "deducoes": "N/A",
+        "aliquota": "N/A",
+        "valor_final": "I"
+      },
+      "amparo_legal": "LC 123/2006, Art. 18, §§ 1º e 24 | Res. CGSN 140/2018",
+      "vigente_desde": "01/01/2018 (Res. CGSN 140/2018)",
+      "detalhe": "CNAE 4753900 mapeado para Anexo I (correspondência exata na tabela CGSN).",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "DECISAO_ANEXO",
+      "titulo": "Anexo Simples Nacional: I (por CNAE 4753900 — fonte: EXPLICITO)",
+      "formula": "Base [CNAE 4753900] - Deduções [N/A] * Alíquota [N/A] = I",
+      "memoria": {
+        "base": "CNAE 4753900",
+        "deducoes": "N/A",
+        "aliquota": "N/A",
+        "valor_final": "I"
+      },
+      "amparo_legal": "LC 123/2006, Art. 18, §§ 1º e 24 | Res. CGSN 140/2018",
+      "vigente_desde": "01/01/2018 (Res. CGSN 140/2018)",
+      "detalhe": "CNAE 4753900 mapeado para Anexo I (correspondência exata na tabela CGSN).",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "AE_SIMPLES",
+      "titulo": "Alíquota Efetiva (Anexo I)",
+      "formula": "Base [RBT12 R$ 1,158,950.86] - Deduções [PD R$ 22,500.00] * Alíquota [Nominal 10.70%] = 8.7586%",
+      "memoria": {
+        "base": "RBT12 R$ 1,158,950.86",
+        "deducoes": "PD R$ 22,500.00",
+        "aliquota": "Nominal 10.70%",
+        "valor_final": "8.7586%"
+      },
+      "amparo_legal": "LC 123/2006, Art. 18, § 1º",
+      "vigente_desde": "",
+      "detalhe": "Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "DECISAO_ANEXO",
+      "titulo": "Anexo Simples Nacional: I (por CNAE 4753900 — fonte: EXPLICITO)",
+      "formula": "Base [CNAE 4753900] - Deduções [N/A] * Alíquota [N/A] = I",
+      "memoria": {
+        "base": "CNAE 4753900",
+        "deducoes": "N/A",
+        "aliquota": "N/A",
+        "valor_final": "I"
+      },
+      "amparo_legal": "LC 123/2006, Art. 18, §§ 1º e 24 | Res. CGSN 140/2018",
+      "vigente_desde": "01/01/2018 (Res. CGSN 140/2018)",
+      "detalhe": "CNAE 4753900 mapeado para Anexo I (correspondência exata na tabela CGSN).",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "DECISAO_ANEXO",
+      "titulo": "Anexo Simples Nacional: I (por CNAE 4753900 — fonte: EXPLICITO)",
+      "formula": "Base [CNAE 4753900] - Deduções [N/A] * Alíquota [N/A] = I",
+      "memoria": {
+        "base": "CNAE 4753900",
+        "deducoes": "N/A",
+        "aliquota": "N/A",
+        "valor_final": "I"
+      },
+      "amparo_legal": "LC 123/2006, Art. 18, §§ 1º e 24 | Res. CGSN 140/2018",
+      "vigente_desde": "01/01/2018 (Res. CGSN 140/2018)",
+      "detalhe": "CNAE 4753900 mapeado para Anexo I (correspondência exata na tabela CGSN).",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "DECISAO_ANEXO",
+      "titulo": "Anexo Simples Nacional: I (por CNAE 4753900 — fonte: EXPLICITO)",
+      "formula": "Base [CNAE 4753900] - Deduções [N/A] * Alíquota [N/A] = I",
+      "memoria": {
+        "base": "CNAE 4753900",
+        "deducoes": "N/A",
+        "aliquota": "N/A",
+        "valor_final": "I"
+      },
+      "amparo_legal": "LC 123/2006, Art. 18, §§ 1º e 24 | Res. CGSN 140/2018",
+      "vigente_desde": "01/01/2018 (Res. CGSN 140/2018)",
+      "detalhe": "CNAE 4753900 mapeado para Anexo I (correspondência exata na tabela CGSN).",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "DECISAO_ANEXO",
+      "titulo": "Anexo Simples Nacional: I (por CNAE 4753900 — fonte: EXPLICITO)",
+      "formula": "Base [CNAE 4753900] - Deduções [N/A] * Alíquota [N/A] = I",
+      "memoria": {
+        "base": "CNAE 4753900",
+        "deducoes": "N/A",
+        "aliquota": "N/A",
+        "valor_final": "I"
+      },
+      "amparo_legal": "LC 123/2006, Art. 18, §§ 1º e 24 | Res. CGSN 140/2018",
+      "vigente_desde": "01/01/2018 (Res. CGSN 140/2018)",
+      "detalhe": "CNAE 4753900 mapeado para Anexo I (correspondência exata na tabela CGSN).",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "AE_SIMPLES",
+      "titulo": "Alíquota Efetiva (Anexo I)",
+      "formula": "Base [RBT12 R$ 1,158,950.86] - Deduções [PD R$ 22,500.00] * Alíquota [Nominal 10.70%] = 8.7586%",
+      "memoria": {
+        "base": "RBT12 R$ 1,158,950.86",
+        "deducoes": "PD R$ 22,500.00",
+        "aliquota": "Nominal 10.70%",
+        "valor_final": "8.7586%"
+      },
+      "amparo_legal": "LC 123/2006, Art. 18, § 1º",
+      "vigente_desde": "",
+      "detalhe": "Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "DECISAO_ANEXO",
+      "titulo": "Anexo Simples Nacional: I (por CNAE 4753900 — fonte: EXPLICITO)",
+      "formula": "Base [CNAE 4753900] - Deduções [N/A] * Alíquota [N/A] = I",
+      "memoria": {
+        "base": "CNAE 4753900",
+        "deducoes": "N/A",
+        "aliquota": "N/A",
+        "valor_final": "I"
+      },
+      "amparo_legal": "LC 123/2006, Art. 18, §§ 1º e 24 | Res. CGSN 140/2018",
+      "vigente_desde": "01/01/2018 (Res. CGSN 140/2018)",
+      "detalhe": "CNAE 4753900 mapeado para Anexo I (correspondência exata na tabela CGSN).",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "AE_SIMPLES",
+      "titulo": "Alíquota Efetiva (Anexo I)",
+      "formula": "Base [RBT12 R$ 1,158,950.86] - Deduções [PD R$ 22,500.00] * Alíquota [Nominal 10.70%] = 8.7586%",
+      "memoria": {
+        "base": "RBT12 R$ 1,158,950.86",
+        "deducoes": "PD R$ 22,500.00",
+        "aliquota": "Nominal 10.70%",
+        "valor_final": "8.7586%"
+      },
+      "amparo_legal": "LC 123/2006, Art. 18, § 1º",
+      "vigente_desde": "",
+      "detalhe": "Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "DECISAO_ANEXO",
+      "titulo": "Anexo Simples Nacional: I (por CNAE 4753900 — fonte: EXPLICITO)",
+      "formula": "Base [CNAE 4753900] - Deduções [N/A] * Alíquota [N/A] = I",
+      "memoria": {
+        "base": "CNAE 4753900",
+        "deducoes": "N/A",
+        "aliquota": "N/A",
+        "valor_final": "I"
+      },
+      "amparo_legal": "LC 123/2006, Art. 18, §§ 1º e 24 | Res. CGSN 140/2018",
+      "vigente_desde": "01/01/2018 (Res. CGSN 140/2018)",
+      "detalhe": "CNAE 4753900 mapeado para Anexo I (correspondência exata na tabela CGSN).",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "DECISAO_ANEXO",
+      "titulo": "Anexo Simples Nacional: I (por CNAE 4753900 — fonte: EXPLICITO)",
+      "formula": "Base [CNAE 4753900] - Deduções [N/A] * Alíquota [N/A] = I",
+      "memoria": {
+        "base": "CNAE 4753900",
+        "deducoes": "N/A",
+        "aliquota": "N/A",
+        "valor_final": "I"
+      },
+      "amparo_legal": "LC 123/2006, Art. 18, §§ 1º e 24 | Res. CGSN 140/2018",
+      "vigente_desde": "01/01/2018 (Res. CGSN 140/2018)",
+      "detalhe": "CNAE 4753900 mapeado para Anexo I (correspondência exata na tabela CGSN).",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "OPT_OUT_CALCULO",
+      "titulo": "Cenário Opt-Out — DAS sem IVA + IVA por fora",
+      "formula": "Base [DAS completo R$ 12,187.07] - Deduções [IBS/CBS no DAS R$ 0.00] * Alíquota [IVA por fora 1.00%] = R$ 13,578.51",
+      "memoria": {
+        "base": "DAS completo R$ 12,187.07",
+        "deducoes": "IBS/CBS no DAS R$ 0.00",
+        "aliquota": "IVA por fora 1.00%",
+        "valor_final": "R$ 13,578.51"
+      },
+      "amparo_legal": "LC 214/2025 (dispositivo de opt-out — aguardar regulamentação)",
+      "vigente_desde": "",
+      "detalhe": "DAS sem IVA R$ 12,187.07 + IVA por fora R$ 1,391.44 = Total R$ 13,578.51. Sem dupla contagem de IBS/CBS.",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "DECISAO_ANEXO",
+      "titulo": "Anexo Simples Nacional: I (por CNAE 4753900 — fonte: EXPLICITO)",
+      "formula": "Base [CNAE 4753900] - Deduções [N/A] * Alíquota [N/A] = I",
+      "memoria": {
+        "base": "CNAE 4753900",
+        "deducoes": "N/A",
+        "aliquota": "N/A",
+        "valor_final": "I"
+      },
+      "amparo_legal": "LC 123/2006, Art. 18, §§ 1º e 24 | Res. CGSN 140/2018",
+      "vigente_desde": "01/01/2018 (Res. CGSN 140/2018)",
+      "detalhe": "CNAE 4753900 mapeado para Anexo I (correspondência exata na tabela CGSN).",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "AE_SIMPLES",
+      "titulo": "Alíquota Efetiva (Anexo I)",
+      "formula": "Base [RBT12 R$ 1,158,950.86] - Deduções [PD R$ 22,500.00] * Alíquota [Nominal 10.70%] = 8.7586%",
+      "memoria": {
+        "base": "RBT12 R$ 1,158,950.86",
+        "deducoes": "PD R$ 22,500.00",
+        "aliquota": "Nominal 10.70%",
+        "valor_final": "8.7586%"
+      },
+      "amparo_legal": "LC 123/2006, Art. 18, § 1º",
+      "vigente_desde": "",
+      "detalhe": "Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "DECISAO_ANEXO",
+      "titulo": "Anexo Simples Nacional: I (por CNAE 4753900 — fonte: EXPLICITO)",
+      "formula": "Base [CNAE 4753900] - Deduções [N/A] * Alíquota [N/A] = I",
+      "memoria": {
+        "base": "CNAE 4753900",
+        "deducoes": "N/A",
+        "aliquota": "N/A",
+        "valor_final": "I"
+      },
+      "amparo_legal": "LC 123/2006, Art. 18, §§ 1º e 24 | Res. CGSN 140/2018",
+      "vigente_desde": "01/01/2018 (Res. CGSN 140/2018)",
+      "detalhe": "CNAE 4753900 mapeado para Anexo I (correspondência exata na tabela CGSN).",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "AE_SIMPLES",
+      "titulo": "Alíquota Efetiva (Anexo I)",
+      "formula": "Base [RBT12 R$ 1,158,950.86] - Deduções [PD R$ 22,500.00] * Alíquota [Nominal 10.70%] = 8.7586%",
+      "memoria": {
+        "base": "RBT12 R$ 1,158,950.86",
+        "deducoes": "PD R$ 22,500.00",
+        "aliquota": "Nominal 10.70%",
+        "valor_final": "8.7586%"
+      },
+      "amparo_legal": "LC 123/2006, Art. 18, § 1º",
+      "vigente_desde": "",
+      "detalhe": "Fórmula: ((RBT12 * Aliq_Nominal) - PD) / RBT12",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "DECISAO_ANEXO",
+      "titulo": "Anexo Simples Nacional: I (por CNAE 4753900 — fonte: EXPLICITO)",
+      "formula": "Base [CNAE 4753900] - Deduções [N/A] * Alíquota [N/A] = I",
+      "memoria": {
+        "base": "CNAE 4753900",
+        "deducoes": "N/A",
+        "aliquota": "N/A",
+        "valor_final": "I"
+      },
+      "amparo_legal": "LC 123/2006, Art. 18, §§ 1º e 24 | Res. CGSN 140/2018",
+      "vigente_desde": "01/01/2018 (Res. CGSN 140/2018)",
+      "detalhe": "CNAE 4753900 mapeado para Anexo I (correspondência exata na tabela CGSN).",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "DECISAO_ANEXO",
+      "titulo": "Anexo Simples Nacional: I (por CNAE 4753900 — fonte: EXPLICITO)",
+      "formula": "Base [CNAE 4753900] - Deduções [N/A] * Alíquota [N/A] = I",
+      "memoria": {
+        "base": "CNAE 4753900",
+        "deducoes": "N/A",
+        "aliquota": "N/A",
+        "valor_final": "I"
+      },
+      "amparo_legal": "LC 123/2006, Art. 18, §§ 1º e 24 | Res. CGSN 140/2018",
+      "vigente_desde": "01/01/2018 (Res. CGSN 140/2018)",
+      "detalhe": "CNAE 4753900 mapeado para Anexo I (correspondência exata na tabela CGSN).",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "CALCULO",
+      "id": "OPT_OUT_CALCULO",
+      "titulo": "Cenário Opt-Out — DAS sem IVA + IVA por fora",
+      "formula": "Base [DAS completo R$ 12,187.07] - Deduções [IBS/CBS no DAS R$ 0.00] * Alíquota [IVA por fora 1.00%] = R$ 13,578.51",
+      "memoria": {
+        "base": "DAS completo R$ 12,187.07",
+        "deducoes": "IBS/CBS no DAS R$ 0.00",
+        "aliquota": "IVA por fora 1.00%",
+        "valor_final": "R$ 13,578.51"
+      },
+      "amparo_legal": "LC 214/2025 (dispositivo de opt-out — aguardar regulamentação)",
+      "vigente_desde": "",
+      "detalhe": "DAS sem IVA R$ 12,187.07 + IVA por fora R$ 1,391.44 = Total R$ 13,578.51. Sem dupla contagem de IBS/CBS.",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    },
+    {
+      "tipo": "INFO_DIFAL",
+      "id": "DIFAL_OPERACAO_INTERNA",
+      "titulo": "DIFAL — Operação interna",
+      "formula": "UF origem (SP) = UF destino (SP) → DIFAL = R$ 0,00",
+      "amparo_legal": "CF/1988, Art. 155, §2º, VII — DIFAL apenas em operações interestaduais",
+      "detalhe": "Operação intra-estadual. Nenhum diferencial de alíquota aplicável.",
+      "timestamp": "2026-04-08 01:23:03.096400"
+    }
+  ],
+  "meta": {
+    "elaborado_por": "Escritório Conect — Motor Tributário v1.0",
+    "legislacao_base": [
+      "LC 123/2006",
+      "LC 214/2025"
+    ],
+    "validar_com_profissional": true,
+    "aviso": "Este diagnóstico é de natureza informativa. Decisões tributárias devem ser validadas por contador responsável (CRC-SP)."
+  },
+  "_extracao": {
+    "confianca": 0.98,
+    "campos_ausentes": [
+      "folha_salarios_12m"
+    ],
+    "observacoes": "Empresa com mix de atividades: revenda de mercadorias (Anexo I, com e sem ST de ICMS) e prestação de serviços (Anexo III, com e sem retenção de ISS). O Fator R não se aplica conforme declarado no PGDAS-D. O DAS referente a 01/2026 com vencimento em 20/02/2026 consta como não pago até a data de geração do extrato (26/03/2026). RBT12 confirmada pelo relatório de faturamento 2025 e pela declaração PGDAS-D, totalizando R$ 1.158.950,86.",
+    "prompt_version": "v2.2-2026-04-02",
+    "layout_ecac": "2026",
+    "das_ecac_referencia": "15200.39",
+    "competencia": "2026-01",
+    "validacao_cruzada": [
+      {
+        "tipo": "DAS_CALCULADO_VS_ECAC",
+        "das_calculado": "12187.07",
+        "das_ecac": "15200.39",
+        "delta": "3013.32",
+        "delta_pct": "19.82",
+        "status": "DIVERGENTE"
+      },
+      {
+        "tipo": "BREAKDOWN_VS_DAS_TOTAL",
+        "soma_breakdown": "15200.39",
+        "das_ecac": "15200.39",
+        "delta": "0.00",
+        "status": "OK"
+      }
+    ]
+  }
+}
