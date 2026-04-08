@@ -321,3 +321,161 @@ class TestGerarDiagnostico:
         motor = motor_comercio_b2b()
         diag = motor.gerar_diagnostico()
         assert diag["meta"]["validar_com_profissional"] is True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Bloco A Frente 3.2 — Recomendação Inteligente Opt-Out
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _motor_misto(pct_b2b: str, rbt12: str = "1800000.00") -> MotorReformaTributaria:
+    """
+    Empresa MISTA com percentual_b2b variável — usado para testar
+    a matriz de decisão de _gerar_recomendacao_opt_out.
+    """
+    return MotorReformaTributaria(
+        EmpresaFornecedora(
+            cnpj="11.222.333/0001-81",
+            razao_social="Mista Sorocaba Ltda",
+            regime="SIMPLES",
+            cnae_principal="4711302",
+            uf_origem="SP",
+            faturamento_12m=Decimal(rbt12),
+        ),
+        EmpresaCompradora(
+            tipo="MISTO",
+            percentual_b2b=Decimal(pct_b2b),
+            uf_destino="SP",
+        ),
+        OperacaoFiscal(
+            data_emissao=date(2026, 6, 15),
+            valor_operacao=Decimal("50000.00"),
+            ncm_nbs="84099190",
+            forma_recebimento="PIX_BOLETO",
+        ),
+    )
+
+
+class TestRecomendacaoInteligenteOptOut:
+    """
+    Matriz de decisão (LC 214/2025 Arts. 41-44 + Resolução CGSN 183/2025):
+
+      B2B ≥ 70% E disparidade/RBT12 ≤ 5%  → OPT_OUT_FORTE
+      B2B ≥ 50% E disparidade/RBT12 ≤ 10% → OPT_OUT_VANTAJOSO
+      B2B < 30%                            → MANTER_SIMPLES
+      Demais casos                         → ZONA_CINZA
+    """
+
+    def test_recomendacao_inteligente_presente_no_diagnostico(self):
+        """O bloco 'recomendacao_inteligente' deve existir em cenarios."""
+        motor = motor_comercio_b2b()
+        diag = motor.gerar_diagnostico()
+        assert "recomendacao_inteligente" in diag["cenarios"]
+        rec = diag["cenarios"]["recomendacao_inteligente"]
+        for campo in ("codigo", "titulo", "justificativa", "amparo_legal"):
+            assert campo in rec, f"Campo '{campo}' ausente em recomendacao_inteligente"
+
+    def test_b2b_100_opt_out_forte(self):
+        """B2B 100% (tipo=B2B_CONTRIBUINTE) → OPT_OUT_FORTE."""
+        motor = motor_comercio_b2b()
+        rec = motor._gerar_recomendacao_opt_out()
+        assert rec["codigo"] == "OPT_OUT_FORTE"
+        assert "FORTEMENTE RECOMENDADO" in rec["titulo"]
+        assert "100%" in rec["justificativa"]
+
+    def test_misto_70_b2b_opt_out_forte(self):
+        """MISTO com 70% B2B → OPT_OUT_FORTE (≥ 70% threshold)."""
+        motor = _motor_misto("70.00")
+        rec = motor._gerar_recomendacao_opt_out()
+        assert rec["codigo"] == "OPT_OUT_FORTE"
+        assert "70%" in rec["justificativa"]
+
+    def test_misto_50_b2b_opt_out_vantajoso(self):
+        """MISTO com 50% B2B → OPT_OUT_VANTAJOSO (≥ 50% mas < 70%)."""
+        motor = _motor_misto("50.00")
+        rec = motor._gerar_recomendacao_opt_out()
+        assert rec["codigo"] == "OPT_OUT_VANTAJOSO"
+        assert "VANTAJOSO" in rec["titulo"]
+        assert "50%" in rec["justificativa"]
+
+    def test_misto_30_b2b_zona_cinza(self):
+        """MISTO com 30% B2B → ZONA_CINZA (≥ 30% mas < 50%)."""
+        motor = _motor_misto("30.00")
+        rec = motor._gerar_recomendacao_opt_out()
+        assert rec["codigo"] == "ZONA_CINZA"
+        assert "análise individual" in rec["justificativa"].lower() or "analise individual" in rec["justificativa"].lower()
+
+    def test_misto_20_b2b_manter_simples(self):
+        """MISTO com 20% B2B → MANTER_SIMPLES (< 30%)."""
+        motor = _motor_misto("20.00")
+        rec = motor._gerar_recomendacao_opt_out()
+        assert rec["codigo"] == "MANTER_SIMPLES"
+        assert "SIMPLES PURO" in rec["titulo"]
+
+    def test_b2c_puro_manter_simples(self):
+        """B2C puro (tipo=B2C_CONSUMIDOR_FINAL) → MANTER_SIMPLES."""
+        motor = MotorReformaTributaria(
+            EmpresaFornecedora(
+                cnpj="11.222.333/0001-81",
+                razao_social="Loja Varejo",
+                regime="SIMPLES",
+                cnae_principal="4711302",
+                uf_origem="SP",
+                faturamento_12m=Decimal("300000.00"),
+            ),
+            EmpresaCompradora(tipo="B2C_CONSUMIDOR_FINAL", uf_destino="SP"),
+            OperacaoFiscal(
+                data_emissao=date(2026, 1, 1),
+                valor_operacao=Decimal("1000.00"),
+                ncm_nbs="84099190",
+            ),
+        )
+        rec = motor._gerar_recomendacao_opt_out()
+        assert rec["codigo"] == "MANTER_SIMPLES"
+        assert "0%" in rec["justificativa"]
+
+    def test_justificativa_contem_valor_financeiro(self):
+        """Justificativa deve citar o custo anual em R$ (transparência)."""
+        motor = motor_comercio_b2b()
+        rec = motor._gerar_recomendacao_opt_out()
+        assert "R$" in rec["justificativa"]
+
+    def test_amparo_legal_cita_lc_214(self):
+        """MAX_FISCAL_02: toda recomendação deve citar a lei."""
+        motor = motor_comercio_b2b()
+        rec = motor._gerar_recomendacao_opt_out()
+        assert "LC 214/2025" in rec["amparo_legal"]
+        assert "Arts. 41-44" in rec["amparo_legal"]
+
+    def test_compat_retro_string_recomendacao_existe(self):
+        """Compat: chave 'recomendacao' string curta ainda existe."""
+        motor = motor_comercio_b2b()
+        diag = motor.gerar_diagnostico()
+        assert "recomendacao" in diag["cenarios"]
+        assert isinstance(diag["cenarios"]["recomendacao"], str)
+
+    def test_b2b_puro_string_compat_menciona_opt_out(self):
+        """B2B 100% → string compat deve mencionar OPT_OUT."""
+        motor = motor_comercio_b2b()
+        diag = motor.gerar_diagnostico()
+        assert "OPT_OUT" in diag["cenarios"]["recomendacao"]
+
+    def test_b2c_puro_string_compat_menciona_simples(self):
+        """B2C puro → string compat deve mencionar SIMPLES."""
+        motor = MotorReformaTributaria(
+            EmpresaFornecedora(
+                cnpj="11.222.333/0001-81",
+                razao_social="Loja B2C",
+                regime="SIMPLES",
+                cnae_principal="4711302",
+                uf_origem="SP",
+                faturamento_12m=Decimal("300000.00"),
+            ),
+            EmpresaCompradora(tipo="B2C_CONSUMIDOR_FINAL", uf_destino="SP"),
+            OperacaoFiscal(
+                data_emissao=date(2026, 1, 1),
+                valor_operacao=Decimal("1000.00"),
+                ncm_nbs="84099190",
+            ),
+        )
+        diag = motor.gerar_diagnostico()
+        assert "SIMPLES" in diag["cenarios"]["recomendacao"]

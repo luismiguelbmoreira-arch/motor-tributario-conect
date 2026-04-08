@@ -1040,6 +1040,132 @@ class MotorReformaTributaria:
         # Multiplica por 12 para projeção anual (simplificação: 1 operação/mês)
         return (disparidade_por_operacao * 12).quantize(Decimal("0.01"), ROUND_HALF_UP)
 
+    def _gerar_recomendacao_opt_out(self) -> Dict[str, str]:
+        """
+        Gera recomendação inteligente de Opt-Out cruzando:
+          - percentual_b2b (peso comercial: quantos clientes perderiam crédito)
+          - disparidade_anual / RBT12 (peso financeiro: custo relativo de sair)
+          - tipo do comprador (gate: B2C puro nunca recomenda Opt-Out)
+
+        Retorna dict com 4 chaves:
+          - codigo: identificador da matriz de decisão (ex: "OPT_OUT_FORTE")
+          - titulo: frase curta para header (ex: "OPT-OUT FORTEMENTE RECOMENDADO")
+          - justificativa: parágrafo explicando o porquê em linguagem de empresário
+          - amparo_legal: LC 214/2025 Arts. 41-44 + CF Art. 146, III, "d"
+
+        MATRIZ DE DECISÃO (LC 214/2025, Arts. 41-44 + Resolução CGSN 183/2025):
+          B2B ≥ 70% E disparidade/RBT12 ≤ 5%  → OPT_OUT_FORTE
+          B2B ≥ 50% E disparidade/RBT12 ≤ 10% → OPT_OUT_VANTAJOSO
+          B2B < 30%                            → MANTER_SIMPLES
+          Demais casos                         → ZONA_CINZA (análise individual)
+
+        NOTA: a disparidade real deve ser próxima de zero quando IVA é repassado
+        no preço de venda. Quando positiva, indica que o Opt-Out custa mais caixa
+        para a empresa — só vale a pena se o ganho de retenção B2B compensa.
+        """
+        percentual_b2b = self.compradora.percentual_b2b or Decimal("0")
+        # Normaliza percentual_b2b quando tipo é B2B_CONTRIBUINTE puro (100%)
+        # ou B2C puro (0%) — independente do default do Pydantic
+        if self.compradora.tipo == "B2B_CONTRIBUINTE":
+            percentual_b2b = Decimal("100")
+        elif self.compradora.tipo == "B2C_CONSUMIDOR_FINAL":
+            percentual_b2b = Decimal("0")
+
+        disparidade = self.calcular_disparidade_anual()
+        rbt12 = self.calcular_rbt12() or Decimal("1")  # evita divisão por zero
+        # Razão disparidade/RBT12 em percentual (absoluto — ganhos e perdas)
+        razao_disparidade = (abs(disparidade) / rbt12 * Decimal("100")).quantize(
+            Decimal("0.01"), ROUND_HALF_UP
+        )
+
+        # ── Matriz de decisão ────────────────────────────────────────────────
+        if percentual_b2b >= Decimal("70") and razao_disparidade <= Decimal("5"):
+            codigo = "OPT_OUT_FORTE"
+            titulo = "OPT-OUT FORTEMENTE RECOMENDADO"
+            justificativa = (
+                f"Você tem {percentual_b2b:.0f}% de clientes B2B (empresas que precisam "
+                f"de crédito de CBS/IBS para abater dos próprios impostos). No Simples "
+                f"Puro, eles recebem apenas 1% de crédito — risco real de migrarem "
+                f"para concorrentes no regime normal. O custo anual extra do Opt-Out "
+                f"é R$ {disparidade:,.2f} ({razao_disparidade:.2f}% da receita), "
+                f"normalmente neutralizado pelo repasse no preço. "
+                f"O ganho de competitividade e retenção de clientes compensa."
+            )
+        elif percentual_b2b >= Decimal("50") and razao_disparidade <= Decimal("10"):
+            codigo = "OPT_OUT_VANTAJOSO"
+            titulo = "OPT-OUT VANTAJOSO — avaliar caixa"
+            justificativa = (
+                f"Você tem {percentual_b2b:.0f}% de clientes B2B. Metade ou mais do seu "
+                f"faturamento vem de empresas que podem exigir crédito IVA. O custo anual "
+                f"extra do Opt-Out é R$ {disparidade:,.2f} ({razao_disparidade:.2f}% da "
+                f"receita). Avalie se o repasse no preço é viável no seu mercado e se há "
+                f"fluxo de caixa para absorver o aumento durante a transição."
+            )
+        elif percentual_b2b < Decimal("30"):
+            codigo = "MANTER_SIMPLES"
+            titulo = "MANTENHA SIMPLES PURO"
+            justificativa = (
+                f"Você tem apenas {percentual_b2b:.0f}% de clientes B2B — a maioria da sua "
+                f"receita vem de consumidores finais (pessoa física), que NÃO usam crédito "
+                f"de CBS/IBS. Sair do Simples Puro para o Opt-Out aumentaria a complexidade "
+                f"operacional (EFD-Reinf, EFD-Contribuições) e o custo anual em "
+                f"R$ {disparidade:,.2f} sem trazer benefício comercial. Mantenha o regime "
+                f"atual e reavalie apenas se o perfil de clientes mudar."
+            )
+        else:
+            codigo = "ZONA_CINZA"
+            titulo = "ZONA CINZA — análise individual necessária"
+            justificativa = (
+                f"Seu caso está numa faixa intermediária: {percentual_b2b:.0f}% de clientes "
+                f"B2B com custo anual de Opt-Out de R$ {disparidade:,.2f} "
+                f"({razao_disparidade:.2f}% da receita). A decisão depende de fatores "
+                f"qualitativos (concentração de clientes, poder de repasse de preço, "
+                f"capacidade de absorver obrigações acessórias adicionais). "
+                f"Recomendamos análise individual com seu contador antes das janelas "
+                f"semestrais (abril e setembro)."
+            )
+
+        return {
+            "codigo": codigo,
+            "titulo": titulo,
+            "justificativa": justificativa,
+            "amparo_legal": (
+                "LC 214/2025, Arts. 41-44 (dispositivo de Opt-Out) | "
+                "CF Art. 146, III, 'd' (regime diferenciado Simples Nacional) | "
+                "Resolução CGSN 183/2025 (janelas semestrais abr/set)"
+            ),
+        }
+
+    def _montar_cenarios_com_recomendacao(self) -> Dict[str, Any]:
+        """
+        Monta o bloco 'cenarios' do diagnóstico com recomendação inteligente.
+
+        Retorna dict com:
+          - simples_puro: cenário A
+          - opt_out: cenário B
+          - disparidade_anual_estimada: diferença financeira anual (str)
+          - recomendacao: frase curta (compat retrô — usada por testes antigos)
+          - recomendacao_inteligente: dict {codigo, titulo, justificativa, amparo_legal}
+        """
+        rec = self._gerar_recomendacao_opt_out()
+        return {
+            "simples_puro": self.cenario_simples_puro(),
+            "opt_out": self.cenario_opt_out(),
+            "disparidade_anual_estimada": str(self.calcular_disparidade_anual()),
+            # Compatibilidade com testes antigos (string curta)
+            "recomendacao": (
+                "OPT_OUT recomendado para reter cliente B2B."
+                if rec["codigo"] in ("OPT_OUT_FORTE", "OPT_OUT_VANTAJOSO")
+                else (
+                    "SIMPLES_PURO adequado — perfil majoritariamente B2C."
+                    if rec["codigo"] == "MANTER_SIMPLES"
+                    else "Análise individual recomendada — zona cinza."
+                )
+            ),
+            # Recomendação inteligente (novo contrato — Bloco A Frente 3.2)
+            "recomendacao_inteligente": rec,
+        }
+
     # ── FASE 5: DIAGNÓSTICO + ALERTAS + LGPD ─────────────────────────────────
 
     def _calcular_difal_diagnostico(self) -> Dict[str, Any]:
@@ -1422,16 +1548,7 @@ class MotorReformaTributaria:
                 "fracao_ibs_no_das": str(self.calcular_fracao_ibs()),
             },
 
-            "cenarios": {
-                "simples_puro": self.cenario_simples_puro(),
-                "opt_out": self.cenario_opt_out(),
-                "disparidade_anual_estimada": str(self.calcular_disparidade_anual()),
-                "recomendacao": (
-                    "OPT_OUT recomendado para reter cliente B2B."
-                    if self.compradora.tipo == "B2B_CONTRIBUINTE"
-                    else "SIMPLES_PURO adequado para B2C. Sem impacto de crédito."
-                ),
-            },
+            "cenarios": self._montar_cenarios_com_recomendacao(),
 
             # DIFAL Interestadual (EC 87/2015 | LC 190/2022)
             "difal": self._calcular_difal_diagnostico(),
