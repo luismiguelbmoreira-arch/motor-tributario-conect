@@ -21,7 +21,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import storage_cifrado  # noqa: E402
 from storage_cifrado import (  # noqa: E402
     MasterKeyAusente,
-    _caminhos_padrao_arquivo,
     _ler_key_de_arquivo,
     _master_key,
     _validar_e_normalizar_key,

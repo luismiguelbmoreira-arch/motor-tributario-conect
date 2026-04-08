@@ -10,7 +10,6 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-import pytest
 from validadores import validar_cnpj, validar_ncm, validar_uf, validar_cnae, normalizar_cnpj, ValidationResult
 
 

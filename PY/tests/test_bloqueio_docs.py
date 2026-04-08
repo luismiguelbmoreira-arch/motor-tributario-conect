@@ -6,7 +6,6 @@ Testa _validar_docs_por_regime() + _detectar_tipo_documento() em isolamento.
 import os
 import sys
 
-import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
