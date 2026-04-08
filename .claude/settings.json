@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import json,os,sys; inp=json.loads(os.environ.get('CLAUDE_TOOL_INPUT','{}')); path=inp.get('file_path',''); (print('BLOQUEADO: tabelas_simples.py e FROZEN. Requer aprovacao explicita de Luiz Moreira (MAX_FISCAL).', file=sys.stderr) or sys.exit(1)) if 'tabelas_simples.py' in path else None\""
+          },
+          {
+            "type": "command",
+            "command": "python -c \"import json,os,sys,re; inp=json.loads(os.environ.get('CLAUDE_TOOL_INPUT','{}')); path=inp.get('file_path',''); content=inp.get('new_string','') or inp.get('content',''); skip=not path.endswith('.py') or any(x in path for x in ['tests','alembic','.lixeira','scripts']); (print('BLOQUEADO: float() detectado em '+os.path.basename(path)+'.\\nUse Decimal(\\\"valor\\\") + ROUND_HALF_UP. Hard Constraint #1 — O Viciado nao aceita float monetario.', file=sys.stderr) or sys.exit(1)) if not skip and re.search(r'\\bfloat\\s*\\(', content) else None\""
+          }
+        ]
+      }
+    ]
+  }
+}
