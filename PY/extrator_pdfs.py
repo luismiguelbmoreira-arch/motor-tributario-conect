@@ -720,11 +720,29 @@ def processar_pdfs_bytes(
         receita_com_st_icms=empresa_params.get("receita_com_st_icms"),
         atividades=empresa_params.get("atividades"),
     )
+    # Inferência de perfil B2B a partir do CNAE (tabelas_simples.PERFIL_B2B_POR_CNAE):
+    # Indústria (25-33) = 90%, Contabilidade (69) = 85%, Transporte (49-53) = 70-90%,
+    # Varejo (47) = 30%, Saúde PF (86-88) = 10-20%, etc.
+    # SEM essa inferência, todo upload de PDF caía em B2C_CONSUMIDOR_FINAL por default
+    # e a recomendação de Opt-Out virava MANTER_SIMPLES mesmo para empresas 90% B2B.
+    # ⚠️ A estimativa NÃO tem base legal (LC 214/2025 Art. 47-48 exige verificação
+    # operação-a-operação) — é apenas uma pré-seleção razoável que o operador pode
+    # ajustar depois via campo editável no resultado.
+    from tabelas_simples import estimar_perfil_b2b
+    pct_b2b_sugerido = estimar_perfil_b2b(empresa_params["cnae_principal"])
+    if pct_b2b_sugerido >= 90:
+        tipo_comprador = "B2B_CONTRIBUINTE"
+    elif pct_b2b_sugerido <= 10:
+        tipo_comprador = "B2C_CONSUMIDOR_FINAL"
+    else:
+        tipo_comprador = "MISTO"
+
     # Default: uf_destino = uf_origem (operacao interna, sem DIFAL)
     # Pode ser ajustado pelo usuario no resultado.html apos o diagnostico inicial
     compradora = EmpresaCompradora(
-        tipo="B2C_CONSUMIDOR_FINAL",
+        tipo=tipo_comprador,
         uf_destino=empresa_params["uf_origem"],
+        percentual_b2b=Decimal(str(pct_b2b_sugerido)),
     )
 
     # Usar competência extraída para definir data_emissao
