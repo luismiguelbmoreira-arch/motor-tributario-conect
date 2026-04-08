@@ -70,13 +70,22 @@ def _esc(s: Any) -> str:
     return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
-def _gerar_html(diagnostico: dict) -> str:
-    """Gera string HTML completo do relatório — CSS inline, sem CDN."""
+def _gerar_html(diagnostico: dict, pii: dict | None = None) -> str:
+    """
+    Gera string HTML completo do relatório — CSS inline, sem CDN.
 
+    Args:
+        diagnostico: dict despersonalizado retornado por gerar_diagnostico() (LGPD).
+        pii: dict opcional com {cnpj, razao_social} entregues separadamente
+             apenas no momento de gerar o PDF para o cliente.
+             Se None, header mostra "—".
+    """
+    pii = pii or {}
     empresa   = diagnostico.get("empresa", {})
     aliquotas = diagnostico.get("aliquotas", {})
-    razao   = _esc(empresa.get("razao_social") or "—")
-    cnpj    = _esc(empresa.get("cnpj") or "—")
+    # PII vem do parâmetro separado (LGPD: nunca do diagnostico)
+    razao   = _esc(pii.get("razao_social") or empresa.get("razao_social") or "—")
+    cnpj    = _esc(pii.get("cnpj") or empresa.get("cnpj") or "—")
     regime  = _esc(empresa.get("regime") or "—")
     anexo   = _esc(empresa.get("anexo_simples") or "—")
     rbt12   = _fmt_moeda(empresa.get("rbt12", 0))
@@ -312,12 +321,15 @@ def _servicos_recomendados(diagnostico: dict) -> str:
     return rows
 
 
-def gerar_pdf(diagnostico: dict) -> bytes:
+def gerar_pdf(diagnostico: dict, pii: dict | None = None) -> bytes:
     """
     Gera bytes do PDF do diagnóstico fiscal.
 
     Args:
         diagnostico: dict retornado por MotorReformaTributaria.gerar_diagnostico()
+                     (despersonalizado por LGPD — sem cnpj/razao_social)
+        pii: dict opcional {cnpj, razao_social} entregue separadamente
+             apenas no momento de gerar PDF para o cliente. Não persistido.
 
     Returns:
         bytes do PDF gerado
@@ -325,18 +337,19 @@ def gerar_pdf(diagnostico: dict) -> bytes:
     Raises:
         RuntimeError: se weasyprint não estiver instalado ou falhar
     """
-    if not _WEASYPRINT_DISPONIVEL:
+    # Lazy import: só carrega weasyprint na primeira chamada
+    if not _tentar_importar_weasyprint() or _WeasyprintHTML is None:
         raise RuntimeError(
-            "weasyprint não instalado. Execute: pip install weasyprint>=61.0"
+            "weasyprint não instalado ou GTK ausente. "
+            "Execute: pip install weasyprint>=61.0 (Windows: precisa GTK3 Runtime)"
         )
 
-    html_str = _gerar_html(diagnostico)
+    html_str = _gerar_html(diagnostico, pii=pii)
     try:
-        pdf_bytes: bytes = WeasyprintHTML(string=html_str).write_pdf()
+        pdf_bytes: bytes = _WeasyprintHTML(string=html_str).write_pdf()
         logger.info(
-            "PDF gerado com sucesso — %d bytes · empresa: %s",
+            "PDF gerado com sucesso — %d bytes",  # sem PII no log
             len(pdf_bytes),
-            diagnostico.get("empresa", {}).get("razao_social") or "desconhecida",
         )
         return pdf_bytes
     except Exception as exc:
