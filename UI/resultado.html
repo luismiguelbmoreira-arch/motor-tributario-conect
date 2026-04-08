@@ -89,6 +89,15 @@
           </svg>
           Baixar PDF
         </button>
+        <button id="btn-baixar-dossie"
+                onclick="baixarDossieProva()"
+                title="Dossiê de prova: ZIP com PDFs originais decifrados + hashes SHA-256 + README com bases legais (LGPD Art. 37)"
+                class="hidden focus-ring inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-slate-700 text-white hover:bg-slate-800 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+          </svg>
+          Dossiê de Prova
+        </button>
       </div>
     </div>
   </div>
@@ -149,6 +158,37 @@
       </section>
 
       <!-- SEÇÃO 2: ALERTAS DE RISCO -->
+      <!-- SEÇÃO: VALIDAÇÃO CONTRA e-CAC (semáforo por delta DAS) -->
+      <section id="sec-validacao-ecac" class="fade-in hidden">
+        <h2 class="text-xl font-semibold text-slate-900 mb-4">Validação contra o e-CAC</h2>
+        <div id="validacao-ecac-card" class="bg-white border-2 rounded-xl p-6 shadow-sm">
+          <div class="flex items-start gap-4">
+            <div id="validacao-ecac-icone" class="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-2xl font-bold" aria-hidden="true">
+              --
+            </div>
+            <div class="flex-1 min-w-0">
+              <h3 id="validacao-ecac-titulo" class="text-base font-bold mb-2">--</h3>
+              <dl class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-3">
+                <div>
+                  <dt class="text-xs text-slate-500 uppercase tracking-wider">DAS calculado pelo motor</dt>
+                  <dd id="validacao-ecac-calculado" class="text-sm font-mono font-semibold text-slate-900 mt-1">--</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-slate-500 uppercase tracking-wider">DAS pago no e-CAC</dt>
+                  <dd id="validacao-ecac-pago" class="text-sm font-mono font-semibold text-slate-900 mt-1">--</dd>
+                </div>
+                <div>
+                  <dt class="text-xs text-slate-500 uppercase tracking-wider">Diferença</dt>
+                  <dd id="validacao-ecac-delta" class="text-sm font-mono font-bold mt-1">--</dd>
+                </div>
+              </dl>
+              <p id="validacao-ecac-explicacao" class="text-sm text-slate-700 leading-relaxed">--</p>
+              <p class="text-xs text-slate-400 italic mt-3">⚖ LC 123/2006, Art. 18 — DAS = alíquota efetiva × receita do período</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="sec-alertas" aria-labelledby="sec-alertas-titulo" class="fade-in hidden">
         <h2 id="sec-alertas-titulo" class="text-xl font-semibold text-slate-900 mb-4">Pontos de Atenção</h2>
         <div id="alertas-container" class="space-y-3" role="list" aria-label="Alertas fiscais"></div>
@@ -298,6 +338,105 @@
         </div>
       </section>
 
+      <!-- SEÇÃO: DECISÃO ESTRATÉGICA OPT-OUT (6 sub-blocos educativos) -->
+      <section id="sec-decisao-optout" class="fade-in">
+        <h2 class="text-xl font-semibold text-slate-900 mb-4">Decisão Estratégica: Opt-Out IVA</h2>
+
+        <!-- Sub-bloco 1: O que é -->
+        <div class="bg-blue-50 border-l-4 border-blue-600 rounded-r-xl p-4 mb-4">
+          <p class="text-xs font-bold text-blue-900 uppercase tracking-wider mb-2">O que é</p>
+          <p class="text-sm text-slate-700 leading-relaxed">
+            Opt-Out é a opção do Simples Nacional de <strong>sair do recolhimento unificado</strong> de CBS/IBS,
+            recolhendo esses dois tributos separadamente. O resto continua no DAS (IRPJ, CSLL, CPP, ICMS, ISS).
+            A grande diferença: com Opt-Out, seu cliente B2B recebe <strong>100% de crédito de CBS/IBS</strong>
+            em vez de 1% — o que pode ser decisivo para reter clientes corporativos após 2027.
+          </p>
+        </div>
+
+        <!-- Sub-bloco 2: Sua situação (tabela comparativa) -->
+        <div class="bg-white border border-slate-200 rounded-xl p-5 mb-4">
+          <h3 class="text-sm font-bold text-slate-900 mb-3">Sua situação específica</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-slate-200">
+                  <th class="text-left py-2 text-xs font-semibold text-slate-500 uppercase">Item</th>
+                  <th class="text-right py-2 text-xs font-semibold text-slate-500 uppercase">Simples Puro</th>
+                  <th class="text-right py-2 text-xs font-semibold text-slate-500 uppercase">Opt-Out IVA</th>
+                </tr>
+              </thead>
+              <tbody id="optout-tabela-situacao">
+                <!-- Preenchido por JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Sub-bloco 3: Diagnóstico personalizado (semáforo) -->
+        <div id="optout-diagnostico-card" class="border-2 rounded-xl p-5 mb-4">
+          <p id="optout-diagnostico-titulo" class="text-sm font-bold mb-2 uppercase tracking-wider">📋 --</p>
+          <p id="optout-diagnostico-justificativa" class="text-sm leading-relaxed">--</p>
+        </div>
+
+        <!-- Sub-bloco 4: Datas-chave 2026 -->
+        <div class="bg-white border border-slate-200 rounded-xl p-5 mb-4">
+          <h3 class="text-sm font-bold text-slate-900 mb-3">Datas-chave 2026 — Janelas de decisão</h3>
+          <ul class="space-y-2 text-sm text-slate-700">
+            <li class="flex items-start gap-3">
+              <span class="inline-block px-2 py-1 rounded bg-slate-100 text-xs font-mono font-semibold text-slate-700 flex-shrink-0">30/04/2026</span>
+              <span>Janela do <strong>1º semestre</strong> — opção válida de Jul/2026 em diante</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="inline-block px-2 py-1 rounded bg-slate-100 text-xs font-mono font-semibold text-slate-700 flex-shrink-0">30/09/2026</span>
+              <span>Janela do <strong>2º semestre</strong> — opção válida de Jan/2027 em diante (CBS sobe para 8,8%)</span>
+            </li>
+          </ul>
+          <div class="mt-4 bg-red-50 border-l-4 border-red-600 rounded-r p-3">
+            <p class="text-xs font-bold text-red-900 uppercase tracking-wider mb-1">⚠ Atenção — Irretratabilidade</p>
+            <p class="text-xs text-red-800">
+              A decisão pelo Opt-Out é <strong>irretratável por 5 anos-calendário</strong> (LC 214/2025, Art. 43).
+              Avalie com seu contador antes de optar.
+            </p>
+          </div>
+        </div>
+
+        <!-- Sub-bloco 5: Como fazer -->
+        <div class="bg-white border border-slate-200 rounded-xl p-5 mb-4">
+          <h3 class="text-sm font-bold text-slate-900 mb-3">Como fazer o Opt-Out na prática</h3>
+          <ol class="space-y-2 text-sm text-slate-700">
+            <li class="flex items-start gap-3">
+              <span class="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">1</span>
+              <span>Acesse o <strong>portal do Simples Nacional</strong> (gov.br/receitafederal) com certificado digital ou código de acesso</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">2</span>
+              <span>No menu PGDAS-D, marque a opção <strong>"Recolhimento de CBS/IBS fora do DAS"</strong> dentro da janela semestral aberta</span>
+            </li>
+            <li class="flex items-start gap-3">
+              <span class="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">3</span>
+              <span>Confirme e <strong>imprima o protocolo</strong>. A partir do semestre seguinte, recolha CBS/IBS via DARF (códigos a serem definidos por ato da RFB)</span>
+            </li>
+          </ol>
+        </div>
+
+        <!-- Sub-bloco 6: Riscos (3 cards vermelhos) -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">
+          <div class="bg-red-50 border-l-4 border-red-600 rounded-r p-3">
+            <p class="text-xs font-bold text-red-900 uppercase mb-1">5 anos sem volta</p>
+            <p class="text-xs text-red-800">Decisão irretratável por 5 anos-calendário. LC 214/2025, Art. 43.</p>
+          </div>
+          <div class="bg-amber-50 border-l-4 border-amber-500 rounded-r p-3">
+            <p class="text-xs font-bold text-amber-900 uppercase mb-1">Obrigações extras</p>
+            <p class="text-xs text-amber-800">EFD-Reinf e EFD-Contribuições passam a ser obrigatórias mensalmente.</p>
+          </div>
+          <div class="bg-red-50 border-l-4 border-red-600 rounded-r p-3">
+            <p class="text-xs font-bold text-red-900 uppercase mb-1">Multa de ofício</p>
+            <p class="text-xs text-red-800">Multa de <strong>75%</strong> sobre o tributo não recolhido (Lei 9.430/1996, Art. 44). Majorada para 100% em sonegação e 150% em reincidência (Lei 14.689/2023).</p>
+          </div>
+        </div>
+        <p id="optout-amparo-legal" class="text-xs text-slate-400 italic mt-3">⚖ LC 214/2025, Arts. 41-44 | CF Art. 146, III, "d" | Resolução CGSN 183/2025</p>
+      </section>
+
       <!-- SEÇÃO 5: SERVIÇOS RECOMENDADOS -->
       <section aria-labelledby="sec-servicos-titulo" class="fade-in">
         <h2 id="sec-servicos-titulo" class="text-xl font-semibold text-slate-900 mb-4">Serviços Recomendados</h2>
@@ -306,7 +445,25 @@
         </div>
       </section>
 
-      <!-- SEÇÃO 6: TRILHA DE AUDITORIA (ACCORDION) -->
+      <!-- SEÇÃO: GLOSSÁRIO (termos técnicos em linguagem de empresário) -->
+      <section id="sec-glossario" class="fade-in">
+        <details class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+          <summary class="cursor-pointer px-6 py-5 hover:bg-slate-50 transition-colors flex items-center gap-3">
+            <span class="text-lg" aria-hidden="true">📖</span>
+            <div>
+              <h2 class="text-base font-semibold text-slate-900">Glossário</h2>
+              <p class="text-xs text-slate-500 mt-0.5">12 termos técnicos em linguagem de empresário</p>
+            </div>
+          </summary>
+          <div class="px-6 pb-6">
+            <dl id="glossario-lista" class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              <!-- Preenchido por JS -->
+            </dl>
+          </div>
+        </details>
+      </section>
+
+      <!-- SEÇÃO 6: TRILHA DE AUDITORIA (ACCORDION) — apenas cálculos efetivamente usados -->
       <section aria-labelledby="sec-auditoria-titulo" class="fade-in">
         <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
           <button id="btn-auditoria"
@@ -317,8 +474,8 @@
             <div class="flex items-center gap-3">
               <span class="text-lg" aria-hidden="true">⚖</span>
               <div>
-                <h2 id="sec-auditoria-titulo" class="text-base font-semibold text-slate-900">Como foi calculado?</h2>
-                <p class="text-xs text-slate-500 mt-0.5">Trilha de auditoria completa — memória de cálculo</p>
+                <h2 id="sec-auditoria-titulo" class="text-base font-semibold text-slate-900">Cálculos usados neste caso</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Apenas os passos aplicáveis ao seu diagnóstico — com lei citada</p>
               </div>
             </div>
             <svg id="icon-auditoria" xmlns="http://www.w3.org/2000/svg"
@@ -462,17 +619,279 @@
         `Calculado em ${dataRodape} com base em LC 123/2006 + LC 214/2025 (vigente 01/01/2026) | Auditado por Luiz Moreira 26/03/2026 | Motor Tributário Conect v2.1`;
 
       // Seções
+      renderValidacaoEcac(d._extracao || {});
       renderAlertas(d.alertas || []);
       renderCronogramaIVA(d.cronograma_iva || []);
       renderBreakdownRegime(d.breakdown_regime, d.aliquotas);
       renderDifal(d.difal || {});
       renderCenarios(d.cenarios || {});
+      renderDecisaoOptOut(d.cenarios || {});
       renderServicos(d.alertas || [], d.cenarios || {});
+      renderGlossario();
       renderTrilhaAuditoria(d.trilha_auditoria || []);
+      mostrarBotaoDossie(d._extracao || {});
 
       // Mostrar conteúdo
       hideElement('loading-state');
       showElement('content-area');
+    }
+
+    // ─────────────────────────────────────────────
+    // VALIDAÇÃO CONTRA e-CAC (semáforo por delta DAS)
+    // ─────────────────────────────────────────────
+    function renderValidacaoEcac(extracao) {
+      const validacoes = extracao.validacao_cruzada || [];
+      const item = validacoes.find(v => v.tipo === 'DAS_CALCULADO_VS_ECAC');
+      if (!item) return; // análise manual — bloco oculto
+
+      const dasCalc = parseFloat(item.das_calculado || 0);
+      const dasEcac = parseFloat(item.das_ecac || 0);
+      const delta = parseFloat(item.delta || 0);
+      const deltaPct = parseFloat(item.delta_pct || 0);
+      if (!isFinite(deltaPct)) return;
+
+      let corBg, corBorda, corTexto, icone, titulo, explicacao;
+      if (deltaPct < 0.5) {
+        corBg = 'bg-emerald-50'; corBorda = 'border-emerald-500'; corTexto = 'text-emerald-900';
+        icone = '✓';
+        titulo = 'Aprovado — confere com o e-CAC';
+        explicacao = 'O DAS calculado pelo motor está alinhado com o valor pago no e-CAC. Diferença dentro da margem aceitável (< 0,5%).';
+      } else if (deltaPct < 5) {
+        corBg = 'bg-amber-50'; corBorda = 'border-amber-500'; corTexto = 'text-amber-900';
+        icone = '⚠';
+        titulo = 'Diferença pequena — revisar antes de pagar';
+        explicacao = 'O DAS calculado difere do pago no e-CAC em menos de 5%. Geralmente é arredondamento, RPA aproximado ou pequeno descasamento de competência. Confira antes de usar como referência.';
+      } else {
+        corBg = 'bg-red-50'; corBorda = 'border-red-500'; corTexto = 'text-red-900';
+        icone = '✗';
+        titulo = 'Diferença significativa — investigue antes de usar';
+        explicacao = 'O DAS calculado difere do pago no e-CAC em mais de 5%. Possíveis causas: ICMS-ST não segregado, multi-atividade não declarada, RPA real diferente do extraído, CNAE/Anexo divergente, ou Fator R com folha desatualizada. Não use este diagnóstico como referência sem revisão.';
+      }
+
+      const card = document.getElementById('validacao-ecac-card');
+      card.className = `${corBg} border-2 ${corBorda} rounded-xl p-6 shadow-sm`;
+
+      const iconeEl = document.getElementById('validacao-ecac-icone');
+      iconeEl.className = `flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center text-2xl font-bold ${corBorda} border-2 ${corTexto} bg-white`;
+      iconeEl.textContent = icone;
+
+      const tituloEl = document.getElementById('validacao-ecac-titulo');
+      tituloEl.className = `text-base font-bold mb-2 ${corTexto}`;
+      tituloEl.textContent = titulo;
+
+      document.getElementById('validacao-ecac-calculado').textContent = formatBRL(dasCalc);
+      document.getElementById('validacao-ecac-pago').textContent = formatBRL(dasEcac);
+      const deltaEl = document.getElementById('validacao-ecac-delta');
+      deltaEl.className = `text-sm font-mono font-bold mt-1 ${corTexto}`;
+      deltaEl.textContent = formatBRL(delta) + ' (' + deltaPct.toFixed(2).replace('.', ',') + '%)';
+
+      document.getElementById('validacao-ecac-explicacao').textContent = explicacao;
+
+      showElement('sec-validacao-ecac');
+    }
+
+    // ─────────────────────────────────────────────
+    // DECISÃO ESTRATÉGICA: OPT-OUT (6 sub-blocos)
+    // ─────────────────────────────────────────────
+    function renderDecisaoOptOut(cenarios) {
+      const simples = cenarios.simples_puro || {};
+      const optOut = cenarios.opt_out || {};
+      const rec = cenarios.recomendacao_inteligente || {};
+
+      // Tabela comparativa
+      const tbody = document.getElementById('optout-tabela-situacao');
+      const linhas = [
+        ['DAS por operação', formatBRL(simples.custo_das_por_operacao), formatBRL(optOut.custo_das_por_operacao)],
+        ['IVA recolhido por fora', '<span class="text-slate-400">—</span>', formatBRL(optOut.iva_recolhido_por_fora)],
+        ['<strong>Custo total por operação</strong>', '<strong>' + formatBRL(simples.custo_das_por_operacao) + '</strong>', '<strong>' + formatBRL(optOut.custo_total) + '</strong>'],
+        ['Crédito gerado para comprador B2B',
+         formatBRL(simples.credito_gerado_para_comprador) + ' <span class="text-slate-400 text-xs">(' + sanitize(simples.percentual_credito_nf || '1%') + ')</span>',
+         '<strong class="text-emerald-700">' + formatBRL(optOut.credito_gerado_para_comprador) + ' (' + sanitize(optOut.percentual_credito_nf || '100%') + ')</strong>'],
+      ];
+      tbody.innerHTML = linhas.map(l =>
+        `<tr class="border-b border-slate-100">
+          <td class="py-2 text-slate-700">${l[0]}</td>
+          <td class="py-2 text-right font-mono text-slate-900">${l[1]}</td>
+          <td class="py-2 text-right font-mono text-slate-900">${l[2]}</td>
+        </tr>`).join('');
+
+      // Diagnóstico personalizado com semáforo
+      const codigo = rec.codigo || 'ZONA_CINZA';
+      const tituloRec = sanitize(rec.titulo || 'Análise individual recomendada');
+      const justificativa = sanitize(rec.justificativa || 'Não foi possível gerar uma recomendação automática — consulte seu contador.');
+      const amparoRec = sanitize(rec.amparo_legal || '');
+
+      const coresRec = {
+        OPT_OUT_FORTE:     { border: 'border-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-900' },
+        OPT_OUT_VANTAJOSO: { border: 'border-blue-500',    bg: 'bg-blue-50',    text: 'text-blue-900' },
+        MANTER_SIMPLES:    { border: 'border-slate-400',   bg: 'bg-slate-50',   text: 'text-slate-800' },
+        ZONA_CINZA:        { border: 'border-amber-500',   bg: 'bg-amber-50',   text: 'text-amber-900' },
+      };
+      const cor = coresRec[codigo] || coresRec.ZONA_CINZA;
+
+      const card = document.getElementById('optout-diagnostico-card');
+      card.className = `border-2 ${cor.border} ${cor.bg} rounded-xl p-5 mb-4`;
+      const tituloEl = document.getElementById('optout-diagnostico-titulo');
+      tituloEl.className = `text-sm font-bold mb-2 uppercase tracking-wider ${cor.text}`;
+      tituloEl.innerHTML = '📋 Diagnóstico personalizado: ' + tituloRec;
+      document.getElementById('optout-diagnostico-justificativa').innerHTML = justificativa;
+
+      if (amparoRec) {
+        document.getElementById('optout-amparo-legal').innerHTML = '⚖ ' + amparoRec;
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // GLOSSÁRIO (12 termos)
+    // ─────────────────────────────────────────────
+    const TERMOS_GLOSSARIO = [
+      ['DAS', 'Documento de Arrecadação do Simples Nacional. Guia única mensal que unifica 8 tributos (IRPJ, CSLL, PIS, COFINS, CPP, ICMS, ISS, IPI).'],
+      ['RBT12', 'Receita Bruta dos últimos 12 meses. É o que define em qual faixa e anexo do Simples sua empresa paga (LC 123/2006, Art. 18).'],
+      ['Anexo I a V', 'Tabelas do Simples Nacional por tipo de atividade. I=Comércio, II=Indústria, III/V=Serviços (Fator R decide), IV=Serviços s/ CPP.'],
+      ['Fator R', 'Folha de pagamento ÷ RBT12. Se ≥ 28%, serviços vão no Anexo III (menor carga); se < 28%, vão no Anexo V (maior carga).'],
+      ['Sublimite', 'Teto de R$ 3.600.000/ano. Acima disso, ICMS e ISS saem do DAS e passam a ser recolhidos fora do Simples (LC 123/2006, Art. 13 §1º).'],
+      ['CBS', 'Contribuição sobre Bens e Serviços. Tributo federal que substitui PIS e COFINS a partir de 2027 (LC 214/2025, EC 132/2023).'],
+      ['IBS', 'Imposto sobre Bens e Serviços. Tributo estadual+municipal que substitui ICMS e ISS gradualmente entre 2029 e 2033.'],
+      ['IVA Dual', 'Nome informal do sistema CBS+IBS. "Dual" porque são dois tributos sobre a mesma base (um federal, outro subnacional).'],
+      ['Opt-Out', 'Opção do Simples Nacional de sair do recolhimento unificado de CBS/IBS, passando a recolher esses dois separadamente. Libera crédito 100% para clientes B2B (LC 214/2025, Arts. 41-44).'],
+      ['B2B / B2C', 'B2B (Business-to-Business) = venda para outra empresa contribuinte. B2C (Business-to-Consumer) = venda para consumidor final.'],
+      ['Crédito IVA', 'Valor de CBS/IBS que o comprador pode abater dos tributos que ele próprio vai recolher. Empresas no Simples geram crédito de apenas 1%; com Opt-Out, geram 100%.'],
+      ['DIFAL', 'Diferencial de Alíquota do ICMS. Devido quando se vende para outro estado — compensa a diferença entre alíquotas interna e interestadual (EC 87/2015, LC 190/2022).'],
+    ];
+
+    function renderGlossario() {
+      const container = document.getElementById('glossario-lista');
+      container.innerHTML = TERMOS_GLOSSARIO.map(([termo, def]) =>
+        `<div>
+          <dt class="font-bold text-slate-900 mb-1">${sanitize(termo)}</dt>
+          <dd class="text-slate-600 text-xs leading-relaxed">${sanitize(def)}</dd>
+        </div>`
+      ).join('');
+    }
+
+    // ─────────────────────────────────────────────
+    // FILTRO DA TRILHA (espelha PY/relatorio_pdf.py::_filtrar_trilha_cliente)
+    // ─────────────────────────────────────────────
+    function filtrarTrilhaCliente(passos) {
+      if (!Array.isArray(passos) || !passos.length) return [];
+
+      const EXCLUIR_PREFIXOS = ['MAX_FISCAL_', 'VIOLACAO_', '_DEBUG', 'TESTE_'];
+      const EXCLUIR_TIPOS = new Set(['VIOLACAO_SEGURANCA', 'DEBUG']);
+
+      // 1. Exclusões + 2. só passos com conteúdo
+      const filtrados = [];
+      for (const p of passos) {
+        if (!p || typeof p !== 'object') continue;
+        const pid = String(p.id || '');
+        const ptipo = String(p.tipo || '');
+        if (EXCLUIR_PREFIXOS.some(pref => pid.startsWith(pref))) continue;
+        if (EXCLUIR_TIPOS.has(ptipo)) continue;
+        if (pid === 'DIFAL_OPERACAO_INTERNA') continue;
+        if (ptipo === 'INFO_DIFAL' && !p.formula) continue;
+        if (!p.formula && !p.memoria && !p.detalhe) continue;
+        filtrados.push(p);
+      }
+
+      // 3. Dedup por id (mantém última ocorrência)
+      const vistos = new Map();
+      for (const p of filtrados) {
+        const chave = String(p.id || p.titulo || Math.random());
+        vistos.set(chave, p);
+      }
+
+      // 4. Ordenar por prioridade
+      const PRIORIDADE = {
+        DECISAO_ANEXO: 1,
+        AE_SIMPLES: 2,
+        FATOR_R: 3,
+        OPT_OUT_CALCULO: 4,
+        SPLIT_PAYMENT: 5,
+        DIFAL_BASE_UNICA: 6,
+        DIFAL_BASE_DUPLA: 6,
+      };
+      return Array.from(vistos.values()).sort((a, b) => {
+        const pa = PRIORIDADE[String(a.id || '')] || 99;
+        const pb = PRIORIDADE[String(b.id || '')] || 99;
+        return pa - pb || String(a.id || '').localeCompare(String(b.id || ''));
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // BOTÃO DOSSIÊ (só aparece em diagnóstico com documentos auditados)
+    // ─────────────────────────────────────────────
+    function mostrarBotaoDossie(extracao) {
+      const docs = extracao.documentos_auditoria || [];
+      if (docs.length > 0) {
+        const btn = document.getElementById('btn-baixar-dossie');
+        if (btn) btn.classList.remove('hidden');
+      }
+    }
+
+    async function baixarDossieProva() {
+      const token = sessionStorage.getItem('token');
+      const cnpjRaw = sessionStorage.getItem('analise_cnpj') || '';
+      const cnpjDigitos = cnpjRaw.replace(/\D/g, '');
+      if (!token || cnpjDigitos.length !== 14) {
+        alert('Não foi possível identificar o CNPJ para gerar o dossiê.');
+        return;
+      }
+
+      const motivo = window.prompt(
+        'Motivo do acesso ao dossiê de prova (mínimo 10 caracteres, obrigatório por LGPD Art. 37):\n\n' +
+        'Exemplos:\n' +
+        '  - Fiscalização RFB processo 123/2026\n' +
+        '  - Auditoria interna revisão fiscal jan/2026\n' +
+        '  - Solicitação do cliente para revisão contábil'
+      );
+      if (!motivo) return;
+      if (motivo.trim().length < 10) {
+        alert('Motivo precisa ter pelo menos 10 caracteres (LGPD Art. 37).');
+        return;
+      }
+
+      const btn = document.getElementById('btn-baixar-dossie');
+      const html = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `
+        <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        Gerando dossiê...`;
+
+      try {
+        const url = `/auditoria/prova/cnpj/${cnpjDigitos}?motivo=${encodeURIComponent(motivo.trim())}`;
+        const resp = await fetch(window.location.origin + url, {
+          headers: { 'Authorization': 'Bearer ' + token },
+        });
+        if (resp.status === 401) {
+          alert('Sessão expirada. Faça login novamente.');
+          sessionStorage.clear();
+          window.location.href = 'login.html';
+          return;
+        }
+        if (resp.status === 404) {
+          alert('Nenhum documento de auditoria encontrado para este CNPJ. O dossiê só é gerado para diagnósticos feitos via upload de PDFs.');
+          return;
+        }
+        if (!resp.ok) throw new Error('Falha ao gerar dossiê: HTTP ' + resp.status);
+
+        const blob = await resp.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+        a.download = `dossie-prova-${cnpjDigitos.slice(0, 8)}-${ts}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(blobUrl);
+      } catch (err) {
+        alert('Não foi possível gerar o dossiê. Tente novamente em instantes.');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = html;
+      }
     }
 
     // ─────────────────────────────────────────────
@@ -815,12 +1234,17 @@
       const container = document.getElementById('auditoria-items');
       container.innerHTML = '';
 
-      if (!trilha.length) {
-        container.innerHTML = '<p class="text-sm text-slate-500 py-4">Nenhum registro na trilha de auditoria.</p>';
+      // Aplica o mesmo filtro do PDF: so passos efetivamente usados no caso,
+      // sem duplicatas (motor loga cada iteracao), sem validacoes internas,
+      // sem "nao aplicavel".
+      const passos = filtrarTrilhaCliente(trilha);
+
+      if (!passos.length) {
+        container.innerHTML = '<p class="text-sm text-slate-500 py-4">Nenhum cálculo aplicável a este caso.</p>';
         return;
       }
 
-      trilha.forEach(function (item, idx) {
+      passos.forEach(function (item, idx) {
         const tipo = sanitize(item.tipo || '');
         const titulo = sanitize(item.titulo || item.id || '');
         const formula = item.formula ? sanitize(item.formula) : null;
