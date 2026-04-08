@@ -33,6 +33,7 @@ from sqlmodel import SQLModel, create_engine  # noqa: E402
 
 
 PDF_FAKE = b"%PDF-1.4\n%fake\n" + b"a" * 512
+CSV_FAKE = b"Competencia;Total Bruto\n01/2026;5000.00\n"  # satisfaz B2C folha_csv check
 CNPJ_DIGITOS = "54657895000160"
 CNPJ_FORMATADO = "54.657.895/0001-60"
 
@@ -180,8 +181,11 @@ class TestEndpointTermoAceite:
         with p1, p2:
             response = client.post(
                 "/analise/pdf",
-                files={"files": ("pgdas.pdf", io.BytesIO(PDF_FAKE), "application/pdf")},
-                data={"termo_aceite": "true"},
+                files=[
+                    ("files", ("pgdas.pdf", io.BytesIO(PDF_FAKE), "application/pdf")),
+                    ("files", ("folha.csv", io.BytesIO(CSV_FAKE), "text/csv")),
+                ],
+                data={"termo_aceite": "true", "tipo_comprador": "B2C_CONSUMIDOR_FINAL"},
             )
         assert response.status_code == 200
 
@@ -190,8 +194,11 @@ class TestEndpointTermoAceite:
         with p1, p2:
             response = client.post(
                 "/analise/pdf",
-                files={"files": ("pgdas.pdf", io.BytesIO(PDF_FAKE), "application/pdf")},
-                data={"termo_aceite": "true"},
+                files=[
+                    ("files", ("pgdas.pdf", io.BytesIO(PDF_FAKE), "application/pdf")),
+                    ("files", ("folha.csv", io.BytesIO(CSV_FAKE), "text/csv")),
+                ],
+                data={"termo_aceite": "true", "tipo_comprador": "B2C_CONSUMIDOR_FINAL"},
             )
         body = response.json()
         assert "diagnostico" in body
@@ -207,21 +214,26 @@ class TestEndpointTermoAceite:
         with p1, p2:
             response = client.post(
                 "/analise/pdf",
-                files={"files": ("pgdas.pdf", io.BytesIO(PDF_FAKE), "application/pdf")},
-                data={"termo_aceite": "true"},
+                files=[
+                    ("files", ("pgdas.pdf", io.BytesIO(PDF_FAKE), "application/pdf")),
+                    ("files", ("folha.csv", io.BytesIO(CSV_FAKE), "text/csv")),
+                ],
+                data={"termo_aceite": "true", "tipo_comprador": "B2C_CONSUMIDOR_FINAL"},
             )
         assert response.status_code == 200
 
         docs = buscar_documentos_por_cnpj(CNPJ_FORMATADO)
-        assert len(docs) == 1
-        doc = docs[0]
+        assert len(docs) >= 1  # PDF + possível CSV auditado
+        pdf_docs = [d for d in docs if d.nome_original.endswith(".pdf")]
+        assert len(pdf_docs) == 1
+        doc = pdf_docs[0]
         assert doc.aceito_em is not None
         assert doc.aceito_por_user_id == 7
         # IP pode ser None em TestClient dependendo da versão, mas aceito_em
         # e user_id são o crítico para auditoria
 
     def test_multiplo_arquivos_todos_marcados_aceitos(self, client):
-        """Upload de 3 PDFs → 3 aceites registrados."""
+        """Upload de 3 PDFs → todos aceites registrados."""
         from database import buscar_documentos_por_cnpj
 
         p1, p2 = _patch_pipeline()
@@ -232,14 +244,16 @@ class TestEndpointTermoAceite:
                     ("files", ("pgdas.pdf", io.BytesIO(PDF_FAKE), "application/pdf")),
                     ("files", ("das.pdf", io.BytesIO(PDF_FAKE + b"diff1"), "application/pdf")),
                     ("files", ("recibo.pdf", io.BytesIO(PDF_FAKE + b"diff2"), "application/pdf")),
+                    ("files", ("folha.csv", io.BytesIO(CSV_FAKE), "text/csv")),
                 ],
-                data={"termo_aceite": "true"},
+                data={"termo_aceite": "true", "tipo_comprador": "B2C_CONSUMIDOR_FINAL"},
             )
         assert response.status_code == 200
 
         docs = buscar_documentos_por_cnpj(CNPJ_FORMATADO)
-        assert len(docs) == 3
-        for doc in docs:
+        pdf_docs = [d for d in docs if d.nome_original.endswith(".pdf")]
+        assert len(pdf_docs) == 3, f"esperado 3 PDFs, encontrados {len(pdf_docs)}"
+        for doc in pdf_docs:
             assert doc.aceito_em is not None, f"doc {doc.nome_original} sem aceito_em"
             assert doc.aceito_por_user_id == 7
 
@@ -277,10 +291,10 @@ class TestHtmlTermoAceite:
         assert "termo_aceite" in bloco
 
     def test_hint_dinamico_muda_por_estado(self, html):
-        """Hint deve mostrar 'Selecione um PDF' / 'Aceite o termo' / 'Tudo pronto'."""
+        """Hint deve mostrar 'Selecione' / 'Aceite o termo' / 'Tudo pronto'."""
         idx = html.find("function updateSubmitButton")
         bloco = html[idx:idx + 2000]
-        assert "Selecione ao menos um PDF" in bloco
+        assert "Selecione" in bloco  # "Selecione os documentos" ou "Selecione ao menos..."
         assert "Aceite o termo" in bloco
         assert "Tudo pronto" in bloco
 

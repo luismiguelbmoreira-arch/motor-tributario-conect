@@ -946,3 +946,118 @@ def processar_pdfs_bytes(
     if envelope:
         return {"diagnostico": diagnostico, "pii": pii_payload}
     return diagnostico
+
+
+# ── Etapa D: Merge multi-documento ───────────────────────────────────────────
+
+def mesclar_fontes_documentais(
+    dados_pdf: "DadosExtraidosPDF",
+    nfe_data: Optional[Any] = None,
+    nfce_data: Optional[Any] = None,
+    folha_data: Optional[Any] = None,
+) -> "DadosExtraidosPDF":
+    """
+    Mescla dados extraídos de múltiplas fontes em um DadosExtraidosPDF único e preciso.
+
+    Regras de precedência:
+    - rpa_mensal (rpa_referencia): XML NFe/NFCe > PDF (mais preciso)
+    - folha_salarios_12m: CSV Folha > PDF (autoridade máxima — Fator R correto)
+    - receita_com_st_icms: XML NFe > PDF (PDF não diferencia ST)
+    - cnpj / faturamento_12m: PDF e-CAC primário (fonte oficial RBT12)
+
+    Se divergência em faturamento_12m > 5%, adiciona aviso CROSSCHECK_RBT12
+    na lista de observacoes do DadosExtraidosPDF retornado.
+
+    Amparo legal:
+    - Fator R: LC 123/2006 Art. 18 §24
+    - ICMS-ST: LC 123/2006 Art. 13 §1º V
+    - RBT12: LC 123/2006 Art. 3º §2º
+
+    Args:
+        dados_pdf: dados extraídos do PDF e-CAC (fonte primária)
+        nfe_data: NFeParsedData do lote NFe (modelo 55), ou None
+        nfce_data: NFeParsedData do lote NFCe (modelo 65), ou None
+        folha_data: FolhaParsedData do CSV folha, ou None
+
+    Returns:
+        DadosExtraidosPDF com campos enriquecidos e observacoes de conflito
+    """
+    avisos: list[str] = list(dados_pdf.observacoes.split("\n")) if dados_pdf.observacoes else []
+
+    # ── Enriquecimento com XML NFe ────────────────────────────────────────────
+    if nfe_data is not None:
+        # Validar que o CNPJ bate
+        cnpj_digits_pdf = "".join(c for c in dados_pdf.cnpj if c.isdigit())
+        if nfe_data.cnpj_emitente and nfe_data.cnpj_emitente != cnpj_digits_pdf:
+            avisos.append(
+                f"AVISO_CNPJ_DIVERGENTE: CNPJ do XML NFe ({nfe_data.cnpj_emitente}) "
+                f"difere do PDF ({cnpj_digits_pdf}). Usando PDF como fonte de identidade."
+            )
+        else:
+            # RPA mensal: XML NFe tem precedência
+            rpa_xml = nfe_data.valor_total_mes
+            rpa_pdf_raw = dados_pdf.to_decimal("rpa_referencia") if hasattr(dados_pdf, "to_decimal") else None
+            if rpa_pdf_raw and rpa_xml > Decimal("0"):
+                delta = abs(rpa_xml - rpa_pdf_raw)
+                if rpa_pdf_raw > 0:
+                    delta_pct = (delta / rpa_pdf_raw * 100).quantize(Decimal("0.1"), ROUND_HALF_UP)
+                    if delta_pct > Decimal("5"):
+                        avisos.append(
+                            f"CROSSCHECK_RPA_DIVERGENTE: RPA do XML NFe R$ {rpa_xml:,.2f} "
+                            f"difere do PDF R$ {rpa_pdf_raw:,.2f} ({delta_pct}%). "
+                            "XML NFe tem precedência para rpa_referencia. "
+                            "Verifique se o PDF e-CAC é do mesmo período."
+                        )
+            # Sobrescreve rpa_referencia com valor do XML
+            dados_pdf = dados_pdf.model_copy(update={
+                "rpa_referencia": str(rpa_xml)
+            })
+
+            # ICMS-ST: XML NFe é a única fonte confiável
+            if nfe_data.receita_st_icms > Decimal("0"):
+                dados_pdf = dados_pdf.model_copy(update={
+                    "receita_com_st_icms": str(nfe_data.receita_st_icms)
+                })
+
+    # ── Enriquecimento com XML NFCe ───────────────────────────────────────────
+    if nfce_data is not None:
+        rpa_nfce = nfce_data.valor_total_mes
+        if rpa_nfce > Decimal("0"):
+            dados_pdf = dados_pdf.model_copy(update={
+                "rpa_referencia": str(rpa_nfce)
+            })
+            if nfce_data.receita_st_icms > Decimal("0"):
+                dados_pdf = dados_pdf.model_copy(update={
+                    "receita_com_st_icms": str(nfce_data.receita_st_icms)
+                })
+
+    # ── Enriquecimento com CSV Folha ──────────────────────────────────────────
+    if folha_data is not None:
+        # CSV Folha é autoridade máxima para Fator R
+        dados_pdf = dados_pdf.model_copy(update={
+            "folha_salarios_12m": str(folha_data.folha_12m)
+        })
+        for aviso in folha_data.avisos:
+            avisos.append(aviso)
+
+    # ── Crosscheck RBT12 ─────────────────────────────────────────────────────
+    # Se NFe disponível, valida RBT12 do PDF contra soma anualizada de NFe
+    if nfe_data is not None and nfe_data.valor_total_mes > Decimal("0"):
+        rbt12_pdf_raw = dados_pdf.to_decimal("faturamento_12m") if hasattr(dados_pdf, "to_decimal") else None
+        if rbt12_pdf_raw and rbt12_pdf_raw > Decimal("0"):
+            rbt12_anualizado_nfe = (nfe_data.valor_total_mes * 12).quantize(Decimal("0.01"), ROUND_HALF_UP)
+            delta_rbt = abs(rbt12_anualizado_nfe - rbt12_pdf_raw)
+            delta_pct_rbt = (delta_rbt / rbt12_pdf_raw * 100).quantize(Decimal("0.1"), ROUND_HALF_UP)
+            if delta_pct_rbt > Decimal("5"):
+                avisos.append(
+                    f"CROSSCHECK_RBT12: RBT12 PDF R$ {rbt12_pdf_raw:,.2f} vs "
+                    f"NFe×12 R$ {rbt12_anualizado_nfe:,.2f} ({delta_pct_rbt}% delta). "
+                    "PDF e-CAC tem precedência para RBT12. "
+                    "LC 123/2006 Art. 3º §2º."
+                )
+
+    # Reconstrói observacoes
+    obs_final = "\n".join(a for a in avisos if a.strip())
+    dados_pdf = dados_pdf.model_copy(update={"observacoes": obs_final})
+
+    return dados_pdf

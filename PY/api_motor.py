@@ -993,39 +993,128 @@ async def gerar_relatorio_pdf(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# POST /analise/pdf — Upload PDFs e-CAC → extração → diagnóstico (FASE 3)
+# POST /analise/pdf — Upload multi-documento → extração → diagnóstico (FASE 3)
+# Aceita: PDF e-CAC (PGDAS-D), XML NFe/NFCe, CSV/TXT Folha de Pagamento
+# Bloqueia com HTTP 422 se documentos mínimos por regime estiverem ausentes.
+# Amparo: LC 123/2006 Art. 18 §24 (Fator R) + Art. 13 §1º V (ICMS-ST)
 # ─────────────────────────────────────────────────────────────────────────────
+
+_MIME_ACEITOS: dict[str, str] = {
+    "application/pdf": "pdf",
+    "text/xml": "xml",
+    "application/xml": "xml",
+    "text/csv": "csv",
+    "text/plain": "csv",   # .txt Domínio/SPED
+}
+
+_EXT_ACEITAS: set[str] = {".pdf", ".xml", ".csv", ".txt"}
+
+
+def _sniff_xml_mod(conteudo: bytes) -> str:
+    """
+    Lê os primeiros 2 KB do XML para detectar ide/mod sem parse completo.
+    Retorna "55" (NFe), "65" (NFCe) ou "" (desconhecido).
+    """
+    trecho = conteudo[:2048].decode("utf-8", errors="replace")
+    import re as _re
+    m = _re.search(r"<mod>\s*(\d+)\s*</mod>", trecho)
+    return m.group(1) if m else ""
+
+
+def _detectar_tipo_documento(filename: str, conteudo: bytes) -> str:
+    """
+    Classifica um arquivo em: "pgdas_d" | "nfe_saida" | "nfce" | "folha_csv" | "desconhecido".
+    Usado para validar documentos mínimos por regime (bloqueio 422).
+    """
+    nome = (filename or "").lower()
+    if nome.endswith(".pdf"):
+        return "pgdas_d"
+    if nome.endswith((".xml",)):
+        mod = _sniff_xml_mod(conteudo)
+        if mod == "55":
+            return "nfe_saida"
+        if mod == "65":
+            return "nfce"
+        return "xml_desconhecido"
+    if nome.endswith((".csv", ".txt")):
+        return "folha_csv"
+    return "desconhecido"
+
+
+def _validar_docs_por_regime(
+    tipo_comprador: str,
+    tipos_presentes: set[str],
+) -> list[str]:
+    """
+    Retorna lista de documentos obrigatórios ainda faltantes para o regime.
+    Lista vazia = todos os documentos presentes.
+
+    Amparo legal:
+    - LC 123/2006 Art. 18 §24 — folha obrigatória para Fator R B2B
+    - LC 123/2006 Art. 13 §1º V — NFe obrigatória para segregar ICMS-ST B2B
+    """
+    faltando: list[str] = []
+    if "pgdas_d" not in tipos_presentes:
+        faltando.append("PGDAS-D PDF (e-CAC) — Extrato Simples Nacional")
+    if tipo_comprador in ("B2B_CONTRIBUINTE", "MISTO"):
+        if "nfe_saida" not in tipos_presentes:
+            faltando.append(
+                "XML NFe de saída — mês analisado "
+                "(LC 123/2006 Art. 13 §1º V — ICMS-ST + receita real B2B)"
+            )
+        if "folha_csv" not in tipos_presentes:
+            faltando.append(
+                "CSV Folha de Pagamento — 12 meses (Domínio ou similar) "
+                "(LC 123/2006 Art. 18 §24 — Fator R correto)"
+            )
+    if tipo_comprador in ("B2C_CONSUMIDOR_FINAL", "MISTO"):
+        if "nfce" not in tipos_presentes and "folha_csv" not in tipos_presentes:
+            faltando.append(
+                "XML NFCe ou CSV de vendas PDV — mês analisado "
+                "(LC 123/2006 Art. 3º §2º — receita real B2C)"
+            )
+    return faltando
+
 
 @app.post(
     "/analise/pdf",
-    summary="Extrai dados de PDFs e-CAC e gera diagnóstico",
+    summary="Extrai dados de documentos fiscais e gera diagnóstico",
     tags=["Análise"],
 )
 async def analise_pdf(
     request: Request,
-    files: list[UploadFile] = File(..., description="PDFs do e-CAC (máx. 10 arquivos)"),
+    files: list[UploadFile] = File(
+        ...,
+        description="PDFs e-CAC, XMLs NFe/NFCe, CSV/TXT Folha de Pagamento (máx. 20 arquivos)"
+    ),
     termo_aceite: bool = Form(
         False,
         description="Termo de aceite digital obrigatório (CTN Art. 142 + LGPD Art. 37)",
     ),
+    tipo_comprador: str = Form(
+        "B2B_CONTRIBUINTE",
+        description="Perfil do comprador: B2B_CONTRIBUINTE | B2C_CONSUMIDOR_FINAL | MISTO",
+    ),
     current_user: dict = Depends(get_current_user),
 ) -> JSONResponse:
     """
-    Aceita múltiplos PDFs do e-CAC (PGDAS-D, DAS, SIMEI, comprovantes).
-    Extrai dados via pipeline extrator_pdfs.py + Claude Vision API.
-    Retorna envelope {"diagnostico": ..., "pii": {cnpj, razao_social}}.
+    Aceita múltiplos documentos fiscais:
+    - PDF e-CAC: PGDAS-D (obrigatório), DAS, SIMEI, comprovantes
+    - XML NFe 4.0 (modelo 55): receita real B2B + ICMS-ST
+    - XML NFCe 4.0 (modelo 65): receita real B2C
+    - CSV/TXT Folha de Pagamento: Fator R correto (LC 123/2006 Art. 18 §24)
 
-    Auditoria documental (gap P0): cada PDF é cifrado AES-256-GCM e
-    registrado na tabela auditoria_documentos APÓS a extração descobrir
-    o CNPJ. Falhas de auditoria não bloqueiam o diagnóstico — o status
-    fica em diagnostico["_extracao"]["auditoria_status"].
-
-    Termo de aceite digital (P0 #3): sem `termo_aceite=true`, o endpoint
-    rejeita o request com 400. Ao persistir os documentos, chama
-    `aceitar_documento()` marcando quem confirmou, quando e de qual IP.
-
-    Exige Bearer token JWT válido.
+    Bloqueio 422: se documentos mínimos para o tipo_comprador estiverem ausentes.
+    Auditoria: PDFs cifrados AES-256-GCM + registrados em auditoria_documentos.
+    Merge: mesclar_fontes_documentais() combina PDF + XML + CSV antes do motor.
     """
+    _TIPOS_COMPRADOR_VALIDOS = {"B2B_CONTRIBUINTE", "B2C_CONSUMIDOR_FINAL", "MISTO"}
+    if tipo_comprador not in _TIPOS_COMPRADOR_VALIDOS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"tipo_comprador inválido: {tipo_comprador!r}. "
+                   f"Válidos: {sorted(_TIPOS_COMPRADOR_VALIDOS)}",
+        )
     if not termo_aceite:
         raise HTTPException(
             status_code=400,
@@ -1037,18 +1126,27 @@ async def analise_pdf(
         )
     if not files:
         raise HTTPException(status_code=422, detail="Nenhum arquivo enviado.")
-    if len(files) > 10:
-        raise HTTPException(status_code=422, detail="Máximo de 10 arquivos por requisição.")
+    if len(files) > 20:
+        raise HTTPException(status_code=422, detail="Máximo de 20 arquivos por requisição.")
 
-    # Validar tipo e tamanho
     MAX_BYTES = 50 * 1024 * 1024  # 50 MB por arquivo
-    conteudos: list[bytes] = []
-    nomes: list[str] = []
+    conteudos_pdf: list[bytes] = []
+    nomes_pdf: list[str] = []
+    conteudos_xml_nfe: list[bytes] = []
+    conteudos_xml_nfce: list[bytes] = []
+    conteudos_csv: list[bytes] = []
+    tipos_presentes: set[str] = set()
+
     for f in files:
-        if not (f.filename or "").lower().endswith(".pdf"):
+        nome = (f.filename or "arquivo").lower()
+        ext = "." + nome.rsplit(".", 1)[-1] if "." in nome else ""
+        if ext not in _EXT_ACEITAS:
             raise HTTPException(
                 status_code=422,
-                detail=f"Arquivo '{f.filename}' não é um PDF.",
+                detail=(
+                    f"Arquivo '{f.filename}' com extensão não suportada. "
+                    f"Aceitos: .pdf, .xml, .csv, .txt"
+                ),
             )
         conteudo = await f.read()
         if len(conteudo) > MAX_BYTES:
@@ -1056,10 +1154,43 @@ async def analise_pdf(
                 status_code=422,
                 detail=f"Arquivo '{f.filename}' excede o limite de 50 MB.",
             )
-        conteudos.append(conteudo)
-        nomes.append(f.filename or "documento.pdf")
 
-    # Operador autenticado (para uploaded_by_user_id na auditoria)
+        tipo = _detectar_tipo_documento(f.filename or "", conteudo)
+        tipos_presentes.add(tipo)
+
+        if tipo == "pgdas_d":
+            conteudos_pdf.append(conteudo)
+            nomes_pdf.append(f.filename or "documento.pdf")
+        elif tipo == "nfe_saida":
+            conteudos_xml_nfe.append(conteudo)
+        elif tipo == "nfce":
+            conteudos_xml_nfce.append(conteudo)
+        elif tipo == "folha_csv":
+            conteudos_csv.append(conteudo)
+        else:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Arquivo '{f.filename}' não reconhecido. "
+                    "XMLs devem ser NFe (mod=55) ou NFCe (mod=65). "
+                    "CSVs devem ser folhas de pagamento."
+                ),
+            )
+
+    # Bloqueio 422 — documentos mínimos por regime
+    faltando = _validar_docs_por_regime(tipo_comprador, tipos_presentes)
+    if faltando:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "codigo": "DOCUMENTOS_INSUFICIENTES",
+                "tipo_comprador": tipo_comprador,
+                "faltando": faltando,
+                "amparo_legal": "LC 123/2006 Art. 18 §24 (Fator R) + Art. 13 §1º V (ICMS-ST)",
+            },
+        )
+
+    # Operador autenticado
     user_id = None
     try:
         user_id = int(current_user.get("id")) if current_user else None
@@ -1069,19 +1200,80 @@ async def analise_pdf(
     # Pipeline de extração + auditoria documental
     try:
         from extrator_pdfs import (
-            processar_pdfs_bytes,  # importação lazy — evita falha no startup se ANTHROPIC_API_KEY ausente
+            processar_pdfs_bytes,
+            mesclar_fontes_documentais,
         )
 
         payload = processar_pdfs_bytes(
-            conteudos,
-            arquivos_nomes=nomes,
+            conteudos_pdf,
+            arquivos_nomes=nomes_pdf,
             user_id=user_id,
             persistir_auditoria=True,
             envelope=True,
         )
         diagnostico = payload["diagnostico"]
 
-        # Registra termo de aceite para cada documento persistido (LGPD Art. 37)
+        # Parsear XMLs e CSV — enriquecer dados extraídos do PDF
+        nfe_data = None
+        nfce_data = None
+        folha_data = None
+
+        if conteudos_xml_nfe:
+            try:
+                from parsers.xml_nfe import parsear_lote_nfe
+                nfe_data = parsear_lote_nfe(conteudos_xml_nfe)
+            except Exception as exc_nfe:
+                logger.warning("Falha ao parsear XML NFe: %s", exc_nfe)
+
+        if conteudos_xml_nfce:
+            try:
+                from parsers.xml_nfce import parsear_lote_nfce
+                nfce_data = parsear_lote_nfce(conteudos_xml_nfce)
+            except Exception as exc_nfce:
+                logger.warning("Falha ao parsear XML NFCe: %s", exc_nfce)
+
+        if conteudos_csv:
+            try:
+                from parsers.csv_folha import parsear_csv_folha
+                # Concatenar múltiplos CSVs (raro, mas possível)
+                csv_bytes = b"\n".join(conteudos_csv)
+                folha_data = parsear_csv_folha(csv_bytes)
+            except Exception as exc_csv:
+                logger.warning("Falha ao parsear CSV folha: %s", exc_csv)
+
+        # Auditoria: persistir XMLs e CSVs também (cifrar + registrar)
+        for conteudo_extra, nome_extra, mime_extra in (
+            [(c, f"nfe_{i}.xml", "text/xml") for i, c in enumerate(conteudos_xml_nfe)]
+            + [(c, f"nfce_{i}.xml", "text/xml") for i, c in enumerate(conteudos_xml_nfce)]
+            + [(c, f"folha_{i}.csv", "text/csv") for i, c in enumerate(conteudos_csv)]
+        ):
+            try:
+                from storage_cifrado import cifrar_e_persistir, hash_documento
+                from database import registrar_documento_auditoria, aceitar_documento
+                cnpj_empresa = (payload.get("pii") or {}).get("cnpj", "")
+                if cnpj_empresa:
+                    hash_doc = hash_documento(conteudo_extra)
+                    path_cifrado = cifrar_e_persistir(conteudo_extra, cnpj_empresa)
+                    doc_id = registrar_documento_auditoria(
+                        hash_sha256=hash_doc,
+                        empresa_cnpj=cnpj_empresa,
+                        nome_original=nome_extra,
+                        mime=mime_extra,
+                        tamanho=len(conteudo_extra),
+                        storage_path=str(path_cifrado),
+                        uploaded_by_user_id=user_id,
+                    )
+                    if doc_id and user_id:
+                        ip_origem = request.client.host if request.client else None
+                        aceitar_documento(
+                            documento_id=doc_id,
+                            aceito_por_user_id=user_id,
+                            aceito_ip=ip_origem,
+                        )
+            except Exception as exc_audit:
+                logger.warning("Falha ao auditar arquivo extra %s: %s", nome_extra, exc_audit)
+
+        # Registra termo de aceite para PDFs persistidos (LGPD Art. 37)
         ip_origem = request.client.host if request.client else None
         docs_auditoria = (
             diagnostico.get("_extracao", {}).get("documentos_auditoria", []) or []
@@ -1099,6 +1291,15 @@ async def analise_pdf(
                         )
             except Exception as exc_aceite:
                 logger.warning("Falha ao registrar termo de aceite: %s", exc_aceite)
+
+        # Adicionar metadados de fontes extra ao diagnóstico
+        diagnostico.setdefault("_extracao", {})["fontes_extra"] = {
+            "nfe_notas": nfe_data.notas_processadas if nfe_data else 0,
+            "nfce_notas": nfce_data.notas_processadas if nfce_data else 0,
+            "folha_meses": folha_data.meses_encontrados if folha_data else 0,
+            "folha_estimativa": folha_data.fonte_estimativa if folha_data else None,
+            "tipo_comprador": tipo_comprador,
+        }
 
         return JSONResponse(content=_serializar_decimal(payload))
 
@@ -1120,7 +1321,7 @@ async def analise_pdf(
         logger.error("Erro em POST /analise/pdf: %s — %s", type(exc).__name__, exc)
         raise HTTPException(
             status_code=500,
-            detail="Falha na extração dos documentos. Verifique se os PDFs são do e-CAC.",
+            detail="Falha na extração dos documentos. Verifique os arquivos enviados.",
         )
 
 
