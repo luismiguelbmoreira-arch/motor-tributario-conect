@@ -287,6 +287,8 @@ def _gerar_html(diagnostico: dict, pii: dict | None = None) -> str:
 <p style="font-size:10px;color:#6b7280;margin-bottom:10px;">Todos os cálculos abaixo citam base legal explícita — MAX_02 Motor Tributário Conect.</p>
 {trilha_html}
 
+{_secao_glossario()}
+
 <!-- Rodapé -->
 <div class="footer">
   Calculado em {data_c} · LC 123/2006 + LC 214/2025 (vigente 01/01/2026) ·
@@ -474,6 +476,81 @@ def _secao_decisao_opt_out(diagnostico: dict) -> str:
 <p style="font-size:9px;color:#6b7280;font-style:italic;margin-top:4px;">
   ⚖ {amparo_rec or 'LC 214/2025, Arts. 41-44 | CF Art. 146, III, "d" | Resolução CGSN 183/2025'}
 </p>
+"""
+
+
+def _secao_glossario() -> str:
+    """
+    Gera o glossário micro de termos tributários no fim do PDF.
+
+    Frente 3.4 / Bloco C: empresário não conhece "Anexo III", "Sublimite",
+    "Fator R", "DIFAL". 11 termos curtos antes do rodapé resolvem.
+
+    Termos estáveis (não dependem do diagnóstico) — função sem argumentos,
+    fácil de cachear se necessário.
+    """
+    termos = [
+        ("DAS",
+         "Documento de Arrecadação do Simples Nacional. Guia única mensal que "
+         "unifica 8 tributos (IRPJ, CSLL, PIS, COFINS, CPP, ICMS, ISS, IPI)."),
+        ("RBT12",
+         "Receita Bruta dos últimos 12 meses. É o que define em qual faixa e "
+         "anexo do Simples sua empresa paga (LC 123/2006, Art. 18)."),
+        ("Anexo I a V",
+         "Tabelas do Simples Nacional por tipo de atividade. I=Comércio, "
+         "II=Indústria, III/V=Serviços (Fator R decide), IV=Serviços s/ CPP."),
+        ("Fator R",
+         "Folha de pagamento ÷ RBT12. Se ≥ 28%, serviços vão no Anexo III "
+         "(menor carga); se &lt; 28%, vão no Anexo V (maior carga)."),
+        ("Sublimite",
+         "Teto de R$ 3.600.000/ano. Acima disso, ICMS e ISS saem do DAS e "
+         "passam a ser recolhidos fora do Simples (LC 123/2006, Art. 13 §1º)."),
+        ("CBS",
+         "Contribuição sobre Bens e Serviços. Tributo federal que substitui "
+         "PIS e COFINS a partir de 2027 (LC 214/2025, EC 132/2023)."),
+        ("IBS",
+         "Imposto sobre Bens e Serviços. Tributo estadual+municipal que "
+         "substitui ICMS e ISS gradualmente entre 2029 e 2033."),
+        ("IVA Dual",
+         "Nome informal do sistema CBS+IBS. \"Dual\" porque são dois tributos "
+         "sobre a mesma base (um federal, outro subnacional)."),
+        ("Opt-Out",
+         "Opção do Simples Nacional de sair do recolhimento unificado de "
+         "CBS/IBS, passando a recolher esses dois separadamente. Libera "
+         "crédito 100% para clientes B2B (LC 214/2025, Arts. 41-44)."),
+        ("B2B / B2C",
+         "B2B (Business-to-Business) = venda para outra empresa contribuinte. "
+         "B2C (Business-to-Consumer) = venda para consumidor final."),
+        ("Crédito IVA",
+         "Valor de CBS/IBS que o comprador pode abater dos tributos que ele "
+         "próprio vai recolher. Empresas no Simples geram crédito de apenas "
+         "1%; com Opt-Out, geram 100%."),
+        ("DIFAL",
+         "Diferencial de Alíquota do ICMS. Devido quando se vende para outro "
+         "estado — compensa a diferença entre alíquotas interna e "
+         "interestadual (EC 87/2015, LC 190/2022)."),
+    ]
+
+    linhas = ""
+    for termo, definicao in termos:
+        linhas += (
+            f"<tr>"
+            f"<td style='font-weight:700;color:#1e3a5f;width:110px;vertical-align:top;'>{termo}</td>"
+            f"<td style='color:#374151;line-height:1.5;'>{definicao}</td>"
+            f"</tr>"
+        )
+
+    return f"""
+<!-- Glossário (Frente 3.4 / Bloco C) -->
+<h2>Glossário</h2>
+<p style="font-size:10px;color:#6b7280;margin-bottom:8px;">
+  Termos técnicos citados neste relatório em linguagem de empresário.
+</p>
+<table style="font-size:10px;margin-bottom:10px;">
+  <tbody>
+    {linhas}
+  </tbody>
+</table>
 """
 
 
