@@ -1,13 +1,14 @@
-from motor_tributario import EmpresaFornecedora
-from decimal import Decimal
 import logging
+from decimal import Decimal
+
+from motor_tributario import EmpresaFornecedora
 
 # Configura logging para capturar avisos de conversão do motor
 logging.basicConfig(level=logging.INFO)
 
 def debug_fornecedora():
     """
-    Script utilitário para validar se uma massa de dados é compatível 
+    Script utilitário para validar se uma massa de dados é compatível
     com o esquema rigoroso de EmpresaFornecedora do Motor.
     """
     try:
@@ -20,12 +21,12 @@ def debug_fornecedora():
             'uf_origem': 'SP',                     # 2 letras
             'faturamento_12m': Decimal('500000.00') # RBT12
         }
-        
+
         print(f"--- Iniciando validação para: {d['razao_social']} ---")
         empresa = EmpresaFornecedora(**d)
         print("✅ SUCESSO: Os dados são compatíveis com o Motor.")
         print(f"Objeto instanciado: {empresa.model_dump_json(indent=2)}")
-        
+
     except Exception as e:
         print("\n❌ ERRO DE VALIDAÇÃO DETECTADO:")
         print("-" * 30)
