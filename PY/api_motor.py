@@ -1199,10 +1199,7 @@ async def analise_pdf(
 
     # Pipeline de extração + auditoria documental
     try:
-        from extrator_pdfs import (
-            processar_pdfs_bytes,
-            mesclar_fontes_documentais,
-        )
+        from extrator_pdfs import processar_pdfs_bytes
 
         payload = processar_pdfs_bytes(
             conteudos_pdf,
@@ -1248,8 +1245,8 @@ async def analise_pdf(
             + [(c, f"folha_{i}.csv", "text/csv") for i, c in enumerate(conteudos_csv)]
         ):
             try:
+                from database import aceitar_documento, registrar_documento_auditoria
                 from storage_cifrado import cifrar_e_persistir, hash_documento
-                from database import registrar_documento_auditoria, aceitar_documento
                 cnpj_empresa = (payload.get("pii") or {}).get("cnpj", "")
                 if cnpj_empresa:
                     hash_doc = hash_documento(conteudo_extra)
