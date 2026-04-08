@@ -24,6 +24,9 @@ PyJWT>=2.8.0                        # JWT tokens (substitui python-jose — sem 
 # ── Geração de PDF ─────────────────────────────────────────────────────────────
 weasyprint>=61.0                    # HTML → PDF (relatórios tributários)
 
+# ── Parsers multi-documento (Fase 1) ──────────────────────────────────────────
+lxml>=5.0                           # Parse XML NFe/NFCe 4.0 com validação namespace
+
 # ── Migrations ────────────────────────────────────────────────────────────────
 alembic>=1.13.0                     # Versionamento de schema (database migrations)
 

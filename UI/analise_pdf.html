@@ -108,9 +108,9 @@
     <!-- TÍTULO -->
     <div class="fade-in">
       <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Upload de Documentos</p>
-      <h1 class="text-3xl font-semibold text-slate-900">Análise por PDF do e-CAC</h1>
+      <h1 class="text-3xl font-semibold text-slate-900">Análise Multi-Documento</h1>
       <p class="text-sm text-slate-500 mt-2 leading-relaxed">
-        Envie os documentos exportados do e-CAC. O sistema extrai os dados automaticamente via IA e gera o diagnóstico fiscal.
+        Envie o PGDAS-D, XML de notas fiscais e folha de pagamento. O sistema extrai dados via IA e calcula Fator R, ICMS-ST e DAS com precisão máxima.
       </p>
     </div>
 
@@ -120,31 +120,59 @@
       <ul class="text-sm text-slate-600 space-y-2" aria-label="Lista de documentos aceitos">
         <li class="flex items-start gap-2">
           <span class="w-5 h-5 rounded bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
-          <div><strong>PGDAS-D Extrato</strong> <span class="text-xs text-emerald-600 font-semibold">(obrigatório)</span><br>
-          <span class="text-xs text-slate-500">e-CAC → Simples Nacional → PGDAS-D → Extrato. Contém RBT12, CNAE, receitas.</span></div>
+          <div><strong>PGDAS-D Extrato</strong> <span class="text-xs text-emerald-600 font-semibold">(obrigatório — .PDF)</span><br>
+          <span class="text-xs text-slate-500">e-CAC → Simples Nacional → PGDAS-D → Extrato. Contém RBT12, CNAE, receitas, DAS referência.</span></div>
         </li>
         <li class="flex items-start gap-2">
-          <span class="w-5 h-5 rounded bg-slate-100 text-slate-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
-          <div><strong>Cartão CNPJ</strong> <span class="text-xs text-slate-400">(recomendado)</span><br>
-          <span class="text-xs text-slate-500">Consulta CNPJ em servicos.receita.fazenda.gov.br. Valida razão social e CNAE principal.</span></div>
+          <span class="w-5 h-5 rounded bg-violet-100 text-violet-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+          <div><strong>XML NFe de Saída</strong> <span class="text-xs text-slate-500">(obrigatório B2B — .XML)</span><br>
+          <span class="text-xs text-slate-500">Modelo 55. Receita real do mês + ICMS-ST segregado. LC 123/2006 Art. 13 §1º V.</span></div>
         </li>
         <li class="flex items-start gap-2">
-          <span class="w-5 h-5 rounded bg-slate-100 text-slate-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
-          <div><strong>DAS — Documento de Arrecadação</strong> <span class="text-xs text-slate-400">(para comparação)</span><br>
-          <span class="text-xs text-slate-500">Comprovante do DAS pago no mês. Permite comparar valor calculado vs valor pago.</span></div>
+          <span class="w-5 h-5 rounded bg-green-100 text-green-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+          <div><strong>CSV Folha de Pagamento</strong> <span class="text-xs text-slate-500">(obrigatório B2B — .CSV ou .TXT)</span><br>
+          <span class="text-xs text-slate-500">Domínio Folha ou similar. 12 meses → Fator R correto. LC 123/2006 Art. 18 §24.</span></div>
         </li>
         <li class="flex items-start gap-2">
-          <span class="w-5 h-5 rounded bg-slate-100 text-slate-600 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
-          <div><strong>Declaração Mensal PGDAS-D</strong> <span class="text-xs text-slate-400">(se disponível)</span><br>
-          <span class="text-xs text-slate-500">Declaração completa com breakdown por tributo (IRPJ, CSLL, PIS, COFINS, CPP, ICMS, ISS).</span></div>
+          <span class="w-5 h-5 rounded bg-amber-100 text-amber-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
+          <div><strong>XML NFCe / CSV Vendas PDV</strong> <span class="text-xs text-slate-500">(obrigatório B2C — .XML ou .CSV)</span><br>
+          <span class="text-xs text-slate-500">Modelo 65 ou planilha de vendas ao consumidor final. Receita real B2C.</span></div>
         </li>
       </ul>
-      <div class="mt-3 pt-3 border-t border-slate-200 flex items-center gap-3">
+      <div class="mt-3 pt-3 border-t border-slate-200 flex items-center gap-3 flex-wrap gap-y-1">
         <div class="bg-slate-100 rounded px-2 py-1 text-xs font-mono text-slate-600">.PDF</div>
+        <div class="bg-violet-100 rounded px-2 py-1 text-xs font-mono text-violet-700">.XML</div>
+        <div class="bg-green-100 rounded px-2 py-1 text-xs font-mono text-green-700">.CSV</div>
+        <div class="bg-green-100 rounded px-2 py-1 text-xs font-mono text-green-700">.TXT</div>
         <p class="text-xs text-slate-500">
-          Formato: apenas PDF. Máximo 10 arquivos, 50 MB cada. Dados processados via IA, sem armazenamento permanente.
+          Máximo 20 arquivos, 50 MB cada.
         </p>
       </div>
+    </div>
+
+    <!-- PERFIL DO COMPRADOR -->
+    <div class="fade-in bg-white border border-slate-200 rounded-2xl shadow-lg px-5 py-4">
+      <label for="tipo-comprador-select" class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
+        Perfil do comprador desta empresa
+      </label>
+      <select id="tipo-comprador-select"
+              onchange="onTipoCompradorChange()"
+              class="w-full rounded-lg border border-slate-300 bg-slate-50 text-sm text-slate-800 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        <option value="B2B_CONTRIBUINTE">B2B — Vende para empresas contribuintes (Nota Fiscal Eletrônica)</option>
+        <option value="B2C_CONSUMIDOR_FINAL">B2C — Vende ao consumidor final (NFCe / PDV)</option>
+        <option value="MISTO">Misto — Vende para empresas e consumidores</option>
+      </select>
+      <p class="text-xs text-slate-400 mt-2">
+        Define quais documentos são obrigatórios para o diagnóstico fiscal.
+      </p>
+    </div>
+
+    <!-- CHECKLIST DE DOCUMENTOS OBRIGATÓRIOS -->
+    <div id="checklist-section" class="fade-in bg-white border border-slate-200 rounded-2xl shadow-lg px-5 py-4">
+      <p class="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-3">Documentos obrigatórios</p>
+      <ul id="checklist-list" class="space-y-2" aria-label="Checklist de documentos obrigatórios">
+        <!-- Preenchido por renderChecklist() -->
+      </ul>
     </div>
 
     <!-- ÁREA DE DRAG AND DROP -->
@@ -167,19 +195,19 @@
           </svg>
         </div>
 
-        <p class="text-base font-semibold text-slate-700">Arraste os PDFs do e-CAC aqui</p>
+        <p class="text-base font-semibold text-slate-700">Arraste os documentos aqui</p>
         <p class="text-sm text-slate-400 mt-1">
           ou
           <span class="text-blue-600 underline font-medium">clique para selecionar</span>
         </p>
-        <p class="text-xs text-slate-400 mt-3">Somente arquivos .pdf — até 10 arquivos — 50 MB cada</p>
+        <p class="text-xs text-slate-400 mt-3">.pdf · .xml · .csv · .txt — até 20 arquivos — 50 MB cada</p>
 
         <input type="file"
                id="file-input"
                class="hidden"
-               accept=".pdf,application/pdf"
+               accept=".pdf,application/pdf,.xml,text/xml,application/xml,.csv,.txt,text/csv,text/plain"
                multiple
-               aria-label="Selecionar arquivos PDF"
+               aria-label="Selecionar documentos fiscais (PDF, XML, CSV, TXT)"
                onchange="handleFileSelect(event)" />
       </div>
     </div>
@@ -319,9 +347,103 @@
     // ESTADO
     // ─────────────────────────────────────────────
     var selectedFiles = []; // Array de File
-    var MAX_FILES = 10;
+    var MAX_FILES = 20;
     var MAX_SIZE_MB = 50;
     var MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+
+    var EXT_ACEITAS = ['.pdf', '.xml', '.csv', '.txt'];
+
+    // Detecta tipo do documento pelo nome do arquivo
+    function detectarTipoDoc(filename) {
+      var nome = (filename || '').toLowerCase();
+      if (nome.endsWith('.pdf')) return 'pgdas_d';
+      if (nome.endsWith('.xml')) return 'xml';  // NFe ou NFCe — backend distingue
+      if (nome.endsWith('.csv') || nome.endsWith('.txt')) return 'folha_csv';
+      return 'desconhecido';
+    }
+
+    // Retorna label e cor por tipo
+    function infoTipoDoc(tipo) {
+      switch (tipo) {
+        case 'pgdas_d':  return { label: 'PDF', color: 'bg-red-100 text-red-700' };
+        case 'xml':      return { label: 'XML', color: 'bg-violet-100 text-violet-700' };
+        case 'folha_csv':return { label: 'CSV', color: 'bg-green-100 text-green-700' };
+        default:         return { label: '?',   color: 'bg-slate-100 text-slate-500' };
+      }
+    }
+
+    // Requisitos por tipo_comprador
+    function requisitosPorPerfil(perfil) {
+      var base = [
+        { id: 'pgdas_d', label: 'PGDAS-D PDF (e-CAC)', ext: '.pdf', legal: 'Obrigatório' }
+      ];
+      if (perfil === 'B2B_CONTRIBUINTE' || perfil === 'MISTO') {
+        base.push({ id: 'xml', label: 'XML NFe de saída (modelo 55)', ext: '.xml',
+                    legal: 'LC 123/2006 Art. 13 §1º V' });
+        base.push({ id: 'folha_csv', label: 'CSV Folha de Pagamento (12 meses)', ext: '.csv / .txt',
+                    legal: 'LC 123/2006 Art. 18 §24' });
+      }
+      if (perfil === 'B2C_CONSUMIDOR_FINAL' || perfil === 'MISTO') {
+        base.push({ id: 'xml_b2c', label: 'XML NFCe ou CSV de vendas PDV', ext: '.xml / .csv',
+                    legal: 'LC 123/2006 Art. 3º §2º' });
+      }
+      return base;
+    }
+
+    // Verifica se um requisito está satisfeito pelos arquivos selecionados
+    function requisitoSatisfeito(reqId) {
+      var tipos = selectedFiles.map(function(f) { return detectarTipoDoc(f.name); });
+      if (reqId === 'pgdas_d') return tipos.includes('pgdas_d');
+      if (reqId === 'xml') return tipos.includes('xml');
+      if (reqId === 'folha_csv') return tipos.includes('folha_csv');
+      if (reqId === 'xml_b2c') return tipos.includes('xml') || tipos.includes('folha_csv');
+      return false;
+    }
+
+    function getTipoComprador() {
+      return document.getElementById('tipo-comprador-select').value;
+    }
+
+    function onTipoCompradorChange() {
+      renderChecklist();
+      updateSubmitButton();
+    }
+
+    // ─────────────────────────────────────────────
+    // CHECKLIST
+    // ─────────────────────────────────────────────
+    function renderChecklist() {
+      var perfil = getTipoComprador();
+      var reqs = requisitosPorPerfil(perfil);
+      var lista = document.getElementById('checklist-list');
+      lista.innerHTML = '';
+
+      reqs.forEach(function(req) {
+        var ok = requisitoSatisfeito(req.id);
+        var li = document.createElement('li');
+        li.className = 'flex items-start gap-3 text-sm';
+        var iconColor = ok ? 'text-emerald-500' : 'text-slate-300';
+        var iconPath = ok
+          ? '<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />'
+          : '<circle cx="12" cy="12" r="9" stroke-width="1.5" />';
+        li.innerHTML =
+          '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0 mt-0.5 ' + iconColor + '" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">' +
+            iconPath +
+          '</svg>' +
+          '<div>' +
+            '<span class="font-medium ' + (ok ? 'text-slate-800' : 'text-slate-500') + '">' + sanitize(req.label) + '</span>' +
+            ' <span class="text-xs font-mono text-slate-400">' + sanitize(req.ext) + '</span>' +
+            (req.legal ? '<br><span class="text-xs text-slate-400">' + sanitize(req.legal) + '</span>' : '') +
+          '</div>';
+        lista.appendChild(li);
+      });
+    }
+
+    function checklistCompleta() {
+      var perfil = getTipoComprador();
+      var reqs = requisitosPorPerfil(perfil);
+      return reqs.every(function(req) { return requisitoSatisfeito(req.id); });
+    }
 
     // ─────────────────────────────────────────────
     // INIT
@@ -331,6 +453,7 @@
       if (!token) {
         window.location.href = 'login.html';
       }
+      renderChecklist();
     });
 
     // ─────────────────────────────────────────────
@@ -414,14 +537,15 @@
       var validFiles = [];
 
       newFiles.forEach(function (file) {
-        var isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+        var nomeLC = file.name.toLowerCase();
+        var extOk = EXT_ACEITAS.some(function(e) { return nomeLC.endsWith(e); });
         var isTooBig = file.size > MAX_SIZE_BYTES;
         var isDuplicate = selectedFiles.some(function (f) {
           return f.name === file.name && f.size === file.size;
         });
 
-        if (!isPDF) {
-          errors.push('"' + sanitize(file.name) + '" não é um arquivo PDF.');
+        if (!extOk) {
+          errors.push('"' + sanitize(file.name) + '" — extensão não suportada. Use .pdf, .xml, .csv ou .txt.');
         } else if (isTooBig) {
           errors.push('"' + sanitize(file.name) + '" excede o limite de ' + MAX_SIZE_MB + ' MB (' + formatFileSize(file.size) + ').');
         } else if (isDuplicate) {
@@ -451,6 +575,7 @@
       if (validFiles.length > 0) {
         selectedFiles = selectedFiles.concat(validFiles);
         renderFileList();
+        renderChecklist();
         updateDropZoneState();
         updateSubmitButton();
       }
@@ -486,19 +611,23 @@
       listEl.innerHTML = '';
 
       selectedFiles.forEach(function (file, idx) {
+        var tipo = detectarTipoDoc(file.name);
+        var info = infoTipoDoc(tipo);
         var li = document.createElement('li');
         li.className = 'file-item bg-white border border-slate-200 rounded-lg px-4 py-3 flex items-center gap-3';
         li.setAttribute('role', 'listitem');
         li.innerHTML =
           '<div class="flex-shrink-0" aria-hidden="true">' +
-            '<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">' +
+            '<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">' +
               '<path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />' +
               '<path stroke-linecap="round" stroke-linejoin="round" d="M10 12h4M10 16h2" />' +
             '</svg>' +
           '</div>' +
           '<div class="flex-1 min-w-0">' +
             '<p class="text-sm font-medium text-slate-900 truncate" title="' + sanitize(file.name) + '">' + sanitize(file.name) + '</p>' +
-            '<p class="text-xs text-slate-400 mt-0.5">' + formatFileSize(file.size) + '</p>' +
+            '<p class="text-xs text-slate-400 mt-0.5">' + formatFileSize(file.size) +
+              ' &nbsp;<span class="inline-block rounded px-1.5 py-0.5 text-xs font-mono font-semibold ' + info.color + '">' + info.label + '</span>' +
+            '</p>' +
           '</div>' +
           '<button onclick="removeFile(' + idx + ')"' +
                   ' aria-label="Remover ' + sanitize(file.name) + '"' +
@@ -514,6 +643,7 @@
     function removeFile(idx) {
       selectedFiles.splice(idx, 1);
       renderFileList();
+      renderChecklist();
       updateDropZoneState();
       updateSubmitButton();
     }
@@ -521,6 +651,7 @@
     function clearAllFiles() {
       selectedFiles = [];
       renderFileList();
+      renderChecklist();
       updateDropZoneState();
       updateSubmitButton();
       hideElement('validation-errors');
@@ -549,14 +680,17 @@
         termoCheckbox.checked = false;  // reseta ao limpar
       }
 
-      // Botão só habilita se há arquivo E termo aceito
+      // Botão só habilita se há arquivo, checklist completa E termo aceito
       var termoOk = termoCheckbox.checked;
       var temArquivo = selectedFiles.length > 0;
-      btn.disabled = !(temArquivo && termoOk);
+      var checkOk = checklistCompleta();
+      btn.disabled = !(temArquivo && checkOk && termoOk);
 
       // Mensagem contextual abaixo do botão
       if (!temArquivo) {
-        hint.textContent = 'Selecione ao menos um PDF para habilitar a análise';
+        hint.textContent = 'Selecione os documentos para habilitar a análise';
+      } else if (!checkOk) {
+        hint.textContent = 'Adicione os documentos obrigatórios indicados no checklist acima';
       } else if (!termoOk) {
         hint.textContent = 'Aceite o termo acima para habilitar a análise';
       } else {
@@ -604,6 +738,8 @@
       });
       // Campo obrigatório do termo de aceite (CTN Art. 142 + LGPD Art. 37)
       formData.append('termo_aceite', 'true');
+      // Perfil do comprador — define documentos obrigatórios (LC 123/2006 Art. 18 §24)
+      formData.append('tipo_comprador', getTipoComprador());
 
       try {
         var response = await fetch(window.location.origin + '/analise/pdf', {
