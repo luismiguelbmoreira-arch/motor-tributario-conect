@@ -3,7 +3,7 @@ integrations — Adaptadores externos (Fase 2).
 
 Módulos:
     onvio_adapter  — Thomson Reuters Onvio (SPED Domínio Contábil via OAuth2)
-    jettax_adapter — Jettax (exports XML NFe via API ou ZIP)
+    sieg_adapter   — Sieg (exports XML NFe via API ou ZIP)
 
 Contratos:
     - OAuth2 client credentials
