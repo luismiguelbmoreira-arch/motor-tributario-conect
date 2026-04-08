@@ -8,22 +8,23 @@ entregue no momento de gerar o PDF para o cliente, via parametro separado.
 
 Estes testes garantem que essa separacao nao quebre.
 """
-import sys
 import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from datetime import date
-from decimal import Decimal
+from datetime import date  # noqa: E402
+from decimal import Decimal  # noqa: E402
 
-import pytest
+import pytest  # noqa: E402
 
-from motor_tributario import (
+from motor_tributario import (  # noqa: E402
     EmpresaCompradora,
     EmpresaFornecedora,
     MotorReformaTributaria,
     OperacaoFiscal,
 )
-from relatorio_pdf import _gerar_html
+from relatorio_pdf import _gerar_html  # noqa: E402
 
 
 @pytest.fixture
