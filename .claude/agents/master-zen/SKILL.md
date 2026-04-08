@@ -220,6 +220,23 @@ TIPOGRAFIA
 
 ## 📱 Componentes Zenistas (HTML/Tailwind/Chart.js)
 
+> **⚠️ SEGURANÇA**: Todas as funções abaixo usam `innerHTML` para renderização dinâmica.
+> Strings vindas de API ou input do usuário **DEVEM** ser sanitizadas com `escapeHtml()`
+> antes de injetar no DOM. Isso evita XSS (Cross-Site Scripting).
+
+### 0. **escapeHtml — Helper Obrigatório Anti-XSS**
+```html
+<script>
+// OBRIGATÓRIO — usar antes de injetar qualquer string dinâmica em innerHTML
+function escapeHtml(str) {
+  if (str == null) return '';
+  const div = document.createElement('div');
+  div.appendChild(document.createTextNode(String(str)));
+  return div.innerHTML;
+}
+</script>
+```
+
 ### 1. **Card — A Unidade Básica**
 ```html
 <!-- card.html — Encapsula informação com respiração visual -->
@@ -251,14 +268,16 @@ function criarCard(containerId, { title, subtitle, icon, stress, content }) {
                          focus-within:ring-2 focus-within:ring-amber-400`;
   container.innerHTML = `
     <div class="flex items-start gap-3">
-      ${icon ? `<span class="text-2xl mt-1">${icon}</span>` : ''}
+      ${icon ? `<span class="text-2xl mt-1">${escapeHtml(icon)}</span>` : ''}
       <div class="flex-1">
-        <h3 class="text-lg font-semibold text-gray-900">${title}</h3>
-        ${subtitle ? `<p class="text-sm text-gray-600 mt-1">${subtitle}</p>` : ''}
+        <h3 class="text-lg font-semibold text-gray-900">${escapeHtml(title)}</h3>
+        ${subtitle ? `<p class="text-sm text-gray-600 mt-1">${escapeHtml(subtitle)}</p>` : ''}
       </div>
     </div>
     ${content ? `<div class="mt-4">${content}</div>` : ''}
   `;
+  // NOTA: 'content' pode conter HTML intencional (ex: sub-componentes).
+  // Se vier de input do usuário, sanitizar antes de passar para criarCard().
 }
 </script>
 ```
@@ -316,8 +335,8 @@ function renderizarStepper(containerId, steps, currentStep) {
     div.style.opacity = '0';
     div.style.transform = 'translateX(-20px)';
     div.innerHTML = `
-      <h4 class="font-semibold">${step.title}</h4>
-      <p class="text-sm text-gray-600 mt-1">${step.description}</p>
+      <h4 class="font-semibold">${escapeHtml(step.title)}</h4>
+      <p class="text-sm text-gray-600 mt-1">${escapeHtml(step.description)}</p>
     `;
     container.appendChild(div);
     // Animação escalonada
@@ -367,9 +386,9 @@ function mostrarAlerta(containerId, { type = 'info', title, message, actionLabel
     <div class="flex items-start gap-3">
       <span class="text-xl">${icones[type]}</span>
       <div class="flex-1">
-        ${title ? `<h4 class="font-semibold">${title}</h4>` : ''}
-        <p class="text-sm mt-1">${message}</p>
-        ${actionLabel ? `<button class="mt-2 underline text-sm font-medium alert-action">${actionLabel}</button>` : ''}
+        ${title ? `<h4 class="font-semibold">${escapeHtml(title)}</h4>` : ''}
+        <p class="text-sm mt-1">${escapeHtml(message)}</p>
+        ${actionLabel ? `<button class="mt-2 underline text-sm font-medium alert-action">${escapeHtml(actionLabel)}</button>` : ''}
       </div>
       <button aria-label="Fechar" class="text-lg alert-close">✕</button>
     </div>
@@ -541,6 +560,14 @@ renderizarGraficoRBT12('chart-rbt12', [
   </div>
 
   <script>
+  // Anti-XSS — obrigatório para innerHTML com dados dinâmicos
+  function escapeHtml(str) {
+    if (str == null) return '';
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(String(str)));
+    return div.innerHTML;
+  }
+
   // Formata valor em BRL
   function formatBRL(valor) {
     return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -582,6 +609,15 @@ renderizarGraficoRBT12('chart-rbt12', [
           </div>
         </div>
       `;
+
+      // Alerta proativo se RBT12 > 90% do teto (antes do risco crítico a 95%)
+      if (data.rbt12_percentual > 0.90) {
+        mostrarAlerta('alert-principal', {
+          type: 'warning',
+          title: 'Atenção: próximo do teto',
+          message: 'Você está perto do teto do Simples Nacional. Considere Opt-Out.'
+        });
+      }
 
       // Card Simulação
       const stressSim = data.economia > 0 ? 'safe' : 'risk';
@@ -650,6 +686,7 @@ renderizarGraficoRBT12('chart-rbt12', [
 - [ ] Cores seguem semântica (risco=laranja, segurança=verde)
 - [ ] Funções JS reutilizáveis (criarCard, mostrarAlerta, renderizarStepper)
 - [ ] `role="alert"` e `aria-live` em alertas dinâmicos
+- [ ] `escapeHtml()` aplicado em todo `innerHTML` com dados dinâmicos (anti-XSS)
 - [ ] Sem scroll horizontal em mobile
 - [ ] Touch targets ≥ 44px (`min-height: 44px` em botões)
 
