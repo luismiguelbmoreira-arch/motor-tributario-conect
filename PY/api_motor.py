@@ -1101,6 +1101,127 @@ def _validar_docs_por_regime(
     return faltando
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SIEG — Sincronização direta de XMLs (PARTE 2 do pareamento)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class SiegSincronizarRequest(BaseModel):
+    """
+    Request do endpoint POST /sieg/sincronizar.
+
+    Janela recomendada: 12 meses retroativos ao mês-corte (alinhada com
+    o período-base do diagnóstico). Use ano_base para baixar o ano inteiro
+    (atalho 01/01..31/12).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    cnpj: str = Field(..., description="CNPJ (14 dígitos, com ou sem pontuação)")
+    data_inicio: Optional[str] = Field(None, description="ISO YYYY-MM-DD")
+    data_fim: Optional[str] = Field(None, description="ISO YYYY-MM-DD")
+    ano_base: Optional[int] = Field(
+        None,
+        ge=2020,
+        le=2033,
+        description="Atalho: baixa 01/01..31/12 do ano informado",
+    )
+    xml_type: int = Field(
+        1,
+        description="1=NFe (default), 2=CTe, 3=NFSe, 4=NFCe",
+    )
+
+
+@app.post(
+    "/sieg/sincronizar",
+    summary="Baixa XMLs da Sieg e persiste cifrados em auditoria_documentos",
+    tags=["Integrações"],
+)
+async def sieg_sincronizar(
+    payload: SiegSincronizarRequest,
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    """
+    Sincronização Sieg → storage_cifrado → DB.
+
+    Idempotente: re-executar a mesma janela não duplica registros. XMLs
+    já conhecidos (mesmo hash SHA-256) são pulados sem refazer I/O.
+
+    A API key da Sieg NÃO trafega no request — ela vem das 3 fontes
+    canônicas (env, arquivo protegido, AWS Secrets Manager).
+
+    Amparo: MAX_FISCAL_05 (auditoria documental obrigatória) +
+    LGPD Art. 37 (registro das operações de tratamento).
+    """
+    from datetime import date as _date
+
+    # ─ resolver janela ─
+    if payload.ano_base:
+        if payload.data_inicio or payload.data_fim:
+            raise HTTPException(
+                status_code=422,
+                detail="ano_base é mutuamente exclusivo com data_inicio/data_fim",
+            )
+        data_inicio = _date(payload.ano_base, 1, 1)
+        data_fim = _date(payload.ano_base, 12, 31)
+    else:
+        if not payload.data_inicio or not payload.data_fim:
+            raise HTTPException(
+                status_code=422,
+                detail="Forneça ano_base OU (data_inicio E data_fim)",
+            )
+        try:
+            data_inicio = _date.fromisoformat(payload.data_inicio)
+            data_fim = _date.fromisoformat(payload.data_fim)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=422, detail=f"Data inválida: {exc}"
+            ) from exc
+
+    # Lazy imports — evita pagar o custo se o endpoint nunca for chamado
+    from integrations.sieg_adapter import (
+        XML_TYPES_VALIDOS,
+        SiegAdapter,
+        SiegError,
+    )
+    from integrations.sieg_credentials import (
+        SiegCredentialError,
+        get_sieg_api_key,
+    )
+    from integrations.sieg_ingestor import SiegIngestor
+
+    if payload.xml_type not in XML_TYPES_VALIDOS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"xml_type inválido — esperado um de {list(XML_TYPES_VALIDOS)}",
+        )
+
+    try:
+        api_key = get_sieg_api_key()
+    except SiegCredentialError as exc:
+        logger.error("SIEG_API_KEY ausente — endpoint não pode operar")
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    adapter = SiegAdapter(api_key=api_key)
+    ingestor = SiegIngestor(adapter)
+
+    try:
+        resultado = ingestor.sincronizar(
+            cnpj=payload.cnpj,
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            xml_type=payload.xml_type,
+            uploaded_by_user_id=current_user.get("id"),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except SiegError as exc:
+        logger.error("Sieg sincronizar falhou: %s", exc)
+        raise HTTPException(status_code=502, detail=f"Sieg: {exc}") from exc
+
+    return JSONResponse(content=resultado.to_dict(), status_code=200)
+
+
 @app.post(
     "/analise/pdf",
     summary="Extrai dados de documentos fiscais e gera diagnóstico",
