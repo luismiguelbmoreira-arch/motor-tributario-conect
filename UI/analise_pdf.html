@@ -150,21 +150,63 @@
       </div>
     </div>
 
-    <!-- PERFIL DO COMPRADOR -->
-    <div class="fade-in bg-white border border-slate-200 rounded-2xl shadow-lg px-5 py-4">
-      <label for="tipo-comprador-select" class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
-        Perfil do comprador desta empresa
-      </label>
-      <select id="tipo-comprador-select"
-              onchange="onTipoCompradorChange()"
-              class="w-full rounded-lg border border-slate-300 bg-slate-50 text-sm text-slate-800 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-        <option value="B2B_CONTRIBUINTE">B2B — Vende para empresas contribuintes (Nota Fiscal Eletrônica)</option>
-        <option value="B2C_CONSUMIDOR_FINAL">B2C — Vende ao consumidor final (NFCe / PDV)</option>
-        <option value="MISTO">Misto — Vende para empresas e consumidores</option>
-      </select>
-      <p class="text-xs text-slate-400 mt-2">
-        Define quais documentos são obrigatórios para o diagnóstico fiscal.
-      </p>
+    <!-- CONFIGURAÇÃO DA ANÁLISE: Ano-alvo + Regime + Perfil -->
+    <div class="fade-in bg-white border border-slate-200 rounded-2xl shadow-lg px-5 py-4 space-y-4">
+      <p class="text-xs font-semibold text-slate-600 uppercase tracking-wider">Configuração da análise</p>
+
+      <!-- ANO-ALVO -->
+      <div>
+        <label for="ano-alvo-select" class="block text-xs font-semibold text-slate-600 mb-1.5">
+          Ano-alvo da análise
+        </label>
+        <select id="ano-alvo-select"
+                onchange="onConfigChange()"
+                class="w-full rounded-lg border border-slate-300 bg-slate-50 text-sm text-slate-800 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+          <option value="2026">2026 (ano-base 2025)</option>
+          <option value="2027">2027 (ano-base 2026)</option>
+          <option value="2028">2028 (ano-base 2027)</option>
+          <option value="2029">2029 (ano-base 2028)</option>
+          <option value="2030">2030 (ano-base 2029)</option>
+          <option value="2031">2031 (ano-base 2030)</option>
+          <option value="2032">2032 (ano-base 2031)</option>
+          <option value="2033">2033 (ano-base 2032)</option>
+        </select>
+        <p class="text-xs text-slate-400 mt-1">
+          MAX_FISCAL_03 — Declarar a data base ANTES do cálculo. LC 123/2006 Art. 3º §1º.
+        </p>
+      </div>
+
+      <!-- REGIME TRIBUTÁRIO -->
+      <div>
+        <label for="regime-select" class="block text-xs font-semibold text-slate-600 mb-1.5">
+          Regime tributário
+        </label>
+        <select id="regime-select"
+                onchange="onConfigChange()"
+                class="w-full rounded-lg border border-slate-300 bg-slate-50 text-sm text-slate-800 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+          <option value="SIMPLES">Simples Nacional</option>
+          <option value="MEI">MEI — Microempreendedor Individual</option>
+          <option value="PRESUMIDO">Lucro Presumido</option>
+          <option value="REAL">Lucro Real</option>
+        </select>
+      </div>
+
+      <!-- PERFIL DO COMPRADOR -->
+      <div>
+        <label for="tipo-comprador-select" class="block text-xs font-semibold text-slate-600 mb-1.5">
+          Perfil do comprador desta empresa
+        </label>
+        <select id="tipo-comprador-select"
+                onchange="onConfigChange()"
+                class="w-full rounded-lg border border-slate-300 bg-slate-50 text-sm text-slate-800 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+          <option value="B2B_CONTRIBUINTE">B2B — Vende para empresas contribuintes (Nota Fiscal Eletrônica)</option>
+          <option value="B2C_CONSUMIDOR_FINAL">B2C — Vende ao consumidor final (NFCe / PDV)</option>
+          <option value="MISTO">Misto — Vende para empresas e consumidores</option>
+        </select>
+        <p class="text-xs text-slate-400 mt-1">
+          Define quais documentos são obrigatórios para o diagnóstico fiscal.
+        </p>
+      </div>
     </div>
 
     <!-- CHECKLIST DE DOCUMENTOS OBRIGATÓRIOS -->
@@ -372,77 +414,125 @@
       }
     }
 
-    // Requisitos por tipo_comprador
-    function requisitosPorPerfil(perfil) {
-      var base = [
-        { id: 'pgdas_d', label: 'PGDAS-D PDF (e-CAC)', ext: '.pdf', legal: 'Obrigatório' }
-      ];
-      if (perfil === 'B2B_CONTRIBUINTE' || perfil === 'MISTO') {
-        base.push({ id: 'xml', label: 'XML NFe de saída (modelo 55)', ext: '.xml',
-                    legal: 'LC 123/2006 Art. 13 §1º V' });
-        base.push({ id: 'folha_csv', label: 'CSV Folha de Pagamento (12 meses)', ext: '.csv / .txt',
-                    legal: 'LC 123/2006 Art. 18 §24' });
-      }
-      if (perfil === 'B2C_CONSUMIDOR_FINAL' || perfil === 'MISTO') {
-        base.push({ id: 'xml_b2c', label: 'XML NFCe ou CSV de vendas PDV', ext: '.xml / .csv',
-                    legal: 'LC 123/2006 Art. 3º §2º' });
-      }
-      return base;
+    // Cache dos cards vindos do endpoint GET /documentos-requeridos.
+    // Populado por carregarRequisitos() — fonte única de verdade de quais
+    // documentos são necessários e de qual período. Backend centraliza a
+    // regra em PY/schemas/catalogo_documentos.py (MAX_FISCAL_03).
+    var cardsCache = [];
+
+    function getAnoAlvo() {
+      return document.getElementById('ano-alvo-select').value;
     }
 
-    // Verifica se um requisito está satisfeito pelos arquivos selecionados
-    function requisitoSatisfeito(reqId) {
-      var tipos = selectedFiles.map(function(f) { return detectarTipoDoc(f.name); });
-      if (reqId === 'pgdas_d') return tipos.includes('pgdas_d');
-      if (reqId === 'xml') return tipos.includes('xml');
-      if (reqId === 'folha_csv') return tipos.includes('folha_csv');
-      if (reqId === 'xml_b2c') return tipos.includes('xml') || tipos.includes('folha_csv');
-      return false;
+    function getRegime() {
+      return document.getElementById('regime-select').value;
     }
 
     function getTipoComprador() {
       return document.getElementById('tipo-comprador-select').value;
     }
 
-    function onTipoCompradorChange() {
+    // Verifica se um card está satisfeito pelos arquivos selecionados.
+    // Usa a extensão esperada + lógica por ID canônico (round-trip com
+    // _detectar_tipo_documento() no backend).
+    function cardSatisfeito(card) {
+      var tipos = selectedFiles.map(function(f) { return detectarTipoDoc(f.name); });
+      switch (card.id) {
+        case 'pgdas_d':
+        case 'das':
+          return tipos.includes('pgdas_d'); // PDF e-CAC
+        case 'nfe_saida':
+        case 'nfce':
+          return tipos.includes('xml');
+        case 'folha_csv':
+        case 'sped_ecd':
+        case 'sped_efd_contrib':
+          return tipos.includes('folha_csv'); // .csv/.txt
+        default:
+          return false;
+      }
+    }
+
+    // Busca os cards no backend para (ano_alvo, perfil, regime).
+    // Chamado no init e a cada mudança de config.
+    async function carregarRequisitos() {
+      var ano = getAnoAlvo();
+      var perfil = getTipoComprador();
+      var regime = getRegime();
+      var url = '/documentos-requeridos'
+        + '?ano_alvo=' + encodeURIComponent(ano)
+        + '&perfil=' + encodeURIComponent(perfil)
+        + '&regime=' + encodeURIComponent(regime);
+      try {
+        var resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        if (!resp.ok) {
+          throw new Error('HTTP ' + resp.status);
+        }
+        var data = await resp.json();
+        cardsCache = data.cards || [];
+      } catch (err) {
+        console.error('Falha ao carregar /documentos-requeridos:', err);
+        cardsCache = [];
+      }
       renderChecklist();
       updateSubmitButton();
+    }
+
+    function onConfigChange() {
+      carregarRequisitos();
     }
 
     // ─────────────────────────────────────────────
     // CHECKLIST
     // ─────────────────────────────────────────────
     function renderChecklist() {
-      var perfil = getTipoComprador();
-      var reqs = requisitosPorPerfil(perfil);
       var lista = document.getElementById('checklist-list');
       lista.innerHTML = '';
 
-      reqs.forEach(function(req) {
-        var ok = requisitoSatisfeito(req.id);
+      if (cardsCache.length === 0) {
+        var li = document.createElement('li');
+        li.className = 'text-xs text-slate-400 italic';
+        li.textContent = 'Carregando requisitos…';
+        lista.appendChild(li);
+        return;
+      }
+
+      cardsCache.forEach(function(card) {
+        var ok = cardSatisfeito(card);
         var li = document.createElement('li');
         li.className = 'flex items-start gap-3 text-sm';
-        var iconColor = ok ? 'text-emerald-500' : 'text-slate-300';
+        var iconColor = ok ? 'text-emerald-500' : (card.obrigatorio ? 'text-slate-400' : 'text-slate-300');
         var iconPath = ok
           ? '<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />'
           : '<circle cx="12" cy="12" r="9" stroke-width="1.5" />';
+        var labelColor = ok ? 'text-slate-800' : (card.obrigatorio ? 'text-slate-700' : 'text-slate-500');
+        var obrigBadge = card.obrigatorio
+          ? '<span class="inline-block text-[10px] font-bold uppercase tracking-wider text-red-600 bg-red-50 rounded px-1.5 py-0.5 ml-2">obrigatório</span>'
+          : '<span class="inline-block text-[10px] font-bold uppercase tracking-wider text-slate-500 bg-slate-100 rounded px-1.5 py-0.5 ml-2">recomendado</span>';
+        var automacao = card.automacao_disponivel
+          ? '<br><span class="text-[11px] text-blue-600">🔌 Automação: ' + sanitize(card.automacao_disponivel) + '</span>'
+          : '';
         li.innerHTML =
           '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0 mt-0.5 ' + iconColor + '" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">' +
             iconPath +
           '</svg>' +
-          '<div>' +
-            '<span class="font-medium ' + (ok ? 'text-slate-800' : 'text-slate-500') + '">' + sanitize(req.label) + '</span>' +
-            ' <span class="text-xs font-mono text-slate-400">' + sanitize(req.ext) + '</span>' +
-            (req.legal ? '<br><span class="text-xs text-slate-400">' + sanitize(req.legal) + '</span>' : '') +
+          '<div class="flex-1">' +
+            '<span class="font-medium ' + labelColor + '">' + sanitize(card.label) + '</span>' +
+            obrigBadge +
+            ' <span class="text-xs font-mono text-slate-400">' + sanitize(card.extensao) + '</span>' +
+            '<br><span class="text-xs font-mono text-blue-700 bg-blue-50 rounded px-1.5 py-0.5 inline-block mt-1">📅 ' + sanitize(card.periodo_label) + '</span>' +
+            '<br><span class="text-xs text-slate-400">' + sanitize(card.amparo_legal) + '</span>' +
+            automacao +
           '</div>';
         lista.appendChild(li);
       });
     }
 
     function checklistCompleta() {
-      var perfil = getTipoComprador();
-      var reqs = requisitosPorPerfil(perfil);
-      return reqs.every(function(req) { return requisitoSatisfeito(req.id); });
+      if (cardsCache.length === 0) return false;
+      return cardsCache
+        .filter(function(c) { return c.obrigatorio; })
+        .every(function(c) { return cardSatisfeito(c); });
     }
 
     // ─────────────────────────────────────────────
@@ -453,7 +543,7 @@
       if (!token) {
         window.location.href = 'login.html';
       }
-      renderChecklist();
+      carregarRequisitos();
     });
 
     // ─────────────────────────────────────────────
