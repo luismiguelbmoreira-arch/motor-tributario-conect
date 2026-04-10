@@ -10,7 +10,7 @@ Amparo: LC 123/2006 Art. 21 — DAS deve refletir apuração mensal correta.
 """
 from __future__ import annotations
 
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from enum import Enum
 from typing import Any
 
