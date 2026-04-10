@@ -123,17 +123,17 @@
           <div><strong>PGDAS-D Extrato</strong> <span class="text-xs text-emerald-600 font-semibold">(obrigatório — .PDF)</span><br>
           <span class="text-xs text-slate-500">e-CAC → Simples Nacional → PGDAS-D → Extrato. Contém RBT12, CNAE, receitas, DAS referência.</span></div>
         </li>
-        <li class="flex items-start gap-2">
+        <li class="flex items-start gap-2 doc-item-b2b" data-perfil="B2B_CONTRIBUINTE,MISTO">
           <span class="w-5 h-5 rounded bg-violet-100 text-violet-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
           <div><strong>XML NFe de Saída</strong> <span class="text-xs text-slate-500">(obrigatório B2B — .XML)</span><br>
           <span class="text-xs text-slate-500">Modelo 55. Receita real do mês + ICMS-ST segregado. LC 123/2006 Art. 13 §1º V.</span></div>
         </li>
-        <li class="flex items-start gap-2">
+        <li class="flex items-start gap-2 doc-item-b2b" data-perfil="B2B_CONTRIBUINTE,MISTO">
           <span class="w-5 h-5 rounded bg-green-100 text-green-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
           <div><strong>CSV Folha de Pagamento</strong> <span class="text-xs text-slate-500">(obrigatório B2B — .CSV ou .TXT)</span><br>
           <span class="text-xs text-slate-500">Domínio Folha ou similar. 12 meses → Fator R correto. LC 123/2006 Art. 18 §24.</span></div>
         </li>
-        <li class="flex items-start gap-2">
+        <li class="flex items-start gap-2 doc-item-b2c" data-perfil="B2C_CONSUMIDOR_FINAL,MISTO">
           <span class="w-5 h-5 rounded bg-amber-100 text-amber-700 text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">4</span>
           <div><strong>XML NFCe / CSV Vendas PDV</strong> <span class="text-xs text-slate-500">(obrigatório B2C — .XML ou .CSV)</span><br>
           <span class="text-xs text-slate-500">Modelo 65 ou planilha de vendas ao consumidor final. Receita real B2C.</span></div>
@@ -480,6 +480,15 @@
 
     function onConfigChange() {
       carregarRequisitos();
+      filtrarDocsAceitos();
+    }
+
+    function filtrarDocsAceitos() {
+      var perfil = getTipoComprador();
+      document.querySelectorAll('[data-perfil]').forEach(function(el) {
+        var perfis = el.getAttribute('data-perfil').split(',');
+        el.style.display = perfis.includes(perfil) ? '' : 'none';
+      });
     }
 
     // ─────────────────────────────────────────────
@@ -544,6 +553,7 @@
         window.location.href = 'login.html';
       }
       carregarRequisitos();
+      filtrarDocsAceitos();
     });
 
     // ─────────────────────────────────────────────

@@ -351,25 +351,6 @@ def _gerar_html(diagnostico: dict, pii: dict | None = None) -> str:
 
 {_secao_decisao_opt_out(diagnostico)}
 
-{_secao_documentos_precisao()}
-
-<!-- Serviços recomendados -->
-<h2>Serviços Recomendados</h2>
-<table>
-  <thead><tr><th>Serviço</th><th>Contexto</th></tr></thead>
-  <tbody>
-    <tr><td style="font-weight:600;">Relatório de Conformidade Fiscal 2026</td><td>Documentação completa da situação tributária — sempre indicado</td></tr>
-    {_servicos_recomendados(diagnostico)}
-  </tbody>
-</table>
-<p style="font-size:10px;color:#9ca3af;margin-top:6px;font-style:italic;">* Valores e condições a combinar com o escritório. Esta lista não constitui proposta comercial.</p>
-
-<!-- Trilha de auditoria -->
-<h2>Trilha de Auditoria</h2>
-<p style="font-size:10px;color:#6b7280;margin-bottom:10px;">Todos os cálculos abaixo citam base legal explícita — MAX_02 Motor Tributário Conect.</p>
-{trilha_html}
-
-{_secao_glossario()}
 
 <!-- Rodapé -->
 <div class="footer">
@@ -614,29 +595,7 @@ def _secao_decisao_opt_out(diagnostico: dict) -> str:
   </div>
 </div>
 
-<!-- Sub-bloco 5: Como fazer (checklist) -->
-<h3 style="margin-top:14px;">Como Fazer o Opt-Out na Prática</h3>
-<table style="margin-bottom:14px;">
-  <thead>
-    <tr><th style="width:40px;">Passo</th><th>Ação</th></tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td style="text-align:center;font-weight:700;color:#1e40af;">1</td>
-      <td>Acessar o <strong>portal do Simples Nacional</strong> (gov.br/receitafederal) com certificado digital ou código de acesso</td>
-    </tr>
-    <tr>
-      <td style="text-align:center;font-weight:700;color:#1e40af;">2</td>
-      <td>No menu PGDAS-D, marcar a opção <strong>"Recolhimento de CBS/IBS fora do DAS"</strong> dentro da janela semestral aberta</td>
-    </tr>
-    <tr>
-      <td style="text-align:center;font-weight:700;color:#1e40af;">3</td>
-      <td>Confirmar e <strong>imprimir o protocolo</strong>. A partir do semestre seguinte, recolher CBS/IBS via DARF (códigos a serem definidos por ato da RFB)</td>
-    </tr>
-  </tbody>
-</table>
-
-<!-- Sub-bloco 6: Riscos -->
+<!-- Sub-bloco 5: Riscos -->
 <h3 style="margin-top:14px;">Riscos do Opt-Out</h3>
 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
   <div style="background:#fef2f2;border-left:3px solid #dc2626;padding:8px 10px;border-radius:0 4px 4px 0;">
@@ -917,8 +876,7 @@ def _secao_validacao_ecac(diagnostico: dict) -> str:
             "(3) ICMS-ST segregado de forma errada (receita bruta incluindo ST); "
             "(4) redução setorial aplicável (saúde/educação/agro) não marcada; "
             "(5) RPA do mês analisado muito distinto da média (sazonalidade). "
-            "Anexe os documentos da seção 'Documentos para análise precisa' e rode "
-            "novamente."
+            "Verifique os dados de entrada e rode novamente."
         )
 
     delta_str = _fmt_moeda(delta)
