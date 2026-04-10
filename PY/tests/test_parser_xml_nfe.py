@@ -13,8 +13,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from parsers.xml_nfe import (
     NFeParsedData,
     NFeParserError,
-    parsear_lote_nfe,
     parsear_xml_nfe,
+    parsear_lote_nfe,
 )
 
 NS = "http://www.portalfiscal.inf.br/nfe"
