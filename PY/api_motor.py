@@ -1812,6 +1812,104 @@ async def gerar_dossie_prova(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# INTEGRA CONTADOR (Serpro/RFB) — PGDAS-D + DAS automatizados
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class IntegraSincronizarRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    cnpj: str = Field(..., description="CNPJ do cliente (14 dígitos, aceita pontuação)")
+    ano_base: Optional[int] = Field(
+        None, ge=2020, le=2033,
+        description="Ano completo (expande em 12 períodos). XOR com 'periodos'.",
+    )
+    periodos: Optional[list[str]] = Field(
+        None, description="Lista explícita YYYY-MM. XOR com 'ano_base'."
+    )
+    tipos: list[Literal["pgdasd", "das"]] = Field(
+        default_factory=lambda: ["pgdasd", "das"],
+        description="Subconjunto de serviços a puxar.",
+    )
+
+    def resolver_periodos(self) -> list[str]:
+        if self.ano_base is not None and self.periodos:
+            raise ValueError("Forneça 'ano_base' OU 'periodos', não ambos.")
+        if self.ano_base is None and not self.periodos:
+            raise ValueError("Forneça 'ano_base' ou 'periodos'.")
+        if self.ano_base is not None:
+            return [f"{self.ano_base}-{m:02d}" for m in range(1, 13)]
+        return list(self.periodos or [])
+
+
+@app.post("/integra/sincronizar", tags=["Integrações"])
+async def integra_sincronizar(
+    payload: IntegraSincronizarRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Puxa PGDAS-D e/ou DAS do Integra Contador (Serpro/RFB) para o CNPJ.
+
+    Requer credenciais configuradas no servidor via env vars
+    (INTEGRA_CERT_PATH, INTEGRA_CERT_PASSWORD, INTEGRA_CONTRATANTE_CNPJ,
+    INTEGRA_AUTOR_PEDIDO_DADOS_CNPJ) ou arquivo INI protegido.
+    """
+    try:
+        periodos = payload.resolver_periodos()
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    # Lazy imports — mantém api_motor carregável sem cryptography/cert
+    try:
+        from integrations.integra_adapter import (
+            IntegraAdapter,
+            IntegraAuthError,
+            IntegraCertError,
+            IntegraError,
+        )
+        from integrations.integra_credentials import (
+            IntegraCredentialError,
+            get_integra_credenciais,
+        )
+        from integrations.integra_ingestor import IntegraIngestor
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Integra Contador indisponível (imports): {exc}",
+        )
+
+    try:
+        credenciais = get_integra_credenciais()
+    except IntegraCredentialError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Integra Contador não configurado: {exc}",
+        )
+
+    adapter = IntegraAdapter(credenciais)
+    try:
+        ingestor = IntegraIngestor(adapter)
+        resultado = ingestor.sincronizar(
+            cnpj=payload.cnpj,
+            periodos=periodos,
+            tipos=tuple(payload.tipos),
+            uploaded_by_user_id=current_user.get("id"),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except IntegraCertError as exc:
+        raise HTTPException(status_code=503, detail=f"Certificado: {exc}")
+    except IntegraAuthError as exc:
+        raise HTTPException(status_code=502, detail=f"Autenticação Serpro: {exc}")
+    except IntegraError as exc:
+        raise HTTPException(status_code=502, detail=f"Integra Contador: {exc}")
+    finally:
+        adapter.close()
+
+    return {"ok": True, "resumo": resultado.to_dict()}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # STATIC FILES — UI servida em /ui/ para não colidir com rotas da API
 # Montagem no final garante que todos os routes têm prioridade.
 # Acesse: http://localhost:8000/ui/login.html
