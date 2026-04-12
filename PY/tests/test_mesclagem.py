@@ -10,7 +10,7 @@ from decimal import Decimal
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from extrator_pdfs import DadosExtraidosPDF, mesclar_fontes_documentais
+from services.extrator_pdfs import DadosExtraidosPDF, mesclar_fontes_documentais
 from parsers.xml_nfe import NFeParsedData
 from parsers.csv_folha import FolhaParsedData
 

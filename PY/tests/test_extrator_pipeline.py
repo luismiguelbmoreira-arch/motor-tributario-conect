@@ -24,7 +24,7 @@ import pytest
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
-from extrator_pdfs import DadosExtraidosPDF, dados_para_motor, extrair_dados_pdfs
+from services.extrator_pdfs import DadosExtraidosPDF, dados_para_motor, extrair_dados_pdfs
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -194,7 +194,7 @@ class TestDadosParaMotorMulti:
 
     def test_atividades_sao_objetos_atividade(self, params):
         """Cada item é instância de motor_tributario.Atividade (Pydantic V2)."""
-        from motor_tributario import Atividade
+        from core.motor_tributario import Atividade
         for item in params["empresa"]["atividades"]:
             assert isinstance(item, Atividade)
 
@@ -277,7 +277,7 @@ class TestExtrairPDFsMocked:
         pdf_fake = tmp_path / "test.pdf"
         pdf_fake.write_bytes(b"%PDF-1.0 fake")  # arquivo válido (read_bytes precisa existir)
 
-        with patch("extrator_pdfs.anthropic.Anthropic") as MockAnthropic:
+        with patch("services.extrator_pdfs.anthropic.Anthropic") as MockAnthropic:
             MockAnthropic.return_value.messages.create.return_value = _mock_api_response(
                 json.dumps(MONO_JSON)
             )
@@ -304,7 +304,7 @@ class TestExtrairPDFsMocked:
         pdf_fake = tmp_path / "test.pdf"
         pdf_fake.write_bytes(b"%PDF-1.0 fake")
 
-        with patch("extrator_pdfs.anthropic.Anthropic") as MockAnthropic:
+        with patch("services.extrator_pdfs.anthropic.Anthropic") as MockAnthropic:
             MockAnthropic.return_value.messages.create.return_value = _mock_api_response(
                 "Desculpe, não consegui extrair os dados."  # não é JSON
             )

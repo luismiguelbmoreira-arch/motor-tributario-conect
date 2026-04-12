@@ -27,7 +27,7 @@ os.environ.setdefault("MOTOR_CONECT_MASTER_KEY", "0" * 64)
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 import database  # noqa: E402
-import storage_cifrado  # noqa: E402
+import services.storage_cifrado as storage_cifrado  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 from sqlmodel import SQLModel, create_engine  # noqa: E402
 
@@ -100,8 +100,8 @@ def _patch_pipeline_claude(cnpj: str = CNPJ_FAKE):
     fake_motor_class = MagicMock(return_value=fake_motor_instance)
 
     return {
-        "anthropic_client": patch("extrator_pdfs.anthropic.Anthropic", return_value=fake_client),
-        "motor": patch("motor_tributario.MotorReformaTributaria", fake_motor_class),
+        "anthropic_client": patch("services.extrator_pdfs.anthropic.Anthropic", return_value=fake_client),
+        "motor": patch("core.motor_tributario.MotorReformaTributaria", fake_motor_class),
     }
 
 
@@ -109,7 +109,7 @@ def _patch_pipeline_claude(cnpj: str = CNPJ_FAKE):
 
 
 def test_persistir_false_nao_toca_auditoria():
-    from extrator_pdfs import processar_pdfs_bytes
+    from services.extrator_pdfs import processar_pdfs_bytes
 
     patches = _patch_pipeline_claude()
     with patches["anthropic_client"], patches["motor"]:
@@ -124,14 +124,14 @@ def test_persistir_false_nao_toca_auditoria():
 
 
 def test_persistir_true_sem_arquivos_nomes_levanta():
-    from extrator_pdfs import processar_pdfs_bytes
+    from services.extrator_pdfs import processar_pdfs_bytes
 
     with pytest.raises(ValueError, match="arquivos_nomes"):
         processar_pdfs_bytes([PDF_FAKE_A], persistir_auditoria=True)
 
 
 def test_arquivos_nomes_tamanho_diferente_levanta():
-    from extrator_pdfs import processar_pdfs_bytes
+    from services.extrator_pdfs import processar_pdfs_bytes
 
     with pytest.raises(ValueError, match="mesmo tamanho"):
         processar_pdfs_bytes(
@@ -142,7 +142,7 @@ def test_arquivos_nomes_tamanho_diferente_levanta():
 
 
 def test_persistir_ok_cifra_e_registra_dois_pdfs():
-    from extrator_pdfs import processar_pdfs_bytes
+    from services.extrator_pdfs import processar_pdfs_bytes
 
     patches = _patch_pipeline_claude()
     with patches["anthropic_client"], patches["motor"]:
@@ -173,7 +173,7 @@ def test_persistir_ok_cifra_e_registra_dois_pdfs():
 
 def test_persistir_arquivos_realmente_cifrados_em_disco():
     """Confere que o byte-a-byte do PDF não aparece no arquivo cifrado."""
-    from extrator_pdfs import processar_pdfs_bytes
+    from services.extrator_pdfs import processar_pdfs_bytes
 
     patches = _patch_pipeline_claude()
     with patches["anthropic_client"], patches["motor"]:
@@ -193,8 +193,8 @@ def test_persistir_arquivos_realmente_cifrados_em_disco():
 
 def test_round_trip_auditoria_decifra_recupera_pdf_original():
     """Workflow completo: cifrar via extrator → buscar do DB → decifrar → bate."""
-    from extrator_pdfs import processar_pdfs_bytes
-    from storage_cifrado import decifrar
+    from services.extrator_pdfs import processar_pdfs_bytes
+    from services.storage_cifrado import decifrar
 
     patches = _patch_pipeline_claude()
     with patches["anthropic_client"], patches["motor"]:
@@ -220,7 +220,7 @@ def test_round_trip_auditoria_decifra_recupera_pdf_original():
 
 def test_falha_de_cifra_nao_derruba_diagnostico(monkeypatch):
     """Se cifrar_e_persistir explodir, o diagnóstico ainda volta."""
-    from extrator_pdfs import processar_pdfs_bytes
+    from services.extrator_pdfs import processar_pdfs_bytes
 
     def cifra_explode(*a, **kw):
         raise RuntimeError("disco cheio")
@@ -243,7 +243,7 @@ def test_falha_de_cifra_nao_derruba_diagnostico(monkeypatch):
 
 def test_falha_total_de_master_key_marca_falhou(monkeypatch):
     """Se a master key não estiver no env, status vira FALHOU mas diag volta."""
-    from extrator_pdfs import processar_pdfs_bytes
+    from services.extrator_pdfs import processar_pdfs_bytes
 
     monkeypatch.delenv("MOTOR_CONECT_MASTER_KEY", raising=False)
 

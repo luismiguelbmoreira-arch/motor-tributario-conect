@@ -27,7 +27,7 @@ from integrations.integra_adapter import (
 )
 
 import database
-import storage_cifrado
+import services.storage_cifrado as storage_cifrado
 
 logger = logging.getLogger(__name__)
 

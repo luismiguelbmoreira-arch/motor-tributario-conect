@@ -23,14 +23,14 @@ from decimal import Decimal
 
 import pytest
 
-from difal import (
+from core.difal import (
     ALIQUOTA_ICMS_INTERNA,
     UFS_SUL_SUDESTE_REMETENTE,
     calcular_difal,
     obter_aliquota_interestadual,
     obter_aliquota_interna,
 )
-from motor_tributario import (
+from core.motor_tributario import (
     EmpresaCompradora,
     EmpresaFornecedora,
     MotorReformaTributaria,

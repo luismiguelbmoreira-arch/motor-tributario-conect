@@ -26,7 +26,7 @@ os.environ.setdefault("MOTOR_CONECT_MASTER_KEY", "0" * 64)
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 import database  # noqa: E402
-import storage_cifrado  # noqa: E402
+import services.storage_cifrado as storage_cifrado  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 from sqlmodel import Session, SQLModel, create_engine, select  # noqa: E402
 

@@ -24,7 +24,7 @@ os.environ.setdefault("MOTOR_CONECT_MASTER_KEY", "0" * 64)
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 import database  # noqa: E402
-import storage_cifrado  # noqa: E402
+import services.storage_cifrado as storage_cifrado  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 from sqlmodel import SQLModel, create_engine  # noqa: E402
@@ -49,7 +49,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(database, "engine", engine)
 
     # Mock do get_current_user para pular JWT real nos testes
-    from api_motor import app, get_current_user
+    from main import app, get_current_user
 
     def fake_user():
         return {"id": "7", "username": "tester", "role": "admin"}
@@ -62,7 +62,7 @@ def client(tmp_path, monkeypatch):
 def _registrar_doc(pdf_bytes: bytes, nome: str) -> str:
     """Helper: cifra + registra + retorna o hash."""
     from database import registrar_documento_auditoria
-    from storage_cifrado import cifrar_e_persistir, hash_documento
+    from services.storage_cifrado import cifrar_e_persistir, hash_documento
 
     h = hash_documento(pdf_bytes)
     _, path = cifrar_e_persistir(pdf_bytes, CNPJ)

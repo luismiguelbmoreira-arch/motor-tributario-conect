@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 import database
-import storage_cifrado
+import services.storage_cifrado as storage_cifrado
 from integrations.sieg_adapter import (
     SiegAdapter,
     SiegError,

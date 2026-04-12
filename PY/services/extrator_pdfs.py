@@ -455,7 +455,7 @@ def dados_para_motor(dados: DadosExtraidosPDF) -> dict:
     # Converte atividades_detalhadas em lista de Atividade (multi-atividade)
     atividades = None
     if dados.atividades_detalhadas:
-        from motor_tributario import Atividade
+        from core.motor_tributario import Atividade
         atividades = []
         for item in dados.atividades_detalhadas:
             receita_str = str(item.get("receita", "0"))
@@ -701,7 +701,7 @@ def processar_pdfs_bytes(
 
     from datetime import date
 
-    from motor_tributario import (
+    from core.motor_tributario import (
         EmpresaCompradora,
         EmpresaFornecedora,
         MotorReformaTributaria,
@@ -728,7 +728,7 @@ def processar_pdfs_bytes(
     # ⚠️ A estimativa NÃO tem base legal (LC 214/2025 Art. 47-48 exige verificação
     # operação-a-operação) — é apenas uma pré-seleção razoável que o operador pode
     # ajustar depois via campo editável no resultado.
-    from tabelas_simples import estimar_perfil_b2b
+    from core.tabelas_simples import estimar_perfil_b2b
     pct_b2b_sugerido = estimar_perfil_b2b(empresa_params["cnae_principal"])
     if pct_b2b_sugerido >= 90:
         tipo_comprador = "B2B_CONTRIBUINTE"
@@ -867,7 +867,7 @@ def processar_pdfs_bytes(
     if persistir_auditoria:
         try:
             from database import registrar_documento_auditoria
-            from storage_cifrado import cifrar_e_persistir, hash_documento
+            from services.storage_cifrado import cifrar_e_persistir, hash_documento
 
             cnpj_cliente = empresa_params["cnpj"]
             for i, pdf_bytes in enumerate(conteudos):

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nova Auditoria — Motor Conect</title>
+  
+  <!-- CSS Centralizado -->
+  <link rel="stylesheet" href="design_system.css">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    .stepper-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 3rem;
+      position: relative;
+    }
+    
+    .stepper-header::before {
+      content: '';
+      position: absolute;
+      top: 15px;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: var(--border-subtle);
+      z-index: 0;
+    }
+
+    .step-item {
+      position: relative;
+      z-index: 1;
+      background: var(--color-black);
+      padding: 0 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .step-dot {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--color-gray-800);
+      border: 2px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      transition: var(--transition-fast);
+    }
+
+    .step-item.active .step-dot {
+      background: var(--action-primary);
+      border-color: var(--action-primary);
+      color: white;
+      box-shadow: 0 0 15px rgba(0, 179, 126, 0.4);
+    }
+
+    .step-item.completed .step-dot {
+      background: var(--color-green-500);
+      border-color: var(--color-green-500);
+      color: white;
+    }
+
+    .drop-zone {
+      border: 2px dashed var(--border-subtle);
+      border-radius: 16px;
+      padding: 3rem;
+      text-align: center;
+      transition: var(--transition-fast);
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .drop-zone:hover, .drop-zone.dragging {
+      border-color: var(--action-primary);
+      background: rgba(0, 179, 126, 0.05);
+    }
+
+    .mode-card {
+      padding: 1.5rem;
+      border-radius: 12px;
+      border: 1px solid var(--border-subtle);
+      cursor: pointer;
+      transition: var(--transition-fast);
+      flex: 1;
+    }
+
+    .mode-card:hover {
+      border-color: var(--text-secondary);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .mode-card.active {
+      border-color: var(--action-primary);
+      background: rgba(0, 179, 126, 0.1);
+    }
+
+    /* Utilitário para troca de fases */
+    .phase { display: none; }
+    .phase.active { display: block; animation: fadeSlideUp 0.4s ease-out; }
+  </style>
+</head>
+
+<body>
+  <div class="app-container">
+    
+    <!-- Sidebar (reutilizando do dashboard para consistência) -->
+    <aside style="width: 280px; height: 100vh; background: rgba(5, 5, 5, 0.8); backdrop-filter: blur(20px); border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; position: sticky; top: 0;">
+      <div class="p-6 mb-8 flex-row items-center gap-3">
+        <div style="width: 32px; height: 32px; background: var(--action-primary); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+          <i data-lucide="zap" style="color: white; width: 18px; height: 18px;"></i>
+        </div>
+        <h1 style="font-size: 1.1rem; font-weight: 700;">Motor Conect</h1>
+      </div>
+      <nav style="flex: 1;">
+        <a href="dashboard.html" style="display: flex; align-items: center; gap: 1rem; padding: 0.875rem 1.25rem; color: var(--text-secondary); text-decoration: none; border-radius: 10px; margin: 0.25rem 1rem;">
+          <i data-lucide="layout-grid" style="width: 18px;"></i> Dashboard
+        </a>
+        <a href="analise_unificada.html" style="display: flex; align-items: center; gap: 1rem; padding: 0.875rem 1.25rem; color: var(--color-green-500); background: rgba(0, 179, 126, 0.1); border: 1px solid rgba(0, 179, 126, 0.2); text-decoration: none; border-radius: 10px; margin: 0.25rem 1rem; font-weight: 600;">
+          <i data-lucide="file-text" style="width: 18px;"></i> Nova Auditoria
+        </a>
+      </nav>
+    </aside>
+
+    <main class="main-content">
+      
+      <!-- Stepper Progressivo -->
+      <div class="stepper-header" style="max-width: 600px; margin-left: auto; margin-right: auto;">
+        <div class="step-item active" id="step-1-head">
+          <div class="step-dot">1</div>
+          <span class="text-muted" style="font-size: 0.75rem;">Configuração</span>
+        </div>
+        <div class="step-item" id="step-2-head">
+          <div class="step-dot">2</div>
+          <span class="text-muted" style="font-size: 0.75rem;">Dados/Upload</span>
+        </div>
+        <div class="step-item" id="step-3-head">
+          <div class="step-dot">3</div>
+          <span class="text-muted" style="font-size: 0.75rem;">Resultado</span>
+        </div>
+      </div>
+
+      <div id="workspace-container" style="max-width: 900px; margin: 0 auto;">
+        
+        <!-- FASE 1: ESCOLHA DO MODO -->
+        <section id="phase-1" class="phase active">
+          <div class="mb-8">
+            <h2 class="text-h1">Como deseja iniciar?</h2>
+            <p class="text-body text-muted">Selecione o método de entrada de dados para a auditoria.</p>
+          </div>
+
+          <div class="flex-row gap-6 mb-12">
+            <div class="mode-card active" onclick="selectMode('smart')" id="mode-smart">
+              <div style="background: rgba(10, 132, 255, 0.1); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem;">
+                <i data-lucide="sparkles" style="color: var(--color-blue-500);"></i>
+              </div>
+              <h3 class="text-h2" style="font-size: 1.1rem; margin-bottom: 0.5rem;">Análise Inteligente</h3>
+              <p class="text-body text-muted" style="font-size: 0.85rem;">Extraia dados automaticamente de PDFs do e-CAC e XMLs de faturamento via IA.</p>
+            </div>
+
+            <div class="mode-card" onclick="selectMode('manual')" id="mode-manual">
+              <div style="background: rgba(255, 255, 255, 0.05); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem;">
+                <i data-lucide="keyboard" style="color: var(--text-secondary);"></i>
+              </div>
+              <h3 class="text-h2" style="font-size: 1.1rem; margin-bottom: 0.5rem;">Entrada Manual</h3>
+              <p class="text-body text-muted" style="font-size: 0.85rem;">Deseja apenas simular um cenário rápido? Informe os valores manualmente.</p>
+            </div>
+          </div>
+
+          <div class="flex-row justify-end">
+            <button class="btn btn-primary" onclick="goToPhase(2)">Continuar <i data-lucide="arrow-right" style="width: 16px;"></i></button>
+          </div>
+        </section>
+
+        <!-- FASE 2: INPUT (MANUAL OU SMART) -->
+        <section id="phase-2" class="phase">
+          <!-- O conteúdo aqui será injetado dinamicamente via JS -->
+          <div id="input-content"></div>
+          
+          <div class="flex-row justify-between mt-12 pt-6 border-t" style="border-color: var(--border-subtle);">
+            <button class="btn btn-ghost" onclick="goToPhase(1)">Voltar</button>
+            <button class="btn btn-primary" id="btn-processar" onclick="processAnalysis()">Iniciar Diagnóstico</button>
+          </div>
+        </section>
+
+        <!-- FASE 3: PROCESSAMENTO (LOADING / ENGINE) -->
+        <section id="phase-loading" class="phase">
+          <div class="flex-col items-center justify-center py-20 text-center">
+            <div class="spinner" style="width: 64px; height: 64px; border-width: 4px; margin-bottom: 2rem;"></div>
+            <h2 class="text-h1">Processando Auditoria...</h2>
+            <p class="text-body text-muted mb-8">O Motor Universal está aplicando as regras da LC 123/2006 e LC 214/2025.</p>
+            
+            <div class="glass-card" style="max-width: 400px; width: 100%; padding: 1rem; text-align: left;">
+              <div id="engine-logs" class="text-body" style="font-family: monospace; font-size: 0.75rem; color: var(--color-green-500);">
+                > Inicializando Engine v2.0...<br>
+                > Validando integridade dos arquivos...<br>
+                <span class="animate-pulse">> Aplicando limpeza (Higienização Akita)...</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- FASE 4: RESULTADO FINAL -->
+        <section id="phase-3" class="phase">
+          <div id="result-content">
+            <!-- Estrutura do resultado premium vinda do resultado.html -->
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    let currentPhase = 1;
+    let selectedMode = 'smart';
+
+    function selectMode(mode) {
+      selectedMode = mode;
+      document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('active'));
+      document.getElementById(`mode-${mode}`).classList.add('active');
+    }
+
+    function goToPhase(phase) {
+      document.querySelectorAll('.phase').forEach(p => p.classList.remove('active'));
+      
+      // Update Stepper Headers
+      for(let i=1; i<=3; i++) {
+        const head = document.getElementById(`step-${i}-head`);
+        if(i < phase) head.className = 'step-item completed';
+        else if(i === phase) head.className = 'step-item active';
+        else head.className = 'step-item';
+      }
+
+      const nextPhase = document.getElementById(`phase-${phase}`);
+      nextPhase.classList.add('active');
+      currentPhase = phase;
+
+      if (phase === 2) {
+        renderInputForm();
+      }
+      lucide.createIcons();
+    }
+
+    function renderInputForm() {
+      const container = document.getElementById('input-content');
+      if (selectedMode === 'smart') {
+        container.innerHTML = `
+          <div class="mb-8">
+            <h2 class="text-h1">Upload de Documentos</h2>
+            <p class="text-body text-muted">Arraste os arquivos oficiais para uma extração precisa.</p>
+          </div>
+          <div class="drop-zone" id="drop-zone">
+            <i data-lucide="upload-cloud" style="width: 48px; height: 48px; color: var(--text-secondary); margin-bottom: 1rem;"></i>
+            <p class="text-h2" style="font-size: 1.1rem;">Arraste arquivos aqui</p>
+            <p class="text-muted">PGDAS-D (.pdf), XMLs (.xml), Folha (.csv)</p>
+            <input type="file" id="file-input" multiple style="display: none;">
+          </div>
+          <div id="file-list" class="mt-6 flex-col gap-2"></div>
+        `;
+      } else {
+        container.innerHTML = `
+          <div class="mb-8">
+            <h2 class="text-h1">Dados da Empresa</h2>
+            <p class="text-body text-muted">Preencha os campos para simular o diagnóstico fiscal.</p>
+          </div>
+          <div class="glass-card flex-col gap-6">
+            <div class="input-group">
+              <label class="input-label">CNPJ</label>
+              <input type="text" class="input-field" placeholder="00.000.000/0000-00">
+            </div>
+            <div class="flex-row gap-4">
+              <div class="input-group flex-1">
+                <label class="input-label">Regime Atual</label>
+                <select class="input-field">
+                  <option>Simples Nacional</option>
+                  <option>Lucro Presumido</option>
+                </select>
+              </div>
+              <div class="input-group flex-1">
+                <label class="input-label">Faturamento Mensal (RPA)</label>
+                <input type="text" class="input-field" placeholder="R$ 0,00">
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      lucide.createIcons();
+    }
+
+    function processAnalysis() {
+      // Transition to loading phase
+      document.querySelectorAll('.phase').forEach(p => p.classList.remove('active'));
+      document.getElementById('phase-loading').classList.add('active');
+      
+      // Simular processamento da Engine (Akita Rails style)
+      const logs = [
+        "> Extraindo metadados fiscais...",
+        "> Identificando divergências RBT12 vs DAS...",
+        "> Simulando transição CBS (8.8%) e IBS (17.7%)...",
+        "> Calculando Delta de Opt-Out...",
+        "> Diagnóstico Concluído. Gerando insights."
+      ];
+      
+      let i = 0;
+      const logContainer = document.getElementById('engine-logs');
+      const interval = setInterval(() => {
+        if(i < logs.length) {
+          logContainer.innerHTML += `<br>> ${logs[i]}`;
+          i++;
+        } else {
+          clearInterval(interval);
+          finishAnalysis();
+        }
+      }, 1000);
+    }
+
+    function finishAnalysis() {
+      goToPhase(3);
+      const content = document.getElementById('result-content');
+      content.innerHTML = `
+        <div class="flex-row justify-between items-start mb-10">
+          <div>
+            <h2 class="text-h1">Diagnóstico Concluído</h2>
+            <p class="text-success" style="font-weight: 600;">Economia Estimada: R$ 42.900/ano no cenário Opt-Out</p>
+          </div>
+          <button class="btn btn-primary"><i data-lucide="download"></i> Exportar PDF</button>
+        </div>
+
+        <div class="stat-grid">
+           <div class="glass-card" style="border-left: 4px solid var(--color-blue-500);">
+             <p class="text-muted">Simples Nacional (Atual)</p>
+             <h4 class="text-h1" style="font-size: 1.5rem;">12.42% <span style="font-size: 0.8rem; font-weight: 400;">Aliq. Efetiva</span></h4>
+           </div>
+           <div class="glass-card" style="border-left: 4px solid var(--color-green-500);">
+             <p class="text-muted">Opt-Out IVA (Recomendado)</p>
+             <h4 class="text-h1" style="font-size: 1.5rem;">9.85% <span style="font-size: 0.8rem; font-weight: 400;">Carga Líquida</span></h4>
+           </div>
+        </div>
+
+        <div class="glass-card mt-8">
+          <h3 class="text-h2 mb-4">Parecer do Auditor</h3>
+          <p class="text-body">A empresa apresenta um volume expressivo de vendas B2B (85%). Neste cenário, a manutenção no Simples Nacional Puro após 2027 acarretará perda de competitividade, visto que seus clientes não poderão creditar o IVA integralmente. <strong>Recomendamos migração para o Opt-Out IVA.</strong></p>
+        </div>
+      `;
+      lucide.createIcons();
+    }
+  </script>
+</body>
+</html>

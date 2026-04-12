@@ -21,8 +21,8 @@ os.environ.setdefault(
     "0" * 64,  # 32 bytes hex = 64 chars; 0x00 * 32 só pra testes
 )
 
-import storage_cifrado  # noqa: E402
-from storage_cifrado import (  # noqa: E402
+import services.storage_cifrado as storage_cifrado  # noqa: E402
+from services.storage_cifrado import (  # noqa: E402
     IntegridadeViolada,
     MasterKeyAusente,
     StorageCifradoError,

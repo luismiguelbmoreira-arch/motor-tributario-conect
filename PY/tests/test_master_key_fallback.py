@@ -18,8 +18,8 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import storage_cifrado  # noqa: E402
-from storage_cifrado import (  # noqa: E402
+import services.storage_cifrado as storage_cifrado  # noqa: E402
+from services.storage_cifrado import (  # noqa: E402
     MasterKeyAusente,
     _ler_key_de_arquivo,
     _master_key,
@@ -118,7 +118,7 @@ class TestFonteArquivo:
         key_file.write_text(HEX_32)
         monkeypatch.setenv("MOTOR_CONECT_MASTER_KEY_FILE", str(key_file))
         # Restaura a função real para usar o env var
-        import storage_cifrado as mod
+        import services.storage_cifrado as mod
         monkeypatch.setattr(mod, "_caminhos_padrao_arquivo", lambda: [key_file])
         assert len(_master_key()) == 32
 

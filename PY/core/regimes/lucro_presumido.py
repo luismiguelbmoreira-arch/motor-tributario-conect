@@ -17,7 +17,7 @@ GUARD CLAUSE (Camada 2):
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Dict, List
 
-from regimes.base import BaseRegimeEngine
+from core.regimes.base import BaseRegimeEngine
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONSTANTES LEGAIS — FROZEN (aprovadas por Luiz Moreira)

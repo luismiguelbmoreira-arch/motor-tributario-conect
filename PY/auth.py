@@ -41,6 +41,7 @@ if _jwt_secret_env:
     SECRET_KEY: str = _jwt_secret_env
 else:
     import secrets as _secrets
+
     SECRET_KEY = _secrets.token_hex(32)
     logger.warning(
         "⚠️  JWT_SECRET_KEY não configurada! "
@@ -67,12 +68,14 @@ _auth_engine = create_engine(
 # MODEL DE PERSISTÊNCIA
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class UserDB(SQLModel, table=True):
     """
     Tabela de usuários do sistema.
     Separada das tabelas fiscais — não contém dados tributários.
     Armazena apenas credenciais operacionais do escritório.
     """
+
     __tablename__ = "users"
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -90,19 +93,23 @@ class UserDB(SQLModel, table=True):
 # EXCEÇÕES CUSTOMIZADAS
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class AutenticacaoError(Exception):
     """Falha de autenticação — credenciais inválidas ou token expirado."""
+
     pass
 
 
 class UsuarioNaoEncontradoError(Exception):
     """Usuário não encontrado no banco."""
+
     pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # INICIALIZAÇÃO
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def criar_tabela_users() -> None:
     """
@@ -116,6 +123,7 @@ def criar_tabela_users() -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 # HASHING DE SENHA
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def verificar_senha(senha_plain: str, hashed: str) -> bool:
     """
@@ -143,6 +151,7 @@ def _hash_senha(senha_plain: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 # CRUD DE USUÁRIOS
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def criar_usuario(
     username: str,
@@ -172,15 +181,11 @@ def criar_usuario(
 
     with Session(_auth_engine) as session:
         # Verificação de unicidade antes de inserir
-        existente_username = session.exec(
-            select(UserDB).where(UserDB.username == username)
-        ).first()
+        existente_username = session.exec(select(UserDB).where(UserDB.username == username)).first()
         if existente_username:
             raise ValueError("Username já cadastrado.")
 
-        existente_email = session.exec(
-            select(UserDB).where(UserDB.email == email)
-        ).first()
+        existente_email = session.exec(select(UserDB).where(UserDB.email == email)).first()
         if existente_email:
             raise ValueError("E-mail já cadastrado.")
 
@@ -214,9 +219,7 @@ def autenticar_usuario(username: str, senha_plain: str) -> Optional[UserDB]:
         UserDB se autenticado, None caso contrário.
     """
     with Session(_auth_engine) as session:
-        user = session.exec(
-            select(UserDB).where(UserDB.username == username)
-        ).first()
+        user = session.exec(select(UserDB).where(UserDB.username == username)).first()
 
         # Falha silenciosa — não indica se username não existe ou senha errada
         if not user or not user.ativo:
@@ -346,29 +349,39 @@ def criar_admin_default() -> None:
     Cria usuário admin padrão se a tabela estiver vazia.
     Executado na startup da API — idempotente.
 
-    Credenciais padrão (TROCAR EM PRODUÇÃO):
+    Credenciais padrão:
         username: admin
-        senha:    Conect@2026!
-
-    AVISO: alterar a senha via endpoint após primeiro deploy.
+        senha:    via env DEFAULT_ADMIN_PASSWORD.
     """
     with Session(_auth_engine) as session:
         total = session.exec(select(UserDB)).first()
         if total is not None:
-            return  # Tabela não está vazia — não cria admin padrão
+            return  # Tabela não está vazia
+
+    senha_admin = os.environ.get("DEFAULT_ADMIN_PASSWORD")
+    if not senha_admin:
+        import secrets
+
+        senha_admin = secrets.token_urlsafe(12)
+        logger.warning(
+            "⚠️ DEFAULT_ADMIN_PASSWORD não configurada no .env! "
+            f"Senha do admin gerada aleatoriamente: {senha_admin} "
+            "SALVE ESTA SENHA. Ela não será exibida novamente."
+        )
 
     criar_usuario(
         username="admin",
         email="admin@conect.local",
-        senha_plain="Conect@2026!",
+        senha_plain=senha_admin,
         role="admin",
     )
-    logger.info("Admin padrão criado. TROCAR SENHA EM PRODUÇÃO.")
+    logger.info("Admin padrão inicializado com segurança.")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # JWT — Geração e verificação de tokens
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def gerar_token_jwt(user_id: int, username: str, role: str) -> str:
     """

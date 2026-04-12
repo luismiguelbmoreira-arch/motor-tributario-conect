@@ -14,7 +14,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
-from relatorio_pdf import _gerar_html, _secao_validacao_ecac  # noqa: E402
+from services.relatorio_pdf import _gerar_html, _secao_validacao_ecac  # noqa: E402
 
 
 def _diag_com_validacao(das_calc: str, das_ecac: str, delta: str, delta_pct: str) -> dict:

@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from api_motor import _validar_docs_por_regime, _detectar_tipo_documento, _sniff_xml_mod
+from main import _validar_docs_por_regime, _detectar_tipo_documento, _sniff_xml_mod
 
 
 # ── Testes de detecção de tipo ────────────────────────────────────────────────

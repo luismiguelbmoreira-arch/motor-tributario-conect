@@ -1,7 +1,7 @@
 import logging
 from decimal import Decimal
 
-from motor_tributario import EmpresaFornecedora
+from core.motor_tributario import EmpresaFornecedora
 
 # Configura logging para capturar avisos de conversão do motor
 logging.basicConfig(level=logging.INFO)

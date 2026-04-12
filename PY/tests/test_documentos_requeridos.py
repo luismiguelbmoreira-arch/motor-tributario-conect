@@ -26,7 +26,7 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from api_motor import app  # noqa: E402
+from main import app  # noqa: E402
 
 
 @pytest.fixture

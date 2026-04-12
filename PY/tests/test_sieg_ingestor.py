@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ.setdefault("MOTOR_CONECT_MASTER_KEY", "0" * 64)
 
 import database  # noqa: E402
-import storage_cifrado  # noqa: E402
+import services.storage_cifrado as storage_cifrado  # noqa: E402
 from integrations.sieg_adapter import (  # noqa: E402
     XML_TYPE_NFE,
     SiegAdapter,

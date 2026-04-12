@@ -14,14 +14,14 @@ import pytest
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
-from motor_tributario import (
+from core.motor_tributario import (
     EmpresaFornecedora,
     EmpresaCompradora,
     OperacaoFiscal,
     MotorReformaTributaria,
 )
-from regimes.mei import MEIEngine, SM_POR_ANO
-from regimes.lucro_presumido import LucroPresumidoEngine
+from core.regimes.mei import MEIEngine, SM_POR_ANO
+from core.regimes.lucro_presumido import LucroPresumidoEngine
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -253,7 +253,7 @@ class TestERR013RBT12Proporcional:
             ncm_nbs="84818099",
         )
         motor = MotorReformaTributaria(empresa_simples_nova, compradora, operacao)
-        rbt12 = motor.calcular_rbt12()
+        rbt12 = motor.rbt12
         # 6 meses de atividade (Jul 2026 -> Jan 2027)
         # RBT12 prop = (300000 / 6) * 12 = 600000
         assert rbt12 == Decimal("600000.00")
@@ -266,7 +266,7 @@ class TestERR013RBT12Proporcional:
             ncm_nbs="84818099",
         )
         motor = MotorReformaTributaria(empresa_simples, compradora, operacao)
-        rbt12 = motor.calcular_rbt12()
+        rbt12 = motor.rbt12
         assert rbt12 == Decimal("500000.00")
 
     def test_trilha_registra_proporcionalizacao(self, empresa_simples_nova, compradora):
@@ -277,7 +277,7 @@ class TestERR013RBT12Proporcional:
             ncm_nbs="84818099",
         )
         motor = MotorReformaTributaria(empresa_simples_nova, compradora, operacao)
-        motor.calcular_rbt12()
+        motor.rbt12
         ids = [p.get("id") for p in motor.trilha_auditoria]
         assert "RBT12_PROPORCIONAL" in ids
 
@@ -318,15 +318,15 @@ class TestERR016ReducaoCBSIBS:
     def test_integral_sem_reducao(self):
         """INTEGRAL: credito B2B = 100% do IVA."""
         motor = self._criar_motor("INTEGRAL")
-        credito = motor.calcular_credito_simples_para_b2b()
+        credito = motor.credito_b2b_simples
         assert credito > Decimal("0")
 
     def test_reducao_30_reduz_credito(self):
         """REDUCAO_30: credito = 70% do integral."""
         motor_integral = self._criar_motor("INTEGRAL")
         motor_red30 = self._criar_motor("REDUCAO_30")
-        credito_integral = motor_integral.calcular_credito_simples_para_b2b()
-        credito_red30 = motor_red30.calcular_credito_simples_para_b2b()
+        credito_integral = motor_integral.credito_b2b_simples
+        credito_red30 = motor_red30.credito_b2b_simples
         esperado = (credito_integral * Decimal("0.70")).quantize(Decimal("0.01"), ROUND_HALF_UP)
         assert credito_red30 == esperado
 
@@ -334,27 +334,27 @@ class TestERR016ReducaoCBSIBS:
         """REDUCAO_60: credito = 40% do integral."""
         motor_integral = self._criar_motor("INTEGRAL")
         motor_red60 = self._criar_motor("REDUCAO_60")
-        credito_integral = motor_integral.calcular_credito_simples_para_b2b()
-        credito_red60 = motor_red60.calcular_credito_simples_para_b2b()
+        credito_integral = motor_integral.credito_b2b_simples
+        credito_red60 = motor_red60.credito_b2b_simples
         esperado = (credito_integral * Decimal("0.40")).quantize(Decimal("0.01"), ROUND_HALF_UP)
         assert credito_red60 == esperado
 
     def test_isento_credito_zero(self):
         """ISENTO: credito = R$ 0,00."""
         motor = self._criar_motor("ISENTO")
-        credito = motor.calcular_credito_simples_para_b2b()
+        credito = motor.credito_b2b_simples
         assert credito == Decimal("0.00")
 
     def test_trilha_registra_reducao(self):
         """Trilha deve registrar passo REDUCAO_CBS_IBS quando nao INTEGRAL."""
         motor = self._criar_motor("REDUCAO_60")
-        motor.calcular_credito_simples_para_b2b()
+        motor.credito_b2b_simples
         ids = [p.get("id") for p in motor.trilha_auditoria]
         assert "REDUCAO_CBS_IBS" in ids
 
     def test_integral_nao_registra_passo(self):
         """INTEGRAL nao deve registrar passo de reducao."""
         motor = self._criar_motor("INTEGRAL")
-        motor.calcular_credito_simples_para_b2b()
+        motor.credito_b2b_simples
         ids = [p.get("id") for p in motor.trilha_auditoria]
         assert "REDUCAO_CBS_IBS" not in ids

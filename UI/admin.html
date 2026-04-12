@@ -1,480 +1,269 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="scroll-smooth">
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Administração — Motor Tributário Conect</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <title>Administração — Motor Conect</title>
+  
+  <!-- CSS Centralizado -->
+  <link rel="stylesheet" href="design_system.css">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
   <style>
-    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; }
-    input:focus, select:focus {
-      outline: none; border-color: #3b82f6;
-      box-shadow: 0 0 0 3px rgba(59,130,246,.18);
+    /* Estilos específicos para a tabela administrativa */
+    .admin-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
     }
-    .btn-primary { background:#2563eb;color:#fff;border-radius:8px;padding:8px 20px;font-weight:600;transition:background .2s; }
-    .btn-primary:hover:not(:disabled) { background:#1d4ed8; }
-    .btn-primary:disabled { opacity:.45;cursor:not-allowed; }
-    .btn-ghost { background:transparent;color:#64748b;border:1px solid #cbd5e1;border-radius:8px;padding:8px 16px;font-weight:500;transition:background .2s; }
-    .btn-ghost:hover { background:#f1f5f9; }
-    .badge-admin { background:#dbeafe;color:#1e40af;font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:999px; }
-    .badge-usuario { background:#f1f5f9;color:#475569;font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:999px; }
-    .badge-ativo { background:#dcfce7;color:#166534;font-size:.7rem;font-weight:600;padding:2px 8px;border-radius:999px; }
-    .badge-inativo { background:#fee2e2;color:#991b1b;font-size:.7rem;font-weight:600;padding:2px 8px;border-radius:999px; }
-    #modal-criar, #modal-confirm, #modal-reset { display:none; }
-    #modal-criar.open, #modal-confirm.open, #modal-reset.open { display:flex; }
-    .msg-error { color:#ef4444;font-size:.72rem;margin-top:2px; }
+    
+    .admin-table th {
+      text-align: left;
+      padding: 1rem;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border-subtle);
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+    
+    .admin-table td {
+      padding: 1rem;
+      font-size: 0.85rem;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+    }
+
+    .admin-table tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 99px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .status-active { background: rgba(0, 179, 126, 0.1); color: var(--color-green-500); }
+    .status-inactive { background: rgba(226, 88, 88, 0.1); color: var(--color-red-500); }
+
+    /* Toasts */
+    .toast-container {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      z-index: 1000;
+    }
+    
     .toast {
-      position:fixed;bottom:24px;right:24px;z-index:9999;
-      background:#1e293b;color:#f8fafc;padding:12px 20px;border-radius:10px;
-      font-size:.85rem;font-weight:500;
-      transform:translateY(100px);opacity:0;transition:all .3s;
-      pointer-events:none;
+      background: var(--color-gray-900);
+      border: 1px solid var(--border-subtle);
+      color: white;
+      padding: 1rem 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      margin-top: 0.5rem;
+      animation: fadeSlideUp 0.3s ease-out;
     }
-    .toast.show { transform:translateY(0);opacity:1; }
-    .toast.success { border-left:4px solid #22c55e; }
-    .toast.error   { border-left:4px solid #ef4444; }
   </style>
 </head>
-<body class="bg-slate-50 min-h-screen">
 
-  <!-- Header -->
-  <header class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between sticky top-0 z-40">
-    <div class="flex items-center gap-3">
-      <a href="dashboard.html" class="text-slate-400 hover:text-slate-600 transition-colors" title="Voltar ao Dashboard">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-      </a>
-      <span class="font-bold text-slate-800 text-lg">Administração</span>
-      <span class="text-xs bg-red-100 text-red-700 font-semibold px-2 py-0.5 rounded-full">Admin</span>
-    </div>
-    <span id="header-user" class="text-xs text-slate-400"></span>
-  </header>
-
-  <main class="max-w-5xl mx-auto px-4 py-8 space-y-6">
-
-    <!-- Stats row -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-      <div class="card p-4">
-        <p class="text-xs text-slate-500 font-medium">Total de Usuários</p>
-        <p id="stat-total" class="text-2xl font-bold text-slate-800 mt-1">—</p>
+<body>
+  <div class="app-container">
+    
+    <!-- Sidebar Shell (consistência visual) -->
+    <aside style="width: 280px; height: 100vh; background: rgba(5, 5, 5, 0.8); backdrop-filter: blur(20px); border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; position: sticky; top: 0;">
+      <div class="p-6 mb-8 flex-row items-center gap-3">
+        <div style="width: 32px; height: 32px; background: var(--action-primary); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+          <i data-lucide="zap" style="color: white; width: 18px; height: 18px;"></i>
+        </div>
+        <h1 style="font-size: 1.1rem; font-weight: 700;">Motor Conect</h1>
       </div>
-      <div class="card p-4">
-        <p class="text-xs text-slate-500 font-medium">Ativos</p>
-        <p id="stat-ativos" class="text-2xl font-bold text-emerald-700 mt-1">—</p>
-      </div>
-      <div class="card p-4">
-        <p class="text-xs text-slate-500 font-medium">Administradores</p>
-        <p id="stat-admins" class="text-2xl font-bold text-blue-700 mt-1">—</p>
-      </div>
-      <div class="card p-4">
-        <p class="text-xs text-slate-500 font-medium">Inativos</p>
-        <p id="stat-inativos" class="text-2xl font-bold text-red-600 mt-1">—</p>
-      </div>
-    </div>
+      <nav style="flex: 1;">
+        <a href="dashboard.html" style="display: flex; align-items: center; gap: 1rem; padding: 0.875rem 1.25rem; color: var(--text-secondary); text-decoration: none; border-radius: 10px; margin: 0.25rem 1rem;">
+          <i data-lucide="layout-grid" style="width: 18px;"></i> Dashboard
+        </a>
+        <a href="analise_unificada.html" style="display: flex; align-items: center; gap: 1rem; padding: 0.875rem 1.25rem; color: var(--text-secondary); text-decoration: none; border-radius: 10px; margin: 0.25rem 1rem;">
+          <i data-lucide="file-text" style="width: 18px;"></i> Nova Auditoria
+        </a>
+        <div class="mt-8 px-8 mb-2">
+          <p class="text-muted" style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">Gestão</p>
+        </div>
+        <a href="admin.html" style="display: flex; align-items: center; gap: 1rem; padding: 0.875rem 1.25rem; color: var(--color-green-500); background: rgba(0, 179, 126, 0.1); border: 1px solid rgba(0, 179, 126, 0.2); text-decoration: none; border-radius: 10px; margin: 0.25rem 1rem; font-weight: 600;">
+          <i data-lucide="users" style="width: 18px;"></i> Usuários
+        </a>
+      </nav>
+    </aside>
 
-    <!-- Tabela de usuários -->
-    <div class="card overflow-hidden">
-      <div class="px-5 py-4 flex items-center justify-between border-b border-slate-100">
-        <h2 class="font-bold text-slate-800">Usuários do Sistema</h2>
-        <button class="btn-primary text-sm" onclick="openModalCriar()">+ Novo Usuário</button>
-      </div>
-
-      <!-- Loading state -->
-      <div id="table-loading" class="py-12 flex justify-center">
-        <svg class="animate-spin w-8 h-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
-        </svg>
-      </div>
-
-      <!-- Empty state -->
-      <div id="table-empty" class="py-12 text-center text-slate-400 hidden">
-        <p class="text-sm">Nenhum usuário encontrado.</p>
-      </div>
-
-      <!-- Table -->
-      <div id="table-wrap" class="hidden overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="bg-slate-50 text-xs text-slate-500 uppercase tracking-wide">
-              <th class="text-left px-5 py-3 font-semibold">Usuário</th>
-              <th class="text-left px-5 py-3 font-semibold">E-mail</th>
-              <th class="text-left px-5 py-3 font-semibold">Perfil</th>
-              <th class="text-left px-5 py-3 font-semibold">Status</th>
-              <th class="text-left px-5 py-3 font-semibold">Último acesso</th>
-              <th class="text-right px-5 py-3 font-semibold">Ação</th>
-            </tr>
-          </thead>
-          <tbody id="user-table-body" class="divide-y divide-slate-100"></tbody>
-        </table>
-      </div>
-    </div>
-
-  </main>
-
-  <!-- Modal: Criar usuário -->
-  <div id="modal-criar" class="fixed inset-0 z-50 items-center justify-center bg-slate-900/60 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 p-6 space-y-4">
-      <h3 class="text-base font-bold text-slate-800">Novo Usuário</h3>
-
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Nome de usuário <span class="text-red-500">*</span></label>
-        <input id="new-username" type="text" maxlength="50" placeholder="ex: joao.silva"
-          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-          oninput="checkNewUser()">
-        <p id="new-username-err" class="msg-error hidden">Mínimo 3 caracteres, apenas letras, números, ponto e underline.</p>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">E-mail <span class="text-red-500">*</span></label>
-        <input id="new-email" type="email" placeholder="usuario@escritorio.com.br"
-          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-          oninput="checkNewUser()">
-        <p id="new-email-err" class="msg-error hidden">E-mail inválido.</p>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Senha temporária <span class="text-red-500">*</span></label>
-        <input id="new-password" type="password" placeholder="Mínimo 8 caracteres"
-          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-          oninput="checkNewUser()">
-        <p class="text-xs text-slate-400 mt-1">O usuário deverá alterar a senha no primeiro acesso.</p>
-        <p id="new-password-err" class="msg-error hidden">Mínimo 8 caracteres.</p>
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Perfil <span class="text-red-500">*</span></label>
-        <select id="new-role" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white" onchange="checkNewUser()">
-          <option value="">Selecione</option>
-          <option value="usuario">Usuário (analisa clientes)</option>
-          <option value="admin">Administrador (acesso total)</option>
-        </select>
-      </div>
-
-      <p id="criar-api-err" class="msg-error hidden"></p>
-
-      <div class="flex gap-3 justify-end pt-2">
-        <button class="btn-ghost text-sm" onclick="closeModalCriar()">Cancelar</button>
-        <button id="btn-criar-usuario" class="btn-primary text-sm" onclick="criarUsuario()" disabled>Criar usuário</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Confirmar desativar -->
-  <div id="modal-confirm" class="fixed inset-0 z-50 items-center justify-center bg-slate-900/60 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6 space-y-4">
-      <h3 class="text-base font-bold text-slate-800">Confirmar desativação</h3>
-      <p id="confirm-msg" class="text-sm text-slate-600"></p>
-      <p class="text-xs text-slate-400">O usuário não poderá mais acessar o sistema. Você pode reativá-lo manualmente via banco de dados.</p>
-      <div class="flex gap-3 justify-end">
-        <button class="btn-ghost text-sm" onclick="closeConfirm()">Cancelar</button>
-        <button id="btn-confirmar-desat" class="bg-red-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-red-700 transition-colors" onclick="confirmarDesativar()">
-          Sim, desativar
+    <main class="main-content">
+      
+      <!-- Header -->
+      <header class="flex-row justify-between items-center mb-10">
+        <div>
+          <h2 class="text-h1">Gestão de Usuários</h2>
+          <p class="text-body text-muted">Controle de acesso e segurança da plataforma.</p>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('modalCriar')">
+          <i data-lucide="plus"></i> Novo Usuário
         </button>
+      </header>
+
+      <!-- Stats Grid -->
+      <div class="flex-row gap-6 mb-8">
+        <div class="glass-card flex-1" style="padding: 1.25rem;">
+          <p class="text-muted" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Total</p>
+          <h4 class="text-h1" id="stat-total" style="font-size: 1.5rem;">--</h4>
+        </div>
+        <div class="glass-card flex-1" style="padding: 1.25rem;">
+          <p class="text-muted" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Ativos</p>
+          <h4 class="text-h1 text-success" id="stat-ativos" style="font-size: 1.5rem;">--</h4>
+        </div>
+        <div class="glass-card flex-1" style="padding: 1.25rem;">
+          <p class="text-muted" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Admins</p>
+          <h4 class="text-h1" id="stat-admins" style="font-size: 1.5rem; color: var(--color-blue-500);">--</h4>
+        </div>
+      </div>
+
+      <!-- Tabela -->
+      <div class="glass-card" style="padding: 0;">
+        <div id="table-loading" class="p-20 text-center">
+          <div class="spinner mx-auto mb-4"></div>
+          <p class="text-muted">Carregando usuários...</p>
+        </div>
+
+        <div id="table-wrap" class="step-hidden">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Usuário / E-mail</th>
+                <th>Perfil</th>
+                <th>Status</th>
+                <th>Último Acesso</th>
+                <th style="text-align: right;">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="user-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Modais -->
+  <!-- Criar Usuário -->
+  <div id="modalCriar" class="step-hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 100;">
+    <div class="glass-card" style="max-width: 450px; width: 100%;">
+      <h3 class="text-h2 mb-6">Novo Usuário</h3>
+      <div class="flex-col gap-4">
+        <div class="input-group">
+          <label class="input-label">Nome de Usuário</label>
+          <input type="text" id="new-username" class="input-field" placeholder="ex: joao.silva">
+        </div>
+        <div class="input-group">
+          <label class="input-label">E-mail</label>
+          <input type="email" id="new-email" class="input-field" placeholder="email@exemplo.com">
+        </div>
+        <div class="input-group">
+          <label class="input-label">Perfil</label>
+          <select id="new-role" class="input-field">
+            <option value="usuario">Analista</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label class="input-label">Senha Temporária</label>
+          <input type="password" id="new-password" class="input-field" placeholder="Mínimo 8 caracteres">
+        </div>
+        <div class="flex-row justify-end gap-3 mt-6">
+          <button class="btn btn-ghost" onclick="closeModal('modalCriar')">Cancelar</button>
+          <button class="btn btn-primary" onclick="criarUsuario()">Criar Acesso</button>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Modal: Reset de senha -->
-  <div id="modal-reset" class="fixed inset-0 z-50 items-center justify-center bg-slate-900/60 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 p-6 space-y-4">
-      <h3 class="text-base font-bold text-slate-800">Redefinir senha</h3>
-      <p id="reset-msg" class="text-sm text-slate-600"></p>
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Nova senha <span class="text-red-500">*</span></label>
-        <input id="reset-nova-senha" type="password" placeholder="Mínimo 8 caracteres"
-          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" oninput="checkReset()">
-        <p class="text-xs text-slate-400 mt-1">O usuário deverá usar esta senha no próximo login.</p>
-      </div>
-      <div>
-        <label class="block text-sm font-medium text-slate-700 mb-1">Confirmar nova senha <span class="text-red-500">*</span></label>
-        <input id="reset-confirmar-senha" type="password" placeholder="Digite novamente"
-          class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" oninput="checkReset()">
-        <p id="reset-mismatch" class="text-xs text-red-600 mt-1 hidden">As senhas não coincidem.</p>
-      </div>
-      <p id="reset-api-err" class="msg-error hidden"></p>
-      <div class="flex gap-3 justify-end pt-2">
-        <button class="btn-ghost text-sm" onclick="closeReset()">Cancelar</button>
-        <button id="btn-confirmar-reset" class="btn-primary text-sm" onclick="confirmarReset()" disabled>Redefinir senha</button>
-      </div>
-    </div>
-  </div>
+  <div id="toast-container" class="toast-container"></div>
 
-  <!-- Toast -->
-  <div id="toast" class="toast"></div>
+  <script>
+    lucide.createIcons();
 
-<script>
-  const API_BASE   = window.location.origin;
-  const token      = sessionStorage.getItem('token');
-  const role       = sessionStorage.getItem('role');
-  const username   = sessionStorage.getItem('username');
-  let pendingDesat = null;
+    const API_BASE = window.location.origin;
+    const token = sessionStorage.getItem('token');
 
-  // Auth + role guard
-  if (!token) { window.location.href = 'login.html'; }
-  if (role !== 'admin') { window.location.href = 'dashboard.html'; }
-  document.getElementById('header-user').textContent = username || '';
+    async function loadUsers() {
+      try {
+        const res = await fetch(`${API_BASE}/admin/usuarios`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const users = await res.json();
+        
+        document.getElementById('table-loading').classList.add('step-hidden');
+        document.getElementById('table-wrap').classList.remove('step-hidden');
 
-  // ── Carregar usuários ──
-  async function carregarUsuarios() {
-    try {
-      const res = await fetch(`${API_BASE}/admin/usuarios`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.status === 401) { sessionStorage.clear(); window.location.href = 'login.html'; return; }
-      if (res.status === 403) { window.location.href = 'dashboard.html'; return; }
-      if (!res.ok) throw new Error('Erro ao carregar usuários');
+        // Stats
+        document.getElementById('stat-total').innerText = users.length;
+        document.getElementById('stat-ativos').innerText = users.filter(u => u.ativo).length;
+        document.getElementById('stat-admins').innerText = users.filter(u => u.role === 'admin').length;
 
-      const lista = await res.json();
-      document.getElementById('table-loading').classList.add('hidden');
-
-      if (!lista.length) {
-        document.getElementById('table-empty').classList.remove('hidden');
-        return;
+        const tbody = document.getElementById('user-table-body');
+        tbody.innerHTML = users.map(u => `
+          <tr>
+            <td>
+              <div class="flex-col">
+                <span style="font-weight: 600;">${u.username}</span>
+                <span class="text-muted" style="font-size: 0.75rem;">${u.email || ''}</span>
+              </div>
+            </td>
+            <td>
+              <span class="text-muted" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">${u.role}</span>
+            </td>
+            <td>
+              <span class="status-badge ${u.ativo ? 'status-active' : 'status-inactive'}">
+                ${u.ativo ? 'Ativo' : 'Inativo'}
+              </span>
+            </td>
+            <td>
+              <span class="text-muted" style="font-size: 0.75rem;">${u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleDateString() : 'Nunca'}</span>
+            </td>
+            <td style="text-align: right;">
+              <button class="btn btn-ghost" style="padding: 0.4rem;" title="Resetar Senha" onclick="resetSenha(${u.id})">
+                <i data-lucide="key" style="width: 14px;"></i>
+              </button>
+              <button class="btn btn-ghost" style="padding: 0.4rem; color: var(--color-red-500);" title="Desativar" onclick="desativarUsuario(${u.id})">
+                <i data-lucide="user-minus" style="width: 14px;"></i>
+              </button>
+            </td>
+          </tr>
+        `).join('');
+        lucide.createIcons();
+      } catch (err) {
+        showToast('Erro ao carregar usuários', 'error');
       }
-
-      document.getElementById('table-wrap').classList.remove('hidden');
-
-      // Stats
-      const total   = lista.length;
-      const ativos  = lista.filter(u => u.ativo).length;
-      const admins  = lista.filter(u => u.role === 'admin').length;
-      const inats   = total - ativos;
-      document.getElementById('stat-total').textContent   = total;
-      document.getElementById('stat-ativos').textContent  = ativos;
-      document.getElementById('stat-admins').textContent  = admins;
-      document.getElementById('stat-inativos').textContent = inats;
-
-      // Rows
-      const tbody = document.getElementById('user-table-body');
-      tbody.innerHTML = '';
-      lista.forEach(u => {
-        const isMe = u.username === username;
-        const tr = document.createElement('tr');
-        tr.className = 'hover:bg-slate-50 transition-colors';
-        tr.innerHTML = `
-          <td class="px-5 py-3 font-medium text-slate-800">${escHtml(u.username)}${isMe ? ' <span class="text-xs text-slate-400">(você)</span>' : ''}</td>
-          <td class="px-5 py-3 text-slate-600">${escHtml(u.email || '—')}</td>
-          <td class="px-5 py-3"><span class="badge-${u.role}">${u.role === 'admin' ? 'Admin' : 'Usuário'}</span></td>
-          <td class="px-5 py-3"><span class="badge-${u.ativo ? 'ativo' : 'inativo'}">${u.ativo ? 'Ativo' : 'Inativo'}</span></td>
-          <td class="px-5 py-3 text-slate-400 text-xs">${formatDate(u.ultimo_acesso)}</td>
-          <td class="px-5 py-3 text-right flex gap-3 justify-end">
-            <button onclick="abrirResetSenha(${u.id}, '${escHtml(u.username)}')"
-              class="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors">Resetar Senha</button>
-            ${u.ativo && !isMe
-              ? `<button onclick="abrirConfirmDesat(${u.id}, '${escHtml(u.username)}')"
-                   class="text-xs text-red-600 hover:text-red-800 font-medium transition-colors">Desativar</button>`
-              : `<span class="text-xs text-slate-300">—</span>`
-            }
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-
-    } catch (e) {
-      document.getElementById('table-loading').classList.add('hidden');
-      showToast('Erro ao carregar usuários: ' + e.message, 'error');
     }
-  }
 
-  function escHtml(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-  function formatDate(iso) {
-    if (!iso) return '—';
-    try {
-      return new Date(iso).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
-    } catch { return iso; }
-  }
+    function openModal(id) { document.getElementById(id).classList.replace('step-hidden', 'step-visible'); }
+    function closeModal(id) { document.getElementById(id).classList.replace('step-visible', 'step-hidden'); }
 
-  // ── Modal criar usuário ──
-  function openModalCriar() {
-    ['new-username','new-email','new-password'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('new-role').value = '';
-    document.getElementById('criar-api-err').classList.add('hidden');
-    const btn = document.getElementById('btn-criar-usuario');
-    btn.textContent = 'Criar usuário';
-    btn.disabled = true;
-    checkNewUser();
-    document.getElementById('modal-criar').classList.add('open');
-  }
-  function closeModalCriar() {
-    document.getElementById('modal-criar').classList.remove('open');
-  }
-
-  function checkNewUser() {
-    const u = document.getElementById('new-username').value.trim();
-    const e = document.getElementById('new-email').value.trim();
-    const p = document.getElementById('new-password').value;
-    const r = document.getElementById('new-role').value;
-    const uOk = /^[a-zA-Z0-9._]{3,50}$/.test(u);
-    const eOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
-    const pOk = p.length >= 8;
-    const rOk = r !== '';
-    document.getElementById('btn-criar-usuario').disabled = !(uOk && eOk && pOk && rOk);
-  }
-
-  async function criarUsuario() {
-    const btn = document.getElementById('btn-criar-usuario');
-    btn.disabled = true; btn.textContent = 'Criando…';
-    document.getElementById('criar-api-err').classList.add('hidden');
-
-    const payload = {
-      username: document.getElementById('new-username').value.trim(),
-      email:    document.getElementById('new-email').value.trim(),
-      password: document.getElementById('new-password').value,
-      role:     document.getElementById('new-role').value,
-    };
-
-    try {
-      const res = await fetch(`${API_BASE}/admin/usuarios`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(payload),
-      });
-      if (res.status === 401) { sessionStorage.clear(); window.location.href = 'login.html'; return; }
-
-      const data = await res.json();
-      if (!res.ok) {
-        const errMsg = data.detail || 'Erro ao criar usuário.';
-        document.getElementById('criar-api-err').textContent = errMsg;
-        document.getElementById('criar-api-err').classList.remove('hidden');
-        btn.disabled = false; btn.textContent = 'Criar usuário';
-        return;
-      }
-
-      closeModalCriar();
-      showToast(`Usuário "${data.username}" criado com sucesso.`, 'success');
-      carregarUsuarios();
-
-    } catch (e) {
-      document.getElementById('criar-api-err').textContent = 'Erro de conexão.';
-      document.getElementById('criar-api-err').classList.remove('hidden');
-      btn.disabled = false; btn.textContent = 'Criar usuário';
+    function showToast(msg, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.innerText = msg;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 4000);
     }
-  }
 
-  // ── Reset de senha ──
-  let pendingReset = null;
-
-  function abrirResetSenha(id, nome) {
-    pendingReset = id;
-    document.getElementById('reset-msg').textContent = `Definir nova senha para o usuário "${nome}".`;
-    document.getElementById('reset-nova-senha').value = '';
-    document.getElementById('reset-confirmar-senha').value = '';
-    document.getElementById('reset-mismatch').classList.add('hidden');
-    document.getElementById('reset-api-err').classList.add('hidden');
-    document.getElementById('btn-confirmar-reset').disabled = true;
-    document.getElementById('btn-confirmar-reset').textContent = 'Redefinir senha';
-    document.getElementById('modal-reset').classList.add('open');
-    document.getElementById('reset-nova-senha').focus();
-  }
-
-  function closeReset() {
-    document.getElementById('modal-reset').classList.remove('open');
-    pendingReset = null;
-  }
-
-  function checkReset() {
-    const p = document.getElementById('reset-nova-senha').value;
-    const c = document.getElementById('reset-confirmar-senha').value;
-    const mismatchEl = document.getElementById('reset-mismatch');
-    const btn = document.getElementById('btn-confirmar-reset');
-
-    if (p.length < 8) {
-      mismatchEl.classList.add('hidden');
-      btn.disabled = true;
-      return;
-    }
-    if (c.length > 0 && p !== c) {
-      mismatchEl.classList.remove('hidden');
-      btn.disabled = true;
-      return;
-    }
-    mismatchEl.classList.add('hidden');
-    btn.disabled = !(p.length >= 8 && p === c);
-  }
-
-  async function confirmarReset() {
-    if (!pendingReset) return;
-    const nova_senha = document.getElementById('reset-nova-senha').value;
-    if (nova_senha.length < 8) return;
-
-    const btn = document.getElementById('btn-confirmar-reset');
-    btn.disabled = true; btn.textContent = 'Salvando…';
-    document.getElementById('reset-api-err').classList.add('hidden');
-
-    try {
-      const res = await fetch(`${API_BASE}/admin/usuarios/${pendingReset}/reset-senha`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ nova_senha }),
-      });
-      if (res.status === 401) { sessionStorage.clear(); window.location.href = 'login.html'; return; }
-      const data = await res.json();
-      if (!res.ok) {
-        document.getElementById('reset-api-err').textContent = data.detail || 'Erro ao redefinir.';
-        document.getElementById('reset-api-err').classList.remove('hidden');
-        btn.disabled = false; btn.textContent = 'Redefinir senha';
-        return;
-      }
-      closeReset();
-      showToast('Senha redefinida com sucesso. Informe a nova senha ao usuário.', 'success');
-    } catch {
-      document.getElementById('reset-api-err').textContent = 'Erro de conexão.';
-      document.getElementById('reset-api-err').classList.remove('hidden');
-      btn.disabled = false; btn.textContent = 'Redefinir senha';
-    }
-  }
-
-  // ── Desativar ──
-  function abrirConfirmDesat(id, nome) {
-    pendingDesat = id;
-    document.getElementById('confirm-msg').textContent = `Desativar o usuário "${nome}"? Ele perderá acesso imediato ao sistema.`;
-    document.getElementById('modal-confirm').classList.add('open');
-  }
-  function closeConfirm() {
-    document.getElementById('modal-confirm').classList.remove('open');
-    pendingDesat = null;
-  }
-
-  async function confirmarDesativar() {
-    if (!pendingDesat) return;
-    const id = pendingDesat;
-    closeConfirm();
-
-    try {
-      const res = await fetch(`${API_BASE}/admin/usuarios/${id}/desativar`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
-      if (res.status === 401) { sessionStorage.clear(); window.location.href = 'login.html'; return; }
-      const data = await res.json();
-      if (!res.ok) {
-        showToast(data.detail || 'Erro ao desativar.', 'error');
-        return;
-      }
-      showToast('Usuário desativado com sucesso.', 'success');
-      carregarUsuarios();
-    } catch {
-      showToast('Erro de conexão.', 'error');
-    }
-  }
-
-  // ── Toast ──
-  function showToast(msg, type = 'success') {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.className   = `toast ${type}`;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3500);
-  }
-
-  // Init
-  carregarUsuarios();
-</script>
+    // Call init
+    loadUsers();
+  </script>
 </body>
 </html>

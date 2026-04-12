@@ -76,7 +76,6 @@ from slowapi.util import get_remote_address  # noqa: E402
 # Adiciona PY/ ao path para imports relativos
 sys.path.insert(0, str(Path(__file__).parent))
 
-from audit_universal import auditar_empresa  # noqa: E402
 from auth import (  # noqa: E402
     autenticar_usuario,
     criar_admin_default,
@@ -90,7 +89,7 @@ from auth import (  # noqa: E402
     trocar_senha_proprio,
     verificar_token,
 )
-from motor_tributario import (  # noqa: E402
+from core.motor_tributario import (  # noqa: E402
     EmpresaCompradora,
     EmpresaFornecedora,
     MotorReformaTributaria,
@@ -103,7 +102,7 @@ from utils.periodo_base import derivar as derivar_periodo  # noqa: E402
 
 # relatorio_pdf importado lazy no endpoint — evita crash de startup se GTK ausente (Windows)
 try:
-    from relatorio_pdf import gerar_pdf as _gerar_pdf
+    from services.relatorio_pdf import gerar_pdf as _gerar_pdf
     _RELATORIO_DISPONIVEL = True
 except Exception:
     _gerar_pdf = None  # type: ignore
@@ -482,7 +481,7 @@ def perfil_cnae(
     Retorna sugestão de perfil B2B/B2C e Anexo para o CNAE informado.
     Usado pelo frontend para pré-preencher campos automaticamente.
     """
-    from tabelas_simples import determinar_anexo_por_cnae_com_fonte, estimar_perfil_b2b
+    from core.tabelas_simples import determinar_anexo_por_cnae_com_fonte, estimar_perfil_b2b
     anexo, fonte = determinar_anexo_por_cnae_com_fonte(cnae)
     pct_b2b = estimar_perfil_b2b(cnae)
     return {
@@ -500,81 +499,10 @@ def perfil_cnae(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ENDPOINTS — Auditoria PDF (existentes — sem auth por ora)
+# ENDPOINTS — Otimização de Planejamento Documental (Novo Core)
 # ─────────────────────────────────────────────────────────────────────────────
 
-@app.post("/auditar", response_model=AuditResult, tags=["auditoria"])
-def auditar(req: AuditarRequest):
-    """
-    Audita uma empresa a partir da pasta com PDFs do e-CAC.
-
-    Pipeline:
-      1. Claude Vision extrai dados dos PDFs
-      2. Motor calcula DAS (Simples Nacional, multi-atividade se detectado)
-      3. Compara com DAS pago no e-CAC
-      4. Retorna delta + status APROVADO/REVISAR
-
-    Erros HTTP:
-      404 — pasta não encontrada
-      422 — erro de configuração (RBT12 inválido, sem PDFs, etc.)
-      500 — erro interno (contate o suporte)
-    """
-    try:
-        resultado = auditar_empresa(req.pasta_empresa)
-        return AuditResult(**resultado)
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
-    except (ValueError, RuntimeError) as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-    except Exception as exc:
-        logger.error("Erro inesperado em POST /auditar: %s", type(exc).__name__)
-        raise HTTPException(status_code=500, detail="Erro interno — contate o suporte.")
-
-
-@app.post("/auditar/batch", response_model=BatchResult, tags=["auditoria"])
-def auditar_batch(req: AuditarBatchRequest):
-    """
-    Audita todas as empresas (subpastas) dentro de pasta_base.
-
-    Falhas individuais não abortam o batch — retornadas em `erros[]`.
-    Útil para processar todos os clientes do escritório de uma vez.
-    """
-    pasta_base = Path(req.pasta_base)
-    if not pasta_base.exists():
-        raise HTTPException(
-            status_code=404,
-            detail=f"Pasta base não encontrada: {pasta_base}",
-        )
-
-    subpastas = sorted(p for p in pasta_base.iterdir() if p.is_dir())
-    if not subpastas:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Nenhuma subpasta encontrada em: {pasta_base}",
-        )
-
-    resultados: list[AuditResult] = []
-    erros: list[dict] = []
-
-    for pasta in subpastas:
-        try:
-            resultado = auditar_empresa(str(pasta))
-            resultados.append(AuditResult(**resultado))
-        except Exception as exc:
-            erros.append({"empresa": pasta.name, "erro": str(exc)})
-            logger.warning("Batch: falha em %s — %s", pasta.name, type(exc).__name__)
-
-    aprovados = sum(1 for r in resultados if r.status == "APROVADO")
-
-    return BatchResult(
-        total=len(resultados) + len(erros),
-        aprovados=aprovados,
-        revisao=len(resultados) - aprovados,
-        erros_extracao=len(erros),
-        resultados=resultados,
-        erros=erros,
-    )
-
+# Futuramente, as rotas que consomem o planejamento_tributario.py serão injetadas aqui.
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ENDPOINTS — Autenticação (público: /auth/login)
@@ -1459,7 +1387,7 @@ async def analise_pdf(
 
     # Pipeline de extração + auditoria documental
     try:
-        from extrator_pdfs import processar_pdfs_bytes
+        from services.extrator_pdfs import processar_pdfs_bytes
 
         payload = processar_pdfs_bytes(
             conteudos_pdf,
@@ -1527,7 +1455,7 @@ async def analise_pdf(
         ):
             try:
                 from database import aceitar_documento, registrar_documento_auditoria
-                from storage_cifrado import cifrar_e_persistir, hash_documento
+                from services.storage_cifrado import cifrar_e_persistir, hash_documento
                 cnpj_empresa = (payload.get("pii") or {}).get("cnpj", "")
                 if cnpj_empresa:
                     hash_doc = hash_documento(conteudo_extra)
@@ -1720,7 +1648,7 @@ async def gerar_dossie_prova(
         buscar_documentos_por_cnpj,
         registrar_acesso_documento,
     )
-    from storage_cifrado import anonimizar_cnpj, decifrar
+    from services.storage_cifrado import anonimizar_cnpj, decifrar
 
     # Normaliza CNPJ: remove qualquer não-dígito, exige 14 dígitos
     apenas_digitos = "".join(c for c in (cnpj_digitos or "") if c.isdigit())

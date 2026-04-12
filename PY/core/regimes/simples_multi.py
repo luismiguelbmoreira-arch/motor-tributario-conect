@@ -22,8 +22,8 @@ GUARD CLAUSE (Camada 2):
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Dict, List
 
-from regimes.base import BaseRegimeEngine
-from tabelas_simples import (
+from core.regimes.base import BaseRegimeEngine
+from core.tabelas_simples import (
     DISTRIBUICAO_DAS,
     TABELAS_ANEXOS,
     TETO_SIMPLES_NACIONAL,

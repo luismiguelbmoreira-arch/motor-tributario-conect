@@ -18,13 +18,13 @@ from decimal import Decimal  # noqa: E402
 
 import pytest  # noqa: E402
 
-from motor_tributario import (  # noqa: E402
+from core.motor_tributario import (  # noqa: E402
     EmpresaCompradora,
     EmpresaFornecedora,
     MotorReformaTributaria,
     OperacaoFiscal,
 )
-from relatorio_pdf import _gerar_html  # noqa: E402
+from services.relatorio_pdf import _gerar_html  # noqa: E402
 
 
 @pytest.fixture

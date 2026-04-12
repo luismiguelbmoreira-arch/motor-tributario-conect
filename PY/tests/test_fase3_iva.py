@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from decimal import Decimal
 from datetime import date
 
-from motor_tributario import (
+from core.motor_tributario import (
     EmpresaFornecedora,
     EmpresaCompradora,
     OperacaoFiscal,
@@ -159,7 +159,7 @@ class TestCreditoB2B:
         equivalente ao CBS/IBS pago dentro do DAS.
         """
         motor = make_motor(ano=2026, valor="50000.00")
-        credito = motor.calcular_credito_simples_para_b2b()
+        credito = motor.credito_b2b_simples
         assert credito == Decimal("0.00"), (
             f"Crédito 2026 deve ser R$ 0 (Art. 348, III, 'c'), obtido R$ {credito}"
         )
@@ -175,8 +175,8 @@ class TestCreditoB2B:
         ICMS ainda NÃO virou IBS (fase-in começa em 2029).
         """
         motor = make_motor(ano=2027, valor="50000.00")
-        das = motor.calcular_das_mensal()
-        credito = motor.calcular_credito_simples_para_b2b()
+        das = motor.das_mensal
+        credito = motor.credito_b2b_simples
         # Anexo I Faixa 5 → PIS 2,76% + COFINS 12,74% = 15,50%
         esperado = (das * Decimal("0.1550")).quantize(Decimal("0.01"))
         assert abs(credito - esperado) <= Decimal("0.02"), (
@@ -193,8 +193,8 @@ class TestCreditoB2B:
         IBS substituiu ICMS integralmente em 2033. ISS=0 neste anexo.
         """
         motor = make_motor(ano=2033, valor="50000.00")
-        das = motor.calcular_das_mensal()
-        credito = motor.calcular_credito_simples_para_b2b()
+        das = motor.das_mensal
+        credito = motor.credito_b2b_simples
         # Anexo I Faixa 5 → PIS 2,76% + COFINS 12,74% + ICMS 34,00% = 49,50%
         esperado = (das * Decimal("0.4950")).quantize(Decimal("0.01"))
         assert abs(credito - esperado) <= Decimal("0.02"), (
@@ -211,8 +211,8 @@ class TestCreditoB2B:
         """
         m1 = make_motor(ano=2027, rbt12="900000.00")
         m2 = make_motor(ano=2027, rbt12="1800000.00")
-        c1 = m1.calcular_credito_simples_para_b2b()
-        c2 = m2.calcular_credito_simples_para_b2b()
+        c1 = m1.credito_b2b_simples
+        c2 = m2.credito_b2b_simples
         # Como DAS não escala perfeitamente linear (dedução parcela por faixa),
         # aceitamos proporção dentro de ±15%
         razao = c2 / c1 if c1 > 0 else Decimal("0")
@@ -224,8 +224,8 @@ class TestCreditoB2B:
         """2027 > R$ 0 (2026) — impacto da CBS substituindo PIS+COFINS."""
         m26 = make_motor(ano=2026, valor="50000.00")
         m27 = make_motor(ano=2027, valor="50000.00")
-        c26 = m26.calcular_credito_simples_para_b2b()
-        c27 = m27.calcular_credito_simples_para_b2b()
+        c26 = m26.credito_b2b_simples
+        c27 = m27.credito_b2b_simples
         assert c26 == Decimal("0.00")
         assert c27 > Decimal("0.00")
 
@@ -259,7 +259,7 @@ class TestCreditoB2BArtigo47:
 
     def test_2026_credito_zero_dispensa(self):
         """2026: Art. 348 III 'c' — dispensa. Crédito sempre R$ 0."""
-        credito = self._moreira(2026).calcular_credito_simples_para_b2b()
+        credito = self._moreira(2026).credito_b2b_simples
         assert credito == Decimal("0.00")
 
     # ── 2027-2028 — apenas CBS (PIS+COFINS) ──────────────────────────────────
@@ -270,8 +270,8 @@ class TestCreditoB2BArtigo47:
         CBS substitui PIS+COFINS integralmente (Arts. 344 + 353).
         """
         motor = self._moreira(2027)
-        das = motor.calcular_das_mensal()
-        credito = motor.calcular_credito_simples_para_b2b()
+        das = motor.das_mensal
+        credito = motor.credito_b2b_simples
         esperado = (das * Decimal("0.1660")).quantize(Decimal("0.01"))
         assert abs(credito - esperado) <= Decimal("10.00"), (
             f"2027: esperado ~R$ {esperado}, obtido R$ {credito} (DAS R$ {das})"
@@ -279,8 +279,8 @@ class TestCreditoB2BArtigo47:
 
     def test_2028_fracao_identica_a_2027(self):
         """2028: IBS ainda em taxa-teste 0,1% — fração igual a 2027."""
-        c27 = self._moreira(2027).calcular_credito_simples_para_b2b()
-        c28 = self._moreira(2028).calcular_credito_simples_para_b2b()
+        c27 = self._moreira(2027).credito_b2b_simples
+        c28 = self._moreira(2028).credito_b2b_simples
         assert abs(c27 - c28) <= Decimal("0.01"), (
             f"2027 (R$ {c27}) deveria ser == 2028 (R$ {c28})"
         )
@@ -293,8 +293,8 @@ class TestCreditoB2BArtigo47:
         Primeiro ano do fase-in IBS — ISS começa a virar IBS.
         """
         motor = self._moreira(2029)
-        das = motor.calcular_das_mensal()
-        credito = motor.calcular_credito_simples_para_b2b()
+        das = motor.das_mensal
+        credito = motor.credito_b2b_simples
         esperado = (das * Decimal("0.1985")).quantize(Decimal("0.01"))
         assert abs(credito - esperado) <= Decimal("10.00"), (
             f"2029: esperado ~R$ {esperado}, obtido R$ {credito}"
@@ -303,8 +303,8 @@ class TestCreditoB2BArtigo47:
     def test_2032_fase_in_40_pct_iss(self):
         """2032: 16,60% + (32,50% × 40%) = 29,60% do DAS. Último ano do fase-in."""
         motor = self._moreira(2032)
-        das = motor.calcular_das_mensal()
-        credito = motor.calcular_credito_simples_para_b2b()
+        das = motor.das_mensal
+        credito = motor.credito_b2b_simples
         esperado = (das * Decimal("0.2960")).quantize(Decimal("0.01"))
         assert abs(credito - esperado) <= Decimal("10.00"), (
             f"2032: esperado ~R$ {esperado}, obtido R$ {credito}"
@@ -318,8 +318,8 @@ class TestCreditoB2BArtigo47:
         IBS substituiu ICMS/ISS integralmente.
         """
         motor = self._moreira(2033)
-        das = motor.calcular_das_mensal()
-        credito = motor.calcular_credito_simples_para_b2b()
+        das = motor.das_mensal
+        credito = motor.credito_b2b_simples
         esperado = (das * Decimal("0.4910")).quantize(Decimal("0.01"))
         assert abs(credito - esperado) <= Decimal("10.00"), (
             f"2033: esperado ~R$ {esperado}, obtido R$ {credito}"
@@ -331,7 +331,7 @@ class TestCreditoB2BArtigo47:
         """Phase-in de IBS garante crédito monotonicamente crescente ano a ano."""
         anterior = Decimal("-0.01")
         for ano in [2027, 2028, 2029, 2030, 2031, 2032, 2033]:
-            c = self._moreira(ano).calcular_credito_simples_para_b2b()
+            c = self._moreira(ano).credito_b2b_simples
             assert c >= anterior, (
                 f"Regressão em {ano}: R$ {c} < R$ {anterior} (ano anterior)"
             )
@@ -345,8 +345,8 @@ class TestCreditoB2BArtigo47:
         """
         for ano in range(2026, 2034):
             motor = self._moreira(ano)
-            das = motor.calcular_das_mensal()
-            credito = motor.calcular_credito_simples_para_b2b()
+            das = motor.das_mensal
+            credito = motor.credito_b2b_simples
             assert credito <= das, (
                 f"{ano}: crédito R$ {credito} > DAS R$ {das} — VIOLAÇÃO fiscal"
             )
@@ -355,7 +355,7 @@ class TestCreditoB2BArtigo47:
         """A trilha de auditoria deve conter um passo CREDITO_B2B_ART_47 com
         amparo legal completo (MAX_FISCAL_02)."""
         motor = self._moreira(2027)
-        motor.calcular_credito_simples_para_b2b()
+        motor.credito_b2b_simples
         passos_art_47 = [
             p for p in motor.trilha_auditoria
             if p.get("id") == "CREDITO_B2B_ART_47"
@@ -379,13 +379,13 @@ class TestSplitPayment:
     def test_split_inativo_em_2026(self):
         """2026: Split Payment ainda não está ativo (Art. 348 — apenas testes)."""
         motor = make_motor(ano=2026, forma="PIX_BOLETO")
-        resultado = motor.calcular_split_payment_impacto()
+        resultado = motor.split_payment_impacto
         assert resultado["ativo"] is False, "Split deve ser inativo em 2026"
 
     def test_split_ativo_2027_pix(self):
         """2027: Split ativo para PIX. Retenção dinâmica = CBS + IBS. Art. 344."""
         motor = make_motor(ano=2027, valor="50000.00", forma="PIX_BOLETO")
-        resultado = motor.calcular_split_payment_impacto()
+        resultado = motor.split_payment_impacto
         assert resultado["ativo"] is True
         retencao = Decimal(resultado["retencao_imediata"])
         esperado = Decimal("50000.00") * (Decimal("0.088") + Decimal("0.001"))
@@ -396,7 +396,7 @@ class TestSplitPayment:
     def test_split_nao_retido_em_dinheiro(self):
         """DINHEIRO: Split Payment não é retido. Art. 344 — apenas meios eletrônicos."""
         motor = make_motor(ano=2027, forma="DINHEIRO")
-        resultado = motor.calcular_split_payment_impacto()
+        resultado = motor.split_payment_impacto
         assert resultado["ativo"] is False, "DINHEIRO não deve sofrer Split Payment"
 
     def test_split_2027_nao_e_taxa_fixa_09(self):
@@ -406,7 +406,7 @@ class TestSplitPayment:
         R$ 50.000 × 8,9% = R$ 4.450 — NÃO R$ 450.
         """
         motor = make_motor(ano=2027, valor="50000.00", forma="PIX_BOLETO")
-        resultado = motor.calcular_split_payment_impacto()
+        resultado = motor.split_payment_impacto
         retencao = Decimal(resultado["retencao_imediata"])
         taxa_errada = Decimal("50000.00") * Decimal("0.009")  # R$ 450 — bug antigo
         assert retencao > taxa_errada * 5, (
@@ -417,7 +417,7 @@ class TestSplitPayment:
     def test_split_2033_taxa_265(self):
         """2033: Split = CBS 8,8% + IBS 17,7% = 26,5%. Regime pleno."""
         motor = make_motor(ano=2033, valor="50000.00", forma="PIX_BOLETO")
-        resultado = motor.calcular_split_payment_impacto()
+        resultado = motor.split_payment_impacto
         retencao = Decimal(resultado["retencao_imediata"])
         esperado = Decimal("50000.00") * (Decimal("0.088") + Decimal("0.177"))
         assert abs(retencao - esperado) <= Decimal("0.01"), (
@@ -429,7 +429,7 @@ class TestSplitPayment:
         retencao_anterior = Decimal("0")
         for ano in [2029, 2030, 2031, 2032, 2033]:
             motor = make_motor(ano=ano, valor="50000.00", forma="PIX_BOLETO")
-            r = motor.calcular_split_payment_impacto()
+            r = motor.split_payment_impacto
             ret = Decimal(r["retencao_imediata"])
             assert ret > retencao_anterior, f"Split {ano} deve ser > Split {ano-1}"
             retencao_anterior = ret

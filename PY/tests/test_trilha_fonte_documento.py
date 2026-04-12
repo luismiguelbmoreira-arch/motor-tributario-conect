@@ -21,8 +21,8 @@ os.environ.setdefault("MOTOR_CONECT_MASTER_KEY", "0" * 64)
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 import database  # noqa: E402
-import storage_cifrado  # noqa: E402
-from extrator_pdfs import _inferir_campo_origem  # noqa: E402
+import services.storage_cifrado as storage_cifrado  # noqa: E402
+from services.extrator_pdfs import _inferir_campo_origem  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 from sqlmodel import SQLModel, create_engine  # noqa: E402
 
@@ -88,8 +88,8 @@ def _patch_pipeline(trilha_fake=None):
     fake_motor_class = MagicMock(return_value=fake_motor_instance)
 
     return (
-        patch("extrator_pdfs.anthropic.Anthropic", return_value=fake_client),
-        patch("motor_tributario.MotorReformaTributaria", fake_motor_class),
+        patch("services.extrator_pdfs.anthropic.Anthropic", return_value=fake_client),
+        patch("core.motor_tributario.MotorReformaTributaria", fake_motor_class),
     )
 
 
@@ -139,7 +139,7 @@ class TestInferirCampoOrigem:
 
 class TestTrilhaEnriquecida:
     def test_trilha_recebe_fonte_em_cada_passo(self):
-        from extrator_pdfs import processar_pdfs_bytes
+        from services.extrator_pdfs import processar_pdfs_bytes
 
         p1, p2 = _patch_pipeline()
         with p1, p2:
@@ -160,7 +160,7 @@ class TestTrilhaEnriquecida:
             assert len(fonte["documentos_hashes"][0]) == 64  # sha256
 
     def test_todos_os_passos_apontam_para_mesma_lista_de_docs(self):
-        from extrator_pdfs import processar_pdfs_bytes
+        from services.extrator_pdfs import processar_pdfs_bytes
 
         p1, p2 = _patch_pipeline()
         with p1, p2:
@@ -177,7 +177,7 @@ class TestTrilhaEnriquecida:
         assert len(set(refs)) == 1  # todas iguais
 
     def test_campo_origem_cada_passo_reflete_sua_semantica(self):
-        from extrator_pdfs import processar_pdfs_bytes
+        from services.extrator_pdfs import processar_pdfs_bytes
 
         p1, p2 = _patch_pipeline()
         with p1, p2:
@@ -198,7 +198,7 @@ class TestTrilhaEnriquecida:
 
     def test_persistir_desativado_trilha_nao_tem_fonte(self):
         """Backward compat: sem persistir_auditoria, trilha continua sem fonte."""
-        from extrator_pdfs import processar_pdfs_bytes
+        from services.extrator_pdfs import processar_pdfs_bytes
 
         p1, p2 = _patch_pipeline()
         with p1, p2:
@@ -209,7 +209,7 @@ class TestTrilhaEnriquecida:
 
     def test_falha_de_cifra_trilha_nao_e_enriquecida(self, monkeypatch):
         """Se nenhum doc foi salvo, não adiciona fonte vazia."""
-        from extrator_pdfs import processar_pdfs_bytes
+        from services.extrator_pdfs import processar_pdfs_bytes
 
         def explode(*a, **kw):
             raise RuntimeError("disco cheio")
@@ -230,7 +230,7 @@ class TestTrilhaEnriquecida:
 
     def test_trilha_vazia_nao_quebra(self):
         """Edge case: diagnóstico sem trilha."""
-        from extrator_pdfs import processar_pdfs_bytes
+        from services.extrator_pdfs import processar_pdfs_bytes
 
         p1, p2 = _patch_pipeline(trilha_fake=[])
         with p1, p2:
@@ -244,7 +244,7 @@ class TestTrilhaEnriquecida:
 
     def test_passo_malformado_e_ignorado(self):
         """Se um passo for string ou None em vez de dict, não quebra."""
-        from extrator_pdfs import processar_pdfs_bytes
+        from services.extrator_pdfs import processar_pdfs_bytes
 
         trilha_com_lixo = [
             {"id": "FASE2_RBT12", "tipo": "CALCULO"},

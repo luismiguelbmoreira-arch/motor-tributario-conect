@@ -22,9 +22,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import pytest
 from decimal import Decimal
 
-from motor_tributario import EmpresaFornecedora, Atividade
-from regimes.base import RegimeMismatchError
-from regimes.simples_multi import SimplesMultiAtividadeEngine
+from core.motor_tributario import EmpresaFornecedora, Atividade
+from core.regimes.base import RegimeMismatchError
+from core.regimes.simples_multi import SimplesMultiAtividadeEngine
 
 
 # ─────────────────────────────────────────────────────────────────────────────

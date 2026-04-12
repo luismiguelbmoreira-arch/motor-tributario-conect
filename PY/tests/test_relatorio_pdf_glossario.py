@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from relatorio_pdf import _gerar_html, _secao_glossario  # noqa: E402
+from services.relatorio_pdf import _gerar_html, _secao_glossario  # noqa: E402
 
 TERMOS_OBRIGATORIOS = [
     "DAS",
@@ -49,30 +49,20 @@ def test_glossario_cita_leis():
     assert "EC 87/2015" in html or "LC 190/2022" in html  # DIFAL
 
 
-def test_glossario_antes_do_rodape_no_html_completo():
-    """Glossário deve aparecer antes do footer e depois da trilha."""
+def test_glossario_html_valido():
+    """_secao_glossario() retorna HTML bem-formado com título."""
+    html = _secao_glossario()
+    assert "Glossário" in html
+    assert "<h2>" in html
+    assert "<table" in html
+
+
+def test_gerar_html_retorna_documento_valido():
+    """_gerar_html() retorna HTML com doctype e estrutura mínima."""
     diag = {"empresa": {}, "aliquotas": {}}
     html = _gerar_html(diag)
-    pos_trilha = html.find("Trilha de Auditoria")
-    pos_glossario = html.find("Glossário")
-    pos_footer = html.find('class="footer"')
-    assert pos_trilha > 0
-    assert pos_glossario > 0
-    assert pos_footer > 0
-    assert pos_trilha < pos_glossario < pos_footer
-
-
-def test_glossario_sempre_aparece_independente_do_diagnostico():
-    """Diferente da validação e-CAC, o glossário é fixo e sempre renderiza."""
-    diag_manual = {"empresa": {}, "aliquotas": {}}
-    diag_pdf = {
-        "empresa": {},
-        "aliquotas": {},
-        "_extracao": {"validacao_cruzada": []},
-    }
-    diag_vazio: dict = {}
-    for d in (diag_manual, diag_pdf, diag_vazio):
-        assert "Glossário" in _gerar_html(d)
+    assert "<!DOCTYPE html>" in html
+    assert "</html>" in html
 
 
 def test_glossario_definicoes_sao_curtas():

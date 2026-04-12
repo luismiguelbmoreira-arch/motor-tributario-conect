@@ -14,7 +14,7 @@ import pytest
 from decimal import Decimal
 from datetime import date
 
-from motor_tributario import (
+from core.motor_tributario import (
     EmpresaFornecedora,
     EmpresaCompradora,
     OperacaoFiscal,
@@ -69,21 +69,21 @@ class TestCalcularRBT12:
 
     def test_rbt12_retorna_decimal(self):
         motor = make_motor("500000.00")
-        resultado = motor.calcular_rbt12()
+        resultado = motor.rbt12
         assert isinstance(resultado, Decimal)
 
     def test_rbt12_valor_correto(self):
         motor = make_motor("1500000.00")
-        assert motor.calcular_rbt12() == Decimal("1500000.00")
+        assert motor.rbt12 == Decimal("1500000.00")
 
     def test_rbt12_arredondamento_dois_decimais(self):
         motor = make_motor("1500000.555")
-        rbt12 = motor.calcular_rbt12()
+        rbt12 = motor.rbt12
         assert rbt12 == Decimal("1500000.56")  # ROUND_HALF_UP
 
     def test_rbt12_zero_aceito(self):
         motor = make_motor("0.00")
-        assert motor.calcular_rbt12() == Decimal("0.00")
+        assert motor.rbt12 == Decimal("0.00")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -95,12 +95,12 @@ class TestCalcularFatorR:
     def test_fator_r_none_sem_folha(self):
         """Sem folha informada → Fator R = None."""
         motor = make_motor("500000.00", cnae="6201501")
-        assert motor.calcular_fator_r() is None
+        assert motor.fator_r is None
 
     def test_fator_r_none_cnae_comercio(self):
         """CNAE de comércio não aplica Fator R."""
         motor = make_motor("500000.00", cnae="4711302", folha="150000.00")
-        assert motor.calcular_fator_r() is None
+        assert motor.fator_r is None
 
     def test_fator_r_correto_28_porcento(self):
         """
@@ -108,7 +108,7 @@ class TestCalcularFatorR:
         Resultado: >= 0.28 → migra para Anexo III
         """
         motor = make_motor("500000.00", cnae="6201501", folha="140000.00")
-        fator = motor.calcular_fator_r()
+        fator = motor.fator_r
         assert fator == Decimal("0.2800")
 
     def test_fator_r_abaixo_do_limiar(self):
@@ -117,7 +117,7 @@ class TestCalcularFatorR:
         Resultado: < 0.28 → permanece Anexo V
         """
         motor = make_motor("500000.00", cnae="6201501", folha="120000.00")
-        fator = motor.calcular_fator_r()
+        fator = motor.fator_r
         assert fator == Decimal("0.2400")
 
     def test_fator_r_zona_risco(self):
@@ -142,16 +142,16 @@ class TestDeterminarAnexo:
 
     def test_comercio_vai_para_anexo_i(self):
         motor = make_motor("500000.00", cnae="4711302")
-        assert motor.determinar_anexo() == "I"
+        assert motor.anexo_principal == "I"
 
     def test_industria_vai_para_anexo_ii(self):
         motor = make_motor("500000.00", cnae="2950600")
-        assert motor.determinar_anexo() == "II"
+        assert motor.anexo_principal == "II"
 
     def test_ti_sem_fator_r_vai_para_anexo_v(self):
         """TI sem folha informada → sem Fator R → Anexo V."""
         motor = make_motor("500000.00", cnae="6201501")
-        assert motor.determinar_anexo() == "V"
+        assert motor.anexo_principal == "V"
 
     def test_ti_com_fator_r_alto_vai_para_anexo_iii(self):
         """
@@ -159,12 +159,12 @@ class TestDeterminarAnexo:
         LC 123/2006, Art. 18, § 24.
         """
         motor = make_motor("500000.00", cnae="6201501", folha="150000.00")
-        assert motor.determinar_anexo() == "III"
+        assert motor.anexo_principal == "III"
 
     def test_ti_com_fator_r_baixo_permanece_anexo_v(self):
         """TI + Fator R < 0.28 → permanece Anexo V."""
         motor = make_motor("500000.00", cnae="6201501", folha="100000.00")
-        assert motor.determinar_anexo() == "V"
+        assert motor.anexo_principal == "V"
 
     def test_anexo_explicito_tem_precedencia(self):
         """Se anexo informado explicitamente, usa-o sem calcular."""
@@ -182,7 +182,7 @@ class TestDeterminarAnexo:
             EmpresaCompradora(tipo="B2B_CONTRIBUINTE", uf_destino="SP"),
             make_operacao(),
         )
-        assert motor.determinar_anexo() == "II"
+        assert motor.anexo_principal == "II"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -193,7 +193,7 @@ class TestCalcularAliquotaEfetiva:
 
     def test_aliquota_retorna_decimal(self):
         motor = make_motor("500000.00")
-        assert isinstance(motor.calcular_aliquota_efetiva(), Decimal)
+        assert isinstance(motor.aliquota_efetiva, Decimal)
 
     def test_aliquota_primeira_faixa_anexo_i(self):
         """
@@ -203,7 +203,7 @@ class TestCalcularAliquotaEfetiva:
         Fonte: LC 123/2006, Anexo I, Faixa 1.
         """
         motor = make_motor("180000.00", cnae="4711302")
-        aliquota = motor.calcular_aliquota_efetiva()
+        aliquota = motor.aliquota_efetiva
         assert aliquota == Decimal("0.040000")
 
     def test_aliquota_segunda_faixa_anexo_i(self):
@@ -214,7 +214,7 @@ class TestCalcularAliquotaEfetiva:
         Verificado: (21900 - 5940) / 300000 = 15960 / 300000 = 0.0532
         """
         motor = make_motor("300000.00", cnae="4711302")
-        aliquota = motor.calcular_aliquota_efetiva()
+        aliquota = motor.aliquota_efetiva
         esperado = ((Decimal("300000") * Decimal("0.073")) - Decimal("5940")) / Decimal("300000")
         assert aliquota == esperado.quantize(Decimal("0.000001"))
 
@@ -225,7 +225,7 @@ class TestCalcularAliquotaEfetiva:
         Fórmula: ((1200000 × 0.107) - 22500) / 1200000
         """
         motor = make_motor("1200000.00", cnae="4711302")
-        aliquota = motor.calcular_aliquota_efetiva()
+        aliquota = motor.aliquota_efetiva
         esperado = ((Decimal("1200000") * Decimal("0.107")) - Decimal("22500")) / Decimal("1200000")
         assert abs(aliquota - esperado.quantize(Decimal("0.000001"))) <= Decimal("0.000001")
 
@@ -236,17 +236,17 @@ class TestCalcularAliquotaEfetiva:
         """
         motor = make_motor("5000000.00", cnae="4711302")
         with pytest.raises(ValueError, match="teto do Simples Nacional"):
-            motor.calcular_aliquota_efetiva()
+            motor.aliquota_efetiva
 
     def test_precisao_6_casas_decimais(self):
         """Alíquota efetiva deve ter 6 casas decimais (padrão SRF)."""
         motor = make_motor("750000.00", cnae="4711302")
-        aliquota = motor.calcular_aliquota_efetiva()
+        aliquota = motor.aliquota_efetiva
         # Verifica que tem exatamente 6 casas decimais
         assert aliquota == aliquota.quantize(Decimal("0.000001"))
 
     def test_aliquota_nao_usa_float(self):
         """Resultado nunca pode ser float. Deve ser Decimal."""
         motor = make_motor("500000.00")
-        resultado = motor.calcular_aliquota_efetiva()
+        resultado = motor.aliquota_efetiva
         assert type(resultado) is Decimal, "Alíquota DEVE ser Decimal, nunca float"

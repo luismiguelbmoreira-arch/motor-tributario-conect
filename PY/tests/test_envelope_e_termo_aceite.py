@@ -26,7 +26,7 @@ os.environ.setdefault("MOTOR_CONECT_MASTER_KEY", "0" * 64)
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 import database  # noqa: E402
-import storage_cifrado  # noqa: E402
+import services.storage_cifrado as storage_cifrado  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 from sqlmodel import SQLModel, create_engine  # noqa: E402
@@ -77,8 +77,8 @@ def _patch_pipeline():
     }
 
     return (
-        patch("extrator_pdfs.anthropic.Anthropic", return_value=fake_client),
-        patch("motor_tributario.MotorReformaTributaria", return_value=fake_motor_instance),
+        patch("services.extrator_pdfs.anthropic.Anthropic", return_value=fake_client),
+        patch("core.motor_tributario.MotorReformaTributaria", return_value=fake_motor_instance),
     )
 
 
@@ -88,7 +88,7 @@ def _patch_pipeline():
 class TestEnvelopeExtrator:
     def test_envelope_false_retorna_dict_simples_backward_compat(self):
         """Default envelope=False: backward compat mantido."""
-        from extrator_pdfs import processar_pdfs_bytes
+        from services.extrator_pdfs import processar_pdfs_bytes
 
         p1, p2 = _patch_pipeline()
         with p1, p2:
@@ -102,7 +102,7 @@ class TestEnvelopeExtrator:
         assert "pii" not in result
 
     def test_envelope_true_retorna_diagnostico_e_pii_separados(self):
-        from extrator_pdfs import processar_pdfs_bytes
+        from services.extrator_pdfs import processar_pdfs_bytes
 
         p1, p2 = _patch_pipeline()
         with p1, p2:
@@ -120,7 +120,7 @@ class TestEnvelopeExtrator:
 
     def test_envelope_true_com_auditoria(self):
         """Envelope + persistir_auditoria combinados."""
-        from extrator_pdfs import processar_pdfs_bytes
+        from services.extrator_pdfs import processar_pdfs_bytes
 
         p1, p2 = _patch_pipeline()
         with p1, p2:
@@ -144,7 +144,7 @@ class TestEnvelopeExtrator:
 @pytest.fixture
 def client(monkeypatch):
     """TestClient com get_current_user mockado."""
-    from api_motor import app, get_current_user
+    from main import app, get_current_user
 
     def fake_user():
         return {"id": "7", "username": "tester", "role": "admin"}

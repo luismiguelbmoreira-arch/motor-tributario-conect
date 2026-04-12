@@ -21,14 +21,14 @@ from decimal import Decimal
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from motor_tributario import (  # noqa: E402
+from core.motor_tributario import (  # noqa: E402
     EmpresaCompradora,
     EmpresaFornecedora,
     MotorReformaTributaria,
     OperacaoFiscal,
     _fmt_brl,
 )
-from tabelas_simples import estimar_perfil_b2b  # noqa: E402
+from core.tabelas_simples import estimar_perfil_b2b  # noqa: E402
 
 
 CNPJ_VALIDO = "54657895000160"

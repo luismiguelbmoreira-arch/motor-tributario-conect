@@ -6,7 +6,7 @@ import pytest
 from datetime import date
 from decimal import Decimal
 
-from motor_tributario import EmpresaFornecedora, EmpresaCompradora, OperacaoFiscal, MotorReformaTributaria
+from core.motor_tributario import EmpresaFornecedora, EmpresaCompradora, OperacaoFiscal, MotorReformaTributaria
 
 
 @pytest.fixture

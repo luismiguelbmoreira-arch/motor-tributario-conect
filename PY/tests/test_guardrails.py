@@ -19,14 +19,14 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from guardrails import assert_legal_anchor, validar_campos_regime
-from motor_tributario import (
+from core.guardrails import assert_legal_anchor, validar_campos_regime
+from core.motor_tributario import (
     EmpresaCompradora,
     EmpresaFornecedora,
     MotorReformaTributaria,
     OperacaoFiscal,
 )
-from tabelas_simples import CRONOGRAMA_IVA, DISTRIBUICAO_DAS
+from core.tabelas_simples import CRONOGRAMA_IVA, DISTRIBUICAO_DAS
 
 
 # ─────────────────────────────────────────────────────────────────────────────

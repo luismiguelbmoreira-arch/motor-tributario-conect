@@ -23,7 +23,7 @@ from typing import Any
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
-from storage_cifrado import _master_key
+from services.storage_cifrado import _master_key
 
 # Salt distinto da cifragem de documentos (storage_cifrado usa salt=cnpj).
 # Se alguém recuperar a chave HMAC da trilha, não consegue decifrar PDFs.

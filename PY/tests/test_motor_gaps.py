@@ -20,7 +20,7 @@ import pytest
 from decimal import Decimal
 from datetime import date
 
-from motor_tributario import (
+from core.motor_tributario import (
     EmpresaFornecedora,
     EmpresaCompradora,
     OperacaoFiscal,
@@ -172,33 +172,33 @@ class TestFracaoIbsCbs:
 
     def test_fracao_ibs_retorna_decimal(self):
         motor = make_motor(rbt12="500000.00", ano=2026)
-        assert isinstance(motor.calcular_fracao_ibs(), Decimal)
+        assert isinstance(motor.fracao_ibs, Decimal)
 
     def test_fracao_cbs_retorna_decimal(self):
         motor = make_motor(rbt12="500000.00", ano=2026)
-        assert isinstance(motor.calcular_fracao_cbs(), Decimal)
+        assert isinstance(motor.fracao_cbs, Decimal)
 
     def test_fracao_ibs_nao_negativa(self):
         motor = make_motor(rbt12="500000.00", ano=2026)
-        assert motor.calcular_fracao_ibs() >= Decimal("0")
+        assert motor.fracao_ibs >= Decimal("0")
 
     def test_fracao_cbs_nao_negativa(self):
         motor = make_motor(rbt12="500000.00", ano=2026)
-        assert motor.calcular_fracao_cbs() >= Decimal("0")
+        assert motor.fracao_cbs >= Decimal("0")
 
     def test_fracao_ibs_menor_que_das_mensal(self):
         """IBS é componente do DAS — nunca maior que o DAS total."""
         motor = make_motor(rbt12="500000.00", ano=2026)
-        assert motor.calcular_fracao_ibs() <= motor.calcular_das_mensal()
+        assert motor.fracao_ibs <= motor.das_mensal
 
     def test_fracao_cbs_menor_que_das_mensal(self):
         motor = make_motor(rbt12="500000.00", ano=2026)
-        assert motor.calcular_fracao_cbs() <= motor.calcular_das_mensal()
+        assert motor.fracao_cbs <= motor.das_mensal
 
     def test_resultado_duas_casas_decimais(self):
         """Valor monetário: 2 casas decimais (centavos)."""
         motor = make_motor(rbt12="500000.00", ano=2026)
-        r = motor.calcular_fracao_cbs()
+        r = motor.fracao_cbs
         assert r == r.quantize(Decimal("0.01"))
 
 

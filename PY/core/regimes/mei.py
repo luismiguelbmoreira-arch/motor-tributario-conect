@@ -22,7 +22,7 @@ CARACTERÍSTICAS MEI:
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Dict, List
 
-from regimes.base import BaseRegimeEngine
+from core.regimes.base import BaseRegimeEngine
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONSTANTES LEGAIS — FROZEN 2026 (LC 123/2006, Art. 18-A + Resolução CGSN)

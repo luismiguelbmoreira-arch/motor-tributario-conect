@@ -27,13 +27,13 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from difal import calcular_difal
-from regimes.base import BaseRegimeEngine
-from regimes.lucro_presumido import LucroPresumidoEngine
-from regimes.lucro_real import LucroRealEngine
-from regimes.mei import MEIEngine
-from regimes.simples_multi import SimplesMultiAtividadeEngine
-from tabelas_simples import (
+from core.difal import calcular_difal
+from core.regimes.base import BaseRegimeEngine
+from core.regimes.lucro_presumido import LucroPresumidoEngine
+from core.regimes.lucro_real import LucroRealEngine
+from core.regimes.mei import MEIEngine
+from core.regimes.simples_multi import SimplesMultiAtividadeEngine
+from core.tabelas_simples import (
     ALERTA_90_PERCENT_TETO,
     ANO_INICIO_SPLIT_PAYMENT,
     CRONOGRAMA_IVA,
@@ -880,7 +880,7 @@ class MotorReformaTributaria:
         if ano in CRONOGRAMA_IVA:
             return CRONOGRAMA_IVA[ano]
         # Ano fora do cronograma: usa pleno
-        from tabelas_simples import ALIQUOTA_IVA_PLENA_ESTIMADA
+        from core.tabelas_simples import ALIQUOTA_IVA_PLENA_ESTIMADA
         return {
             "CBS": ALIQUOTA_IVA_PLENA_ESTIMADA,
             "IBS": Decimal("0.177"),

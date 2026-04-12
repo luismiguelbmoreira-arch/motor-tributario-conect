@@ -20,14 +20,14 @@ import pytest
 from decimal import Decimal
 
 from datetime import date
-from motor_tributario import (
+from core.motor_tributario import (
     EmpresaCompradora,
     EmpresaFornecedora,
     MotorReformaTributaria,
     OperacaoFiscal,
 )
-from regimes.base import RegimeMismatchError
-from regimes.lucro_real import LucroRealEngine
+from core.regimes.base import RegimeMismatchError
+from core.regimes.lucro_real import LucroRealEngine
 
 
 # ─────────────────────────────────────────────────────────────────────────────

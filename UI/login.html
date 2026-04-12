@@ -1,524 +1,139 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="scroll-smooth">
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Conect — Motor Tributário 2026-2033</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600&display=swap" rel="stylesheet">
-
-  <style>
-    body { font-family: 'Inter', sans-serif; }
-    .font-playfair { font-family: 'Playfair Display', serif; }
-
-    /* Grade geométrica — CSS puro, sem SVG externo */
-    .geo-pattern {
-      background-image:
-        linear-gradient(rgba(59, 130, 246, 0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(59, 130, 246, 0.05) 1px, transparent 1px);
-      background-size: 56px 56px;
-    }
-
-    /* Orbs de profundidade */
-    .orb-1 {
-      position: absolute;
-      width: 480px; height: 480px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(59,130,246,0.14) 0%, transparent 70%);
-      top: -100px; left: -100px;
-      pointer-events: none;
-    }
-    .orb-2 {
-      position: absolute;
-      width: 320px; height: 320px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(245,158,11,0.09) 0%, transparent 70%);
-      bottom: 60px; right: -60px;
-      pointer-events: none;
-    }
-    .orb-3 {
-      position: absolute;
-      width: 200px; height: 200px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(16,185,129,0.07) 0%, transparent 70%);
-      bottom: 200px; left: 60px;
-      pointer-events: none;
-    }
-
-    /* Linhas verticais decorativas */
-    .stripe-line {
-      position: absolute;
-      width: 1px;
-      background: linear-gradient(to bottom, transparent, rgba(59,130,246,0.2), transparent);
-    }
-
-    /* Animacoes de entrada */
-    @keyframes fadeSlideUp {
-      from { opacity: 0; transform: translateY(28px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes fadeSlideRight {
-      from { opacity: 0; transform: translateX(-20px); }
-      to   { opacity: 1; transform: translateX(0); }
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to   { opacity: 1; }
-    }
-    .animate-fade-slide-up    { animation: fadeSlideUp 0.65s cubic-bezier(0.16,1,0.3,1) both; }
-    .animate-fade-slide-right { animation: fadeSlideRight 0.65s cubic-bezier(0.16,1,0.3,1) both; }
-    .animate-fade             { animation: fadeIn 0.8s ease-out both; }
-    .delay-100 { animation-delay: 0.10s; }
-    .delay-150 { animation-delay: 0.15s; }
-    .delay-200 { animation-delay: 0.20s; }
-    .delay-250 { animation-delay: 0.25s; }
-    .delay-300 { animation-delay: 0.30s; }
-    .delay-350 { animation-delay: 0.35s; }
-    .delay-400 { animation-delay: 0.40s; }
-    .delay-500 { animation-delay: 0.50s; }
-    .delay-600 { animation-delay: 0.60s; }
-
-    /* Spinner de loading */
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .spinner {
-      display: inline-block;
-      width: 16px; height: 16px;
-      border: 2px solid rgba(255,255,255,0.25);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin 0.75s linear infinite;
-      vertical-align: middle;
-      margin-right: 8px;
-    }
-
-    /* Focus ring acessivel */
-    input:focus-visible {
-      outline: 2px solid #3B82F6;
-      outline-offset: 2px;
-    }
-    a:focus-visible, button:focus-visible {
-      outline: 2px solid #3B82F6;
-      outline-offset: 2px;
-      border-radius: 4px;
-    }
-
-    /* Divisor do formulário */
-    .form-divider {
-      position: relative;
-      text-align: center;
-    }
-    .form-divider::before {
-      content: '';
-      position: absolute;
-      top: 50%; left: 0;
-      width: 100%; height: 1px;
-      background: #E2E8F0;
-    }
-
-    /* Input — transicao de borda */
-    .field-input {
-      transition: border-color 0.15s, box-shadow 0.15s;
-    }
-    .field-input:hover { border-color: #CBD5E1; }
-    .field-input:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,0.08); outline: none; }
-    .field-input.error { border-color: #FCA5A5; box-shadow: 0 0 0 3px rgba(239,68,68,0.08); }
-
-    /* Marcadores do ticker lateral */
-    .ticker-item {
-      opacity: 0;
-      animation: fadeSlideRight 0.5s cubic-bezier(0.16,1,0.3,1) both;
-    }
-  </style>
+  
+  <!-- CSS Centralizado (Design System) -->
+  <link rel="stylesheet" href="design_system.css">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 
-<body class="bg-slate-900 min-h-screen">
+<body class="justify-center items-center">
 
-  <!-- Container split-screen -->
-  <div class="min-h-screen flex flex-col lg:flex-row">
+  <!-- Background Decorativo -->
+  <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; overflow: hidden; background: var(--color-black);">
+    <div style="position: absolute; width: 600px; height: 600px; background: radial-gradient(circle, rgba(0, 179, 126, 0.08) 0%, transparent 70%); top: -200px; left: -200px;"></div>
+    <div style="position: absolute; width: 400px; height: 400px; background: radial-gradient(circle, rgba(10, 132, 255, 0.05) 0%, transparent 70%); bottom: -100px; right: -100px;"></div>
+  </div>
 
-    <!-- ====================================================
-         LADO ESQUERDO — Branding / Hero
-    ===================================================== -->
-    <div class="relative lg:w-1/2 xl:w-[55%] bg-slate-900 geo-pattern flex flex-col justify-between
-                p-8 sm:p-12 lg:p-16 xl:p-20 overflow-hidden min-h-72 lg:min-h-screen">
-
-      <!-- Orbs -->
-      <div class="orb-1" aria-hidden="true"></div>
-      <div class="orb-2" aria-hidden="true"></div>
-      <div class="orb-3" aria-hidden="true"></div>
-
-      <!-- Linhas decorativas -->
-      <div class="stripe-line animate-fade delay-300"
-           style="height:65%;top:17%;left:6%;" aria-hidden="true"></div>
-      <div class="stripe-line animate-fade delay-400"
-           style="height:45%;top:27%;left:10%;" aria-hidden="true"></div>
-      <div class="stripe-line animate-fade delay-500"
-           style="height:30%;top:35%;left:14%;opacity:0.5;" aria-hidden="true"></div>
-
-      <!-- Logo -->
-      <div class="relative z-10 animate-fade-slide-up">
-        <div class="flex items-center gap-3">
-          <div class="w-9 h-9 bg-blue-500 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/40"
-               role="img" aria-label="Logo Conect">
-            <span class="text-white font-bold text-base font-playfair leading-none">C</span>
-          </div>
-          <div>
-            <span class="text-white text-lg font-semibold tracking-wide">Conect</span>
-            <span class="text-blue-400/60 text-xs ml-2 uppercase tracking-widest hidden sm:inline">Motor Tributário</span>
-          </div>
-        </div>
+  <div class="animate-fade-slide-up" style="max-width: 420px; width: 100%; padding: 1rem;">
+    <!-- Logo -->
+    <div class="flex-col items-center gap-4 mb-6 text-center">
+      <div style="width: 48px; height: 48px; background: var(--action-primary); border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 16px rgba(0, 179, 126, 0.3);">
+        <i data-lucide="shield-check" style="color: white; width: 28px; height: 28px;"></i>
       </div>
-
-      <!-- Hero central -->
-      <div class="relative z-10 flex-1 flex flex-col justify-center py-10 lg:py-0">
-
-        <div class="animate-fade-slide-up delay-100">
-          <p class="text-blue-400 text-xs font-semibold uppercase tracking-[0.18em] mb-5">
-            Sorocaba-SP &nbsp;·&nbsp; Reforma Tributária 2026-2033
-          </p>
-          <h1 class="font-playfair text-3xl sm:text-4xl lg:text-[2.75rem] xl:text-5xl
-                     text-white leading-[1.15] mb-6">
-            Precisão fiscal.<br>
-            <span class="text-blue-400">Sem margem</span><br>
-            para erro.
-          </h1>
-          <p class="text-slate-400 text-sm sm:text-[15px] leading-relaxed max-w-xs">
-            A plataforma construída para a nova legislação —
-            <span class="text-slate-300">EC 132/2023</span>,
-            <span class="text-slate-300">LC 123/2006</span> e
-            <span class="text-slate-300">LC 214/2025</span>.
-          </p>
-        </div>
-
-        <!-- Bullets de valor -->
-        <ul class="mt-9 space-y-5 animate-fade-slide-up delay-200" role="list">
-
-          <li class="flex items-start gap-3.5 ticker-item" style="animation-delay:0.25s">
-            <div class="w-6 h-6 rounded-full bg-blue-500/15 border border-blue-500/30
-                        flex items-center justify-center flex-shrink-0 mt-0.5" aria-hidden="true">
-              <div class="w-2 h-2 rounded-full bg-blue-400"></div>
-            </div>
-            <div>
-              <p class="text-white text-sm font-medium">Cálculo por fora com trilha de auditoria</p>
-              <p class="text-slate-500 text-xs mt-0.5">Base &rarr; Deduções &rarr; Alíquota &rarr; Valor final documentado</p>
-            </div>
-          </li>
-
-          <li class="flex items-start gap-3.5 ticker-item" style="animation-delay:0.35s">
-            <div class="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/30
-                        flex items-center justify-center flex-shrink-0 mt-0.5" aria-hidden="true">
-              <div class="w-2 h-2 rounded-full bg-amber-400"></div>
-            </div>
-            <div>
-              <p class="text-white text-sm font-medium">IVA dual — cronograma 2026 a 2033</p>
-              <p class="text-slate-500 text-xs mt-0.5">IBS + CBS com Split Payment e Opt-Out simulados</p>
-            </div>
-          </li>
-
-          <li class="flex items-start gap-3.5 ticker-item" style="animation-delay:0.45s">
-            <div class="w-6 h-6 rounded-full bg-emerald-500/15 border border-emerald-500/30
-                        flex items-center justify-center flex-shrink-0 mt-0.5" aria-hidden="true">
-              <div class="w-2 h-2 rounded-full bg-emerald-400"></div>
-            </div>
-            <div>
-              <p class="text-white text-sm font-medium">Guard Fiscal — 199 testes certificados</p>
-              <p class="text-slate-500 text-xs mt-0.5">Simples Nacional · Lucro Presumido · MEI · Lucro Real</p>
-            </div>
-          </li>
-
-        </ul>
-
-        <!-- Separador sutil -->
-        <div class="mt-10 w-16 h-px bg-slate-700 animate-fade delay-500"></div>
-
-        <!-- Estatísticas inline -->
-        <div class="mt-6 flex items-center gap-6 animate-fade delay-600">
-          <div>
-            <p class="text-white text-xl font-semibold tabular-nums">199</p>
-            <p class="text-slate-500 text-xs mt-0.5">Testes passando</p>
-          </div>
-          <div class="w-px h-8 bg-slate-700"></div>
-          <div>
-            <p class="text-white text-xl font-semibold tabular-nums">2026</p>
-            <p class="text-slate-500 text-xs mt-0.5">Ano fiscal ativo</p>
-          </div>
-          <div class="w-px h-8 bg-slate-700"></div>
-          <div>
-            <p class="text-white text-xl font-semibold tabular-nums">Fase 2</p>
-            <p class="text-slate-500 text-xs mt-0.5">Certificada</p>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Rodapé esquerdo -->
-      <div class="relative z-10 animate-fade delay-500">
-        <div class="flex items-center gap-3 flex-wrap gap-y-2">
-          <span class="inline-flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20
-                       text-blue-300 text-xs font-medium px-3 py-1.5 rounded-full">
-            <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse inline-block" aria-hidden="true"></span>
-            Ano Fiscal 2026
-          </span>
-          <span class="text-slate-600 text-xs">EC 132/2023 vigente</span>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- ====================================================
-         LADO DIREITO — Formulário
-    ===================================================== -->
-    <div class="relative lg:w-1/2 xl:w-[45%] bg-white lg:bg-slate-50 flex items-center justify-center
-                p-8 sm:p-12 lg:p-14 xl:p-20">
-
-      <!-- Detalhe decorativo canto superior direito (desktop) -->
-      <div class="absolute top-0 right-0 w-40 h-40 opacity-30 pointer-events-none hidden lg:block"
-           aria-hidden="true"
-           style="background: radial-gradient(circle at top right, rgba(59,130,246,0.12), transparent 70%);">
-      </div>
-
-      <div class="w-full max-w-sm animate-fade-slide-up delay-150">
-
-        <!-- Cabeçalho do formulário -->
-        <div class="mb-9">
-          <h2 class="font-playfair text-2xl sm:text-3xl text-slate-900 font-medium mb-2 leading-snug">
-            Bem-vindo de volta
-          </h2>
-          <p class="text-slate-500 text-sm leading-relaxed">
-            Acesse seu painel de análise tributária.
-          </p>
-        </div>
-
-        <!-- Formulário -->
-        <form id="loginForm" novalidate aria-label="Formulário de acesso ao sistema">
-
-          <!-- Campo Usuário -->
-          <div class="mb-5">
-            <label for="username"
-                   class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
-              Usuário
-            </label>
-            <input
-              id="username"
-              name="username"
-              type="text"
-              autocomplete="username"
-              required
-              placeholder="admin"
-              aria-describedby="emailError"
-              class="field-input w-full px-4 py-3 rounded-lg border border-slate-200 bg-white
-                     text-slate-900 text-sm placeholder-slate-300"
-            >
-            <p id="emailError" role="alert" aria-live="polite"
-               class="text-red-500 text-xs mt-1.5 hidden flex items-center gap-1">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24"
-                   stroke="currentColor" stroke-width="2.5" class="flex-shrink-0" aria-hidden="true">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="8" x2="12" y2="12"/>
-                <circle cx="12" cy="16.5" r="0.6" fill="currentColor" stroke="none"/>
-              </svg>
-              Insira um e-mail válido.
-            </p>
-          </div>
-
-          <!-- Campo Senha -->
-          <div class="mb-7">
-            <div class="flex items-center justify-between mb-2">
-              <label for="password"
-                     class="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                Senha
-              </label>
-              <button type="button" onclick="document.getElementById('modal-senha').classList.remove('hidden')"
-                 class="text-xs text-blue-500 hover:text-blue-700 transition-colors font-medium">
-                Esqueci a senha
-              </button>
-            </div>
-            <div class="relative">
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autocomplete="current-password"
-                required
-                placeholder="••••••••"
-                aria-describedby="passwordError"
-                class="field-input w-full px-4 py-3 pr-12 rounded-lg border border-slate-200 bg-white
-                       text-slate-900 text-sm placeholder-slate-300"
-              >
-              <button
-                type="button"
-                id="togglePassword"
-                aria-label="Mostrar senha"
-                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600
-                       transition-colors p-1 rounded focus-visible:outline focus-visible:outline-2
-                       focus-visible:outline-blue-500"
-              >
-                <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" width="18" height="18"
-                     fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                  <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7
-                           -1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                </svg>
-              </button>
-            </div>
-            <p id="passwordError" role="alert" aria-live="polite"
-               class="text-red-500 text-xs mt-1.5 hidden">
-              A senha deve ter ao menos 6 caracteres.
-            </p>
-          </div>
-
-          <!-- Botão Entrar -->
-          <button
-            id="submitBtn"
-            type="submit"
-            class="w-full bg-blue-500 hover:bg-blue-600 active:scale-[0.99] text-white
-                   font-semibold text-sm py-3.5 rounded-lg transition-all duration-150
-                   shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30
-                   focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2
-                   focus-visible:outline-blue-500 disabled:opacity-55 disabled:cursor-not-allowed
-                   disabled:shadow-none"
-            aria-label="Entrar no sistema tributário"
-          >
-            <span id="btnText">Entrar no sistema</span>
-          </button>
-
-          <!-- Alerta de erro geral -->
-          <div
-            id="generalError"
-            role="alert"
-            aria-live="assertive"
-            class="hidden mt-4 flex items-start gap-2.5 bg-red-50 border border-red-200
-                   text-red-700 text-sm px-4 py-3 rounded-lg"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24"
-                 stroke="currentColor" stroke-width="2" class="flex-shrink-0 mt-0.5" aria-hidden="true">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <circle cx="12" cy="16" r="0.5" fill="currentColor" stroke="none"/>
-            </svg>
-            <span id="generalErrorText">Credenciais inválidas. Verifique e tente novamente.</span>
-          </div>
-
-        </form>
-
-        <!-- Divisor -->
-        <div class="my-8 form-divider" aria-hidden="true"></div>
-
-        <!-- Badge LGPD -->
-        <div class="flex items-center gap-2 justify-center animate-fade delay-400">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24"
-               stroke="currentColor" stroke-width="2" class="text-slate-400 flex-shrink-0" aria-hidden="true">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-          </svg>
-          <p class="text-slate-400 text-xs">
-            Dados protegidos —
-            <span class="font-medium text-slate-500">LGPD Lei 13.709/2018</span>
-          </p>
-        </div>
-
-        <!-- Versão -->
-        <p class="text-center text-slate-300 text-xs mt-5 animate-fade delay-500">
-          Motor Tributário v2.0 &nbsp;&middot;&nbsp; 199 testes &nbsp;&middot;&nbsp; Fase 2 Certificada
-        </p>
-
+      <div>
+        <h2 class="text-h2">Conect Motor</h2>
+        <p class="text-muted" style="letter-spacing: 0.1em; text-transform: uppercase;">Inteligência Fiscal 2026</p>
       </div>
     </div>
 
-  </div><!-- fim split-screen -->
+    <!-- Login Card -->
+    <div class="glass-card">
+      <div class="mb-6">
+        <h3 class="text-h2" style="font-size: 1.25rem;">Boas-vindas</h3>
+        <p class="text-body">Acesse a plataforma de auditoria.</p>
+      </div>
+
+      <form id="loginForm" novalidate>
+        <div class="input-group">
+          <label class="input-label" for="username">Usuário</label>
+          <div style="position: relative;">
+            <i data-lucide="user" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); width: 16px; color: var(--text-secondary);"></i>
+            <input type="text" id="username" class="input-field" placeholder="Administrador" style="padding-left: 3rem;" required>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <div class="flex-row justify-between w-full">
+            <label class="input-label" for="password">Senha</label>
+            <a href="#" class="text-muted" style="text-decoration: none;" onclick="showRecoveryModal()">Esqueceu?</a>
+          </div>
+          <div style="position: relative;">
+            <i data-lucide="lock" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); width: 16px; color: var(--text-secondary);"></i>
+            <input type="password" id="password" class="input-field" placeholder="••••••••" style="padding-left: 3rem;" required>
+            <button type="button" id="togglePassword" style="position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-secondary);">
+              <i data-lucide="eye" id="eyeIcon" style="width: 16px;"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" id="submitBtn" class="btn btn-primary w-full mt-4">
+          <span id="btnText">Entrar no Sistema</span>
+        </button>
+
+        <div id="generalError" class="step-hidden mt-4 p-4 text-danger text-center" style="background: rgba(226, 88, 88, 0.1); border-radius: 8px; border: 1px solid rgba(226, 88, 88, 0.2); font-size: 0.8rem;">
+          Credenciais inválidas. Tente novamente.
+        </div>
+      </form>
+    </div>
+
+    <!-- Footer -->
+    <div class="mt-6 text-center">
+      <p class="text-muted">
+        <i data-lucide="shield" style="width: 12px; vertical-align: middle; margin-right: 4px;"></i>
+        Protegido por LGPD &bull; v2.0
+      </p>
+    </div>
+  </div>
+
+  <!-- Modal Recuperação -->
+  <div id="modalRecovery" class="step-hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 1.5rem;">
+    <div class="glass-card" style="max-width: 400px; width: 100%;">
+      <div class="flex-row gap-4 mb-4">
+        <div style="width: 40px; height: 40px; background: rgba(10, 132, 255, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <i data-lucide="info" style="color: var(--color-blue-500);"></i>
+        </div>
+        <h3 class="text-h2" style="font-size: 1.1rem;">Recuperação</h3>
+      </div>
+      <p class="text-body mb-6">Entre em contato com o suporte do escritório para resetar suas credenciais no painel administrativo.</p>
+      <button class="btn btn-ghost w-full" onclick="hideRecoveryModal()">Fechar</button>
+    </div>
+  </div>
 
   <script>
-    // ============================================================
-    // Toggle visibilidade da senha
-    // ============================================================
-    const toggleBtn    = document.getElementById('togglePassword');
+    // Inicializar ícones Lucide
+    lucide.createIcons();
+
+    const loginForm = document.getElementById('loginForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const btnText = document.getElementById('btnText');
+    const generalError = document.getElementById('generalError');
+    const togglePassword = document.getElementById('togglePassword');
     const passwordField = document.getElementById('password');
-    const eyeIcon      = document.getElementById('eyeIcon');
+    const eyeIcon = document.getElementById('eyeIcon');
 
-    const PATH_EYE_OPEN = `
-      <path stroke-linecap="round" stroke-linejoin="round"
-            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-      <path stroke-linecap="round" stroke-linejoin="round"
-            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7
-               -1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>`;
-
-    const PATH_EYE_CLOSED = `
-      <path stroke-linecap="round" stroke-linejoin="round"
-            d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7
-               a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243
-               M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29
-               M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7
-               a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>`;
-
-    let passwordVisible = false;
-
-    toggleBtn.addEventListener('click', () => {
-      passwordVisible = !passwordVisible;
-      passwordField.type        = passwordVisible ? 'text' : 'password';
-      eyeIcon.innerHTML         = passwordVisible ? PATH_EYE_CLOSED : PATH_EYE_OPEN;
-      toggleBtn.setAttribute('aria-label', passwordVisible ? 'Ocultar senha' : 'Mostrar senha');
+    // Toggle Senha
+    togglePassword.addEventListener('click', () => {
+      const isPassword = passwordField.type === 'password';
+      passwordField.type = isPassword ? 'text' : 'password';
+      eyeIcon.setAttribute('data-lucide', isPassword ? 'eye-off' : 'eye');
+      lucide.createIcons();
     });
 
-    // ============================================================
-    // Validacao e submit
-    // ============================================================
-    const form          = document.getElementById('loginForm');
-    const submitBtn     = document.getElementById('submitBtn');
-    const btnText       = document.getElementById('btnText');
-    const emailField    = document.getElementById('username');
-    const emailError    = document.getElementById('emailError');
-    const passwordError = document.getElementById('passwordError');
-    const generalError  = document.getElementById('generalError');
+    // Modais
+    function showRecoveryModal() { document.getElementById('modalRecovery').classList.replace('step-hidden', 'step-visible'); }
+    function hideRecoveryModal() { document.getElementById('modalRecovery').classList.replace('step-visible', 'step-hidden'); }
 
-    function clearErrors() {
-      emailError.classList.add('hidden');
-      passwordError.classList.add('hidden');
-      generalError.classList.add('hidden');
-      emailField.classList.remove('error');
-      passwordField.classList.remove('error');
-    }
-
-    function isValidEmail(val) {
-      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
-    }
-
-    const API_BASE = window.location.origin;
-
-    form.addEventListener('submit', async (e) => {
+    // Logic Login
+    loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      clearErrors();
-
-      const username = emailField.value.trim();
+      generalError.classList.add('step-hidden');
+      
+      const username = document.getElementById('username').value;
       const password = passwordField.value;
-      let valid      = true;
 
-      if (username.length < 2) {
-        emailError.textContent = 'Informe seu usuário ou e-mail.';
-        emailError.classList.remove('hidden');
-        emailField.classList.add('error');
-        emailField.focus();
-        valid = false;
-      }
+      if (!username || !password) return;
 
-      if (password.length < 6) {
-        passwordError.classList.remove('hidden');
-        passwordField.classList.add('error');
-        if (valid) passwordField.focus();
-        valid = false;
-      }
-
-      if (!valid) return;
-
-      // Estado de carregamento
       submitBtn.disabled = true;
-      btnText.innerHTML  = '<span class="spinner" aria-hidden="true"></span>Verificando credenciais...';
+      btnText.innerHTML = '<div class="spinner"></div> Autenticando...';
 
       try {
-        const res = await fetch(`${API_BASE}/auth/login`, {
+        const res = await fetch(`${window.location.origin}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password }),
@@ -526,69 +141,19 @@
 
         if (res.ok) {
           const data = await res.json();
-          // Salva token e dados do usuário — sessionStorage (apagado ao fechar aba)
           sessionStorage.setItem('token', data.access_token);
-          sessionStorage.setItem('username', data.username);
-          sessionStorage.setItem('role', data.role);
-          // Força troca de senha no primeiro acesso (admin padrão ou novo usuário)
-          if (data.must_change_password) {
-            sessionStorage.setItem('must_change_password', '1');
-          }
           window.location.href = 'dashboard.html';
-        } else if (res.status === 401) {
-          generalError.textContent = 'Usuário ou senha incorretos. Verifique e tente novamente.';
-          generalError.classList.remove('hidden');
-          emailField.focus();
         } else {
-          generalError.textContent = `Erro no servidor (${res.status}). Tente novamente em instantes.`;
-          generalError.classList.remove('hidden');
+          generalError.classList.remove('step-hidden');
         }
       } catch (err) {
-        generalError.textContent = 'Não foi possível conectar ao servidor. Verifique se a API está rodando.';
-        generalError.classList.remove('hidden');
+        generalError.innerText = 'Erro de conexão com o servidor.';
+        generalError.classList.remove('step-hidden');
       } finally {
         submitBtn.disabled = false;
-        btnText.textContent = 'Entrar no sistema';
+        btnText.innerText = 'Entrar no Sistema';
       }
     });
-
-    // Limpa erros ao digitar
-    emailField.addEventListener('input', () => {
-      emailError.classList.add('hidden');
-      emailField.classList.remove('error');
-      generalError.classList.add('hidden');
-    });
-    passwordField.addEventListener('input', () => {
-      passwordError.classList.add('hidden');
-      passwordField.classList.remove('error');
-      generalError.classList.add('hidden');
-    });
   </script>
-
-<!-- Modal: Esqueci a senha -->
-<div id="modal-senha" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
-  <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 space-y-4">
-    <div class="flex items-center gap-3">
-      <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
-        </svg>
-      </div>
-      <h3 class="text-base font-bold text-slate-800">Recuperação de acesso</h3>
-    </div>
-    <p class="text-sm text-slate-600 leading-relaxed">
-      O reset de senha é feito pelo <strong>administrador do sistema</strong>.<br><br>
-      Entre em contato com o responsável pelo escritório para que ele acesse o painel de administração e redefina sua senha.
-    </p>
-    <div class="bg-slate-50 rounded-lg px-4 py-3 text-xs text-slate-500">
-      <strong>Admin:</strong> acesse <code class="bg-white px-1 rounded border border-slate-200">admin.html</code> → coluna do usuário → <em>Resetar Senha</em>
-    </div>
-    <button onclick="document.getElementById('modal-senha').classList.add('hidden')"
-      class="w-full bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium py-2.5 rounded-xl transition-colors">
-      Entendido
-    </button>
-  </div>
-</div>
-
 </body>
 </html>
