@@ -45,11 +45,19 @@ data/auditoria/
 *.log
 .lixeira/
 
-# PDFs reais de clientes (LGPD — nunca commitar)
-samples/doc_calculo/MOREIRA/
-samples/doc_calculo/CANAVEZI/
-samples/doc_calculo/CONFI_AR/
-samples/doc_calculo/ITANGUA/
+# ⚠️ DADOS DE CLIENTES — LGPD — NUNCA COMMITAR ⚠️
+# PDFs, JSONs, HTMLs e qualquer documento real de cliente
+samples/doc_calculo/
+samples/piloto_*.json
+samples/piloto_*.html
+samples/piloto_*.pdf
+samples/piloto_3_clientes.py
+samples/revisao_pdf_*.pdf
+samples/teste_pdf_*.pdf
+samples/relatorio_*.pdf
+docs/pilotos/
+docs/piloto_*.pdf
+docs/piloto_*.html
 
 # Notas pessoais / master key em texto (raiz)
 /key.md.txt
