@@ -62,3 +62,8 @@ docs/piloto_*.html
 # Notas pessoais / master key em texto (raiz)
 /key.md.txt
 /key.md*.txt
+
+# READMEs de documentação interna ignorados
+UI/README.md
+PY/regimes/README.md
+PY/integrations/README.md
