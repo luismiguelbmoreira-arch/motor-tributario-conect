@@ -160,3 +160,10 @@ class BaseRegimeEngine:
             "timestamp": str(datetime.now()),
         }
         self.trilha.append(passo)
+
+    def calcular_carga_total_mensal(self, *args, **kwargs) -> Dict[str, Any]:
+        """
+        Método abstrato para cálculo de carga total.
+        Deve ser implementado pelas subclasses.
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} não implementou calcular_carga_total_mensal.")

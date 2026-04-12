@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="pt-br" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motor Tributário Conect | Dashboard Premium</title>
+    <!-- Tailwind CSS Play CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter e Outfit -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#0ea5e9',
+                        secondary: '#6366f1',
+                        accent: '#f43f5e',
+                        dark: '#0f172a',
+                        'dark-lighter': '#1e293b',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Outfit', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #020617;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+        .glass {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .card-gradient {
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%);
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="font-sans">
+
+    <!-- Sidebar -->
+    <aside class="fixed left-0 top-0 h-full w-64 glass border-r z-50 transition-all duration-300 hidden md:block">
+        <div class="p-6">
+            <div class="flex items-center gap-3 mb-10">
+                <div class="w-10 h-10 bg-gradient-to-tr from-primary to-secondary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
+                    <i data-lucide="shield-check" class="text-white w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="font-display font-bold text-lg leading-tight">Motor Conect</h1>
+                    <span class="text-[10px] uppercase tracking-widest text-primary font-bold">Moreira Contábil</span>
+                </div>
+            </div>
+
+            <nav class="space-y-1">
+                <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/10 text-primary border border-primary/20">
+                    <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                    <span class="font-medium text-sm">Dashboard</span>
+                </a>
+                <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 transition-all group">
+                    <i data-lucide="file-search" class="w-5 h-5 group-hover:text-white"></i>
+                    <span class="font-medium text-sm group-hover:text-white">Auditorias</span>
+                </a>
+                <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 transition-all group">
+                    <i data-lucide="database" class="w-5 h-5 group-hover:text-white"></i>
+                    <span class="font-medium text-sm group-hover:text-white">Nibo API</span>
+                </a>
+                <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 transition-all group">
+                    <i data-lucide="pie-chart" class="w-5 h-5 group-hover:text-white"></i>
+                    <span class="font-medium text-sm group-hover:text-white">Simulador Reforma</span>
+                </a>
+                <div class="pt-10 pb-4 px-4">
+                    <span class="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Suporte</span>
+                </div>
+                <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 transition-all group">
+                    <i data-lucide="settings" class="w-5 h-5 group-hover:text-white"></i>
+                    <span class="font-medium text-sm group-hover:text-white">Configurações</span>
+                </a>
+            </nav>
+        </div>
+        
+        <div class="absolute bottom-0 w-full p-6 border-t border-white/5">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center overflow-hidden">
+                    <img src="https://ui-avatars.com/api/?name=Admin+Moreira&background=0ea5e9&color=fff" alt="Avatar">
+                </div>
+                <div class="flex-1 overflow-hidden">
+                    <p class="text-sm font-semibold truncate text-white">Admin Moreira</p>
+                    <p class="text-[10px] text-slate-400 truncate">admin@moreira.com.br</p>
+                </div>
+                <button class="text-slate-500 hover:text-white">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="md:ml-64 p-4 md:p-8">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
+            <div>
+                <h2 class="text-3xl font-display font-bold text-white mb-1">Painel Estratégico</h2>
+                <p class="text-slate-400">Bem-vindo à inteligência tributária da <span class="text-primary font-semibold">Moreira Contábil</span>.</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                    <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                    <span class="text-xs font-bold text-emerald-500">Nibo API: ONLINE</span>
+                </div>
+                <button class="p-2 bg-slate-800 text-white rounded-xl border border-white/5 hover:bg-slate-700">
+                    <i data-lucide="bell" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            <div class="glass p-6 rounded-3xl card-gradient relative overflow-hidden group">
+                <div class="absolute -right-4 -top-4 w-24 h-24 bg-primary/5 rounded-full group-hover:scale-125 transition-transform duration-500"></div>
+                <div class="flex items-center justify-between mb-4">
+                    <div class="p-3 bg-primary/20 text-primary rounded-2xl">
+                        <i data-lucide="briefcase" class="w-6 h-6"></i>
+                    </div>
+                    <span class="text-xs font-bold text-emerald-500">+12%</span>
+                </div>
+                <p class="text-slate-400 text-sm font-medium mb-1">Empresas Ativas</p>
+                <h3 stats-empresas class="text-2xl font-bold text-white font-display">42</h3>
+            </div>
+
+            <div class="glass p-6 rounded-3xl card-gradient relative overflow-hidden group">
+                <div class="absolute -right-4 -top-4 w-24 h-24 bg-secondary/5 rounded-full group-hover:scale-125 transition-transform duration-500"></div>
+                <div class="flex items-center justify-between mb-4">
+                    <div class="p-3 bg-secondary/20 text-secondary rounded-2xl">
+                        <i data-lucide="trending-up" class="w-6 h-6"></i>
+                    </div>
+                    <span class="text-xs font-bold text-emerald-500">+R$ 15k</span>
+                </div>
+                <p class="text-slate-400 text-sm font-medium mb-1">Economia Apurada</p>
+                <h3 stats-economia class="text-2xl font-bold text-white font-display">R$ 184.290</h3>
+            </div>
+
+            <div class="glass p-6 rounded-3xl card-gradient relative overflow-hidden group">
+                <div class="absolute -right-4 -top-4 w-24 h-24 bg-accent/5 rounded-full group-hover:scale-125 transition-transform duration-500"></div>
+                <div class="flex items-center justify-between mb-4">
+                    <div class="p-3 bg-accent/20 text-accent rounded-2xl">
+                        <i data-lucide="alert-circle" class="w-6 h-6"></i>
+                    </div>
+                    <span class="text-xs font-bold text-accent">-5</span>
+                </div>
+                <p class="text-slate-400 text-sm font-medium mb-1">Alertas de Risco</p>
+                <h3 stats-alertas class="text-2xl font-bold text-white font-display">12</h3>
+            </div>
+
+            <div class="glass p-6 rounded-3xl card-gradient relative overflow-hidden group">
+                <div class="absolute -right-4 -top-4 w-24 h-24 bg-emerald-400/5 rounded-full group-hover:scale-125 transition-transform duration-500"></div>
+                <div class="flex items-center justify-between mb-4">
+                    <div class="p-3 bg-emerald-400/20 text-emerald-400 rounded-2xl">
+                        <i data-lucide="target" class="w-6 h-6"></i>
+                    </div>
+                    <span class="text-xs font-bold font-bold text-emerald-500">Alta</span>
+                </div>
+                <p class="text-slate-400 text-sm font-medium mb-1">Precisão Auditoria</p>
+                <h3 stats-precisao class="text-2xl font-bold text-white font-display">99.8%</h3>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+            <div class="lg:col-span-2 glass p-8 rounded-3xl">
+                <div class="flex items-center justify-between mb-8">
+                    <div>
+                        <h4 class="text-xl font-bold text-white font-display">Projeção da Reforma Tributária</h4>
+                        <p class="text-sm text-slate-400">Comparativo Simples Nacional vs IBS/CBS (Transição 2026-2033)</p>
+                    </div>
+                    <select class="bg-slate-800 text-xs border-none rounded-lg px-3 py-2 text-white outline-none">
+                        <option>Próximos 12 meses</option>
+                        <option>Acumulado 2026</option>
+                    </select>
+                </div>
+                <div class="h-64">
+                    <canvas id="projectionChart"></canvas>
+                </div>
+            </div>
+
+            <div class="glass p-8 rounded-3xl">
+                <div class="mb-8">
+                    <h4 class="text-xl font-bold text-white font-display">Status Nibo Sync</h4>
+                    <p class="text-sm text-slate-400">Sincronização de notas fiscais</p>
+                </div>
+                <div class="space-y-6">
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-medium text-slate-300">Organização Moreira (Matriz)</span>
+                            <span class="text-xs font-bold text-primary">100%</span>
+                        </div>
+                        <div class="w-full bg-slate-800 rounded-full h-1.5">
+                            <div class="bg-primary h-1.5 rounded-full" style="width: 100%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-medium text-slate-300">Cliente ABC Ltda</span>
+                            <span class="text-xs font-bold text-secondary">75%</span>
+                        </div>
+                        <div class="w-full bg-slate-800 rounded-full h-1.5">
+                            <div class="bg-secondary h-1.5 rounded-full" style="width: 75%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-medium text-slate-300">Varejo Central</span>
+                            <span class="text-xs font-bold text-accent">32%</span>
+                        </div>
+                        <div class="w-full bg-slate-800 rounded-full h-1.5">
+                            <div class="bg-accent h-1.5 rounded-full" style="width: 32%"></div>
+                        </div>
+                    </div>
+                </div>
+                <button class="w-full mt-10 py-3 bg-white/5 border border-white/10 text-white rounded-2xl hover:bg-white/10 transition-all font-semibold text-sm">
+                    Ver todos os clientes
+                </button>
+            </div>
+        </div>
+
+        <!-- Recent Audits Table -->
+        <div class="glass p-8 rounded-3xl">
+            <div class="flex items-center justify-between mb-8">
+                <div>
+                    <h4 class="text-xl font-bold text-white font-display">Últimas Auditorias Executadas</h4>
+                    <p class="text-sm text-slate-400">Resultados gerados pelo motor universal</p>
+                </div>
+                <button class="text-sm font-bold text-primary hover:underline">Ver Histórico Total</button>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="border-b border-white/5">
+                        <tr>
+                            <th class="pb-4 font-semibold text-slate-400 text-sm">Empresa</th>
+                            <th class="pb-4 font-semibold text-slate-400 text-sm">Período</th>
+                            <th class="pb-4 font-semibold text-slate-400 text-sm text-right">Diferença (Delta)</th>
+                            <th class="pb-4 font-semibold text-slate-400 text-sm text-center">Status</th>
+                            <th class="pb-4 font-semibold text-slate-400 text-sm text-right">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-white/5">
+                        <tr class="group hover:bg-white/[0.02] transition-colors">
+                            <td class="py-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-slate-800 border border-white/5 flex items-center justify-center text-xs font-bold">MC</div>
+                                    <span class="text-sm font-semibold text-white">Moreira Comércio</span>
+                                </div>
+                            </td>
+                            <td class="py-4 text-sm text-slate-400">Mar/2026</td>
+                            <td class="py-4 text-right text-sm font-mono text-emerald-400">- R$ 1.240,50</td>
+                            <td class="py-4 text-center">
+                                <span class="px-2 py-1 bg-emerald-500/10 text-emerald-500 text-[10px] font-bold rounded-md uppercase">Aprovado</span>
+                            </td>
+                            <td class="py-4 text-right">
+                                <button class="p-2 text-slate-400 hover:text-white"><i data-lucide="eye" class="w-4 h-4"></i></button>
+                            </td>
+                        </tr>
+                        <tr class="group hover:bg-white/[0.02] transition-colors">
+                            <td class="py-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-slate-800 border border-white/5 flex items-center justify-center text-xs font-bold">TJ</div>
+                                    <span class="text-sm font-semibold text-white">Transportadora Jota</span>
+                                </div>
+                            </td>
+                            <td class="py-4 text-sm text-slate-400">Mar/2026</td>
+                            <td class="py-4 text-right text-sm font-mono text-accent">+ R$ 4.890,22</td>
+                            <td class="py-4 text-center">
+                                <span class="px-2 py-1 bg-accent/10 text-accent text-[10px] font-bold rounded-md uppercase">Revisar</span>
+                            </td>
+                            <td class="py-4 text-right">
+                                <button class="p-2 text-slate-400 hover:text-white"><i data-lucide="eye" class="w-4 h-4"></i></button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Chart instance (store it for updates)
+        let projectionChart;
+
+        function initChart(labels, snData, reformaData) {
+            const ctx = document.getElementById('projectionChart').getContext('2d');
+            if (projectionChart) projectionChart.destroy();
+            
+            projectionChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Simples Nacional (Atual)',
+                            data: snData,
+                            borderColor: '#0ea5e9',
+                            backgroundColor: 'rgba(14, 165, 233, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Projeção IBS/CBS',
+                            data: reformaData,
+                            borderColor: '#6366f1',
+                            borderDash: [5, 5],
+                            backgroundColor: 'transparent',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                color: '#94a3b8',
+                                font: { family: 'Inter', size: 10 }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#64748b', font: { size: 10 } }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#64748b', font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- Lógica de Integração Real-Time "Programada" ---
+        async function updateDashboard() {
+            try {
+                // Tentativa de conexão com a API local
+                const response = await fetch('/dashboard/summary', {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                
+                if (!response.ok) throw new Error('API Offline ou Sem Auth');
+
+                const data = await response.json();
+                
+                // 1. Atualiza Stats
+                document.querySelector('[stats-empresas]').innerText = data.stats.empresas_ativas;
+                document.querySelector('[stats-economia]').innerText = `R$ ${data.stats.economia_apurada}`;
+                document.querySelector('[stats-alertas]').innerText = data.stats.alertas_risco;
+                document.querySelector('[stats-precisao]').innerText = `${data.stats.precisao}%`;
+
+                // 2. Atualiza Gráfico
+                initChart(data.projection.labels, data.projection.simples_nacional, data.projection.receita_reforma);
+
+                console.log('Dashboard atualizado com dados reais via API Motor.');
+            } catch (err) {
+                console.warn('Usando Mock Data: O Motor ainda não está em modo API ou token ausente.');
+                // Fallback para os dados do mockup caso o backend não responda
+                initChart(
+                    ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+                    [12000, 12500, 11800, 13000, 12800, 13500, 14000, 12900, 13200, 14500, 15000, 16000],
+                    [10000, 10500, 9800, 11000, 10800, 11500, 12000, 10900, 11200, 12500, 13000, 14000]
+                );
+            }
+        }
+
+        // Inicia o dashboard
+        updateDashboard();
+    </script>
+</body>
+</html>

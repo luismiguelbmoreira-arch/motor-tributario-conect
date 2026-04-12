@@ -35,6 +35,7 @@ from motor_tributario import (
     EmpresaFornecedora,
     MotorReformaTributaria,
     OperacaoFiscal,
+    _fmt_brl,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -81,7 +82,7 @@ def auditar_empresa(pasta_empresa: str | Path) -> dict:
     print(f"      Empresa: {dados.razao_social}")
     print(f"      CNPJ: {dados.cnpj}")
     print(f"      CNAE: {dados.cnae_principal}")
-    print(f"      RBT12: R$ {empresa_params['faturamento_12m']:,.2f}")
+    print(f"      RBT12: {_fmt_brl(empresa_params['faturamento_12m'])}")
     print(f"      Confianca extracao: {meta['confianca']:.0%}")
 
     if meta["campos_ausentes"]:
@@ -110,7 +111,7 @@ def auditar_empresa(pasta_empresa: str | Path) -> dict:
 
     # ETAPA 3: Calcular DAS
     print("\n[3/4] Calculando DAS pelo motor...")
-    rbt12 = motor.calcular_rbt12()
+    rbt12 = motor.rbt12
 
     engine = motor.obter_engine_regime()
     if engine is not None and hasattr(engine, "calcular_das_multi_atividade"):
@@ -119,24 +120,24 @@ def auditar_empresa(pasta_empresa: str | Path) -> dict:
         das_motor = resultado_multi["total_mensal"]
         ae = resultado_multi["aliquota_efetiva"]
         n_atividades = len(resultado_multi["atividades"])
-        print(f"      RBT12: R$ {rbt12:,.2f}")
+        print(f"      RBT12: {_fmt_brl(rbt12)}")
         print(f"      Modo: MULTI-ATIVIDADE ({n_atividades} atividades)")
         for item in resultado_multi["atividades"]:
             flag_st  = " [ST]"  if item["icms_st"]    else ""
             flag_iss = " [ISS-ret]" if item["iss_retido"] else ""
             print(f"        Anexo {item['anexo']}{flag_st}{flag_iss}: "
-                  f"R$ {item['receita']:,.2f} × {item['ae_liquida']*100:.4f}% = R$ {item['das']:,.2f}")
+                  f"{_fmt_brl(item['receita'])} × {item['ae_liquida']*100:.4f}% = {_fmt_brl(item['das'])}")
         print(f"      Aliquota Efetiva: {ae:.4%}")
-        print(f"      DAS Motor: R$ {das_motor:,.2f}")
+        print(f"      DAS Motor: {_fmt_brl(das_motor)}")
     else:
         # Mono-atividade: caminho original
-        anexo = motor.determinar_anexo()
-        ae = motor.calcular_aliquota_efetiva()
-        das_motor = motor.calcular_das_mensal()
-        print(f"      RBT12: R$ {rbt12:,.2f}")
+        anexo = motor.anexo_principal
+        ae = motor.aliquota_efetiva
+        das_motor = motor.das_mensal
+        print(f"      RBT12: {_fmt_brl(rbt12)}")
         print(f"      Anexo: {anexo}")
         print(f"      Aliquota Efetiva: {ae:.4%}")
-        print(f"      DAS Motor: R$ {das_motor:,.2f}")
+        print(f"      DAS Motor: {_fmt_brl(das_motor)}")
 
     # ETAPA 4: Comparar com e-CAC
     print("\n[4/4] Comparando com e-CAC...")
@@ -150,16 +151,17 @@ def auditar_empresa(pasta_empresa: str | Path) -> dict:
     print(f"\n{'='*60}")
     print(f"RESULTADO — {pasta.name}")
     print(f"{'='*60}")
-    print(f"  DAS Motor:   R$ {das_motor:>12,.2f}")
-    print(f"  DAS e-CAC:   R$ {das_ecac:>12,.2f}")
-    print(f"  Delta:       R$ {delta:>12,.2f} ({delta_pct:.2f}%)")
+    print(f"  DAS Motor:   {_fmt_brl(das_motor):>12}")
+    print(f"  DAS e-CAC:   {_fmt_brl(das_ecac):>12}")
+    print(f"  Delta:       {_fmt_brl(delta):>12} ({delta_pct:.2f}%)")
     print(f"  Status:      [{icone}] {status}")
 
     if auditoria_params.get("breakdown"):
         print("\nComposicao do DAS (e-CAC):")
         for tributo, valor in auditoria_params["breakdown"].items():
-            if valor and float(str(valor).replace(",", ".")) > 0:
-                print(f"  {tributo:<8}: R$ {float(str(valor).replace(',', '.')):>10,.2f}")
+            if valor and Decimal(str(valor).replace(",", ".")) > 0:
+                v_dec = Decimal(str(valor).replace(",", "."))
+                print(f"  {tributo:<8}: {_fmt_brl(v_dec)}")
 
     if meta["observacoes"]:
         print(f"\nObservacoes da IA: {meta['observacoes']}")
@@ -198,12 +200,12 @@ def main():
         resultado = auditar_empresa(pasta)
 
         if resultado["status"] == "APROVADO":
-            print(f"Auditoria concluida: APROVADO (delta R$ {resultado['delta']:.2f})")
+            print(f"Auditoria concluida: APROVADO (delta {_fmt_brl(resultado['delta'])})")
             sys.exit(0)
         else:
             print(
-                f"Auditoria concluida: REVISAR (delta R$ {resultado['delta']:.2f} "
-                f"— acima do limite de R$ {LIMITE_DELTA_ACEITAVEL})"
+                f"Auditoria concluida: REVISAR (delta {_fmt_brl(resultado['delta'])} "
+                f"— acima do limite de {_fmt_brl(LIMITE_DELTA_ACEITAVEL)})"
             )
             sys.exit(1)
 

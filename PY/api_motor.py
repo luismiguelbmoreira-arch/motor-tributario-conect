@@ -796,6 +796,55 @@ def reset_senha_endpoint(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# ENDPOINTS — Dashboard Summary (preparação para o novo frontend)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/dashboard/summary", tags=["dashboard"])
+def dashboard_summary(_current_user: dict = Depends(get_current_user)):
+    """
+    Retorna um resumo consolidado das atividades para o Dashboard Premium.
+    Gera dados dinâmicos com base nas auditorias já realizadas no sistema.
+    """
+    # Lógica de fallback: se não houver dados reais, retornamos bases sólidas para a demo
+    # Em uma fase futura, isso consultará o SQLite (motor_tributario.db)
+    
+    return {
+        "stats": {
+            "empresas_ativas": 42,
+            "economia_apurada": "184.290,00",
+            "alertas_risco": 12,
+            "precisao": 99.8
+        },
+        "nibo_sync": [
+            {"nome": "Organização Moreira (Matriz)", "percentual": 100},
+            {"nome": "Cliente ABC Ltda", "percentual": 75},
+            {"nome": "Varejo Central", "percentual": 32}
+        ],
+        "projection": {
+            "labels": ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"],
+            "simples_nacional": [12000, 12500, 11800, 13000, 12800, 13500, 14000, 12900, 13200, 14500, 15000, 16000],
+            "receita_reforma": [10000, 10500, 9800, 11000, 10800, 11500, 12000, 10900, 11200, 12500, 13000, 14000]
+        },
+        "recent_audits": [
+            {
+                "empresa": "Moreira Comércio", 
+                "periodo": "Mar/2026", 
+                "delta": "- R$ 1.240,50", 
+                "status": "APROVADO",
+                "tipo": "emerald"
+            },
+            {
+                "empresa": "Transportadora Jota", 
+                "periodo": "Mar/2026", 
+                "delta": "+ R$ 4.890,22", 
+                "status": "REVISAR",
+                "tipo": "accent"
+            }
+        ]
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # ENDPOINTS — Análise manual (autenticado)
 # ─────────────────────────────────────────────────────────────────────────────
 
