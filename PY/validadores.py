@@ -7,7 +7,9 @@ Padrão: NUNCA lança exceção pura. Retorna ValidationResult estruturado.
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import List
+from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
+from typing import Any, List, Optional
 
 logger = logging.getLogger("motor_conect.validadores")
 
@@ -155,3 +157,102 @@ def validar_cnae(cnae: str) -> ValidationResult:
             f"CNAE inválido: '{cnae}'. Deve conter exatamente 7 dígitos (ex: 4711302)."
         )
     return resultado
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DETECÇÃO DE ANOMALIAS E CROSSCHECK (Legado de validacoes.py)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_RBT12_VS_RPA_LIMITE = Decimal("20")
+_CONFIANCA_OCR_LIMIAR = 0.75
+_FOLHA_VS_RBT12_LIMITE = Decimal("1")
+_PIS_DIVERGENCIA_LIMITE = Decimal("0.05")
+
+_TOL_VERDE = Decimal("0.005")   # 0.5%
+_TOL_AMARELO = Decimal("0.05")  # 5%
+
+def _ts() -> str:
+    return datetime.now().isoformat()
+
+def rbt12_vs_rpa(rbt12: Decimal, rpa_mensal: Decimal) -> Optional[dict[str, Any]]:
+    """Dispara se RBT12 > 20× RPA (receita mensal média)."""
+    if rpa_mensal <= 0 or rbt12 <= 0:
+        return None
+    razao = rbt12 / rpa_mensal
+    if razao <= _RBT12_VS_RPA_LIMITE:
+        return None
+    return {
+        "tipo": "ALERTA_ANOMALIA_RBT12_DESPROPORCIONAL",
+        "id": "ANOMALIA_RBT12_VS_RPA",
+        "titulo": "RBT12 desproporcional ao RPA mensal",
+        "memoria": {
+            "rbt12": str(rbt12), "rpa_mensal": str(rpa_mensal),
+            "razao": str(razao.quantize(Decimal("0.01"))),
+        },
+        "interpretacao": (
+            f"RBT12 R$ {rbt12:,.2f} eh {razao:.1f}x o RPA mensal R$ {rpa_mensal:,.2f}. "
+            "Ou queda brutal ou erro de extracao. Revisar."
+        ),
+        "amparo_legal": "LC 123/2006, Art. 3 §2 — base RBT12 mensal",
+        "timestamp": _ts(),
+    }
+
+def folha_inconsistente(folha_12m: Decimal, rbt12: Decimal) -> Optional[dict[str, Any]]:
+    """Dispara se folha_12m > 100% do RBT12."""
+    if folha_12m <= 0 or rbt12 <= 0:
+        return None
+    if folha_12m <= rbt12 * _FOLHA_VS_RBT12_LIMITE:
+        return None
+    razao = folha_12m / rbt12
+    return {
+        "tipo": "ALERTA_ANOMALIA_FOLHA_IMPOSSIVEL",
+        "id": "ANOMALIA_FOLHA_VS_RBT12",
+        "titulo": "Folha maior que faturamento — provavel erro de separador decimal",
+        "memoria": {"folha_12m": str(folha_12m), "rbt12": str(rbt12), "razao": str(razao.quantize(Decimal("0.01")))},
+        "interpretacao": (
+            f"Folha R$ {folha_12m:,.2f} eh {razao:.1f}x o RBT12. "
+            "Verificar separador decimal do CSV (virgula vs ponto)."
+        ),
+        "amparo_legal": "LC 123/2006, Art. 18 §24 — Fator R exige folha real",
+        "timestamp": _ts(),
+    }
+
+def avaliar_das(das_calculado: Decimal, das_pago: Decimal) -> dict[str, Any]:
+    """Crosscheck DAS calculado pelo motor vs DAS efetivamente pago."""
+    das_calc = Decimal(das_calculado).quantize(Decimal("0.01"), ROUND_HALF_UP)
+    das_pg = Decimal(das_pago).quantize(Decimal("0.01"), ROUND_HALF_UP)
+    delta_abs = (das_pg - das_calc).copy_abs()
+
+    _INTERPRETACAO_DAS = {
+        "verde": "Divergencia <=0.5% — arredondamento aceitavel.",
+        "amarelo": "Divergencia 0.5-5% — verificar periodo ou exclusao ICMS-ST.",
+        "vermelho": "Divergencia >5% — possivel erro de apuracao. Revisar PGDAS-D.",
+    }
+
+    if das_calc == 0:
+        semaforo = "verde" if das_pg == 0 else "vermelho"
+        delta_pct = Decimal("0") if das_pg == 0 else Decimal("100")
+    else:
+        delta_pct_raw = delta_abs / das_calc
+        delta_pct = (delta_pct_raw * 100).quantize(Decimal("0.01"), ROUND_HALF_UP)
+        if delta_pct_raw <= _TOL_VERDE:
+            semaforo = "verde"
+        elif delta_pct_raw <= _TOL_AMARELO:
+            semaforo = "amarelo"
+        else:
+            semaforo = "vermelho"
+
+    return {
+        "tipo": "SEMAFORO_DAS",
+        "id": "SEMAFORO_DAS_CROSSCHECK",
+        "titulo": f"Crosscheck DAS calculado vs pago — {semaforo.upper()}",
+        "semaforo": semaforo,
+        "memoria": {
+            "das_calculado": str(das_calc),
+            "das_pago": str(das_pg),
+            "delta_abs": str(delta_abs),
+            "delta_pct": str(delta_pct),
+        },
+        "interpretacao": _INTERPRETACAO_DAS[semaforo],
+        "amparo_legal": "LC 123/2006, Art. 21 — apuracao mensal do DAS unificado",
+    }

@@ -32,6 +32,7 @@ DÉCIMAL:
 import json
 import logging
 import os
+import re
 import sys
 import warnings
 from contextlib import asynccontextmanager
@@ -67,7 +68,7 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import JSONResponse, Response, StreamingResponse  # noqa: E402
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
-from pydantic import BaseModel, ConfigDict, Field  # noqa: E402
+from pydantic import BaseModel, ConfigDict, Field, field_validator  # noqa: E402
 from pydantic import ValidationError as PydanticValidationError  # noqa: E402
 from slowapi import Limiter, _rate_limit_exceeded_handler  # noqa: E402
 from slowapi.errors import RateLimitExceeded  # noqa: E402
@@ -98,6 +99,8 @@ from core.motor_tributario import (  # noqa: E402
 from schemas.catalogo_documentos import montar_cards  # noqa: E402
 from schemas.documentos_requeridos import CardsResponse  # noqa: E402
 from utils.periodo_base import ANO_MAX, ANO_MIN  # noqa: E402
+import database  # noqa: E402
+from validadores import validar_cnpj, validar_uf, validar_cnae  # noqa: E402
 from utils.periodo_base import derivar as derivar_periodo  # noqa: E402
 
 # relatorio_pdf importado lazy no endpoint — evita crash de startup se GTK ausente (Windows)
@@ -157,33 +160,9 @@ TOTAL_TESTES = 327  # Atualizado 08/04/2026: + 7 testes LGPD PII separation (fix
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SECURITY — HTTPBearer + helpers de dependency injection
+# SECURITY — Importados de api.dependencies
 # ─────────────────────────────────────────────────────────────────────────────
-
-security = HTTPBearer()
-
-
-def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> dict:
-    """
-    Dependency FastAPI: extrai e valida o Bearer token JWT.
-    Lança HTTPException 401 se token inválido ou expirado.
-    """
-    return verificar_token(credentials.credentials)
-
-
-def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
-    """
-    Dependency FastAPI: exige role == "admin".
-    Lança HTTPException 403 se usuário não for administrador.
-    """
-    if current_user.get("role") != "admin":
-        raise HTTPException(
-            status_code=403,
-            detail="Acesso restrito a administradores.",
-        )
-    return current_user
+from api.dependencies import get_current_user, require_admin, security, limiter
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -206,22 +185,6 @@ class AuditarBatchRequest(BaseModel):
     )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# MODELOS DE REQUEST — Autenticação e administração
-# ─────────────────────────────────────────────────────────────────────────────
-
-class LoginRequest(BaseModel):
-    """Credenciais para autenticação via username + senha."""
-    username: str
-    password: str
-
-
-class CriarUsuarioRequest(BaseModel):
-    """Dados necessários para criar novo usuário no sistema."""
-    username: str
-    email: str
-    password: str
-    role: Literal["admin", "usuario"] = "usuario"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -238,12 +201,39 @@ class AnaliseManualRequest(BaseModel):
 
     # ── EmpresaFornecedora ────────────────────────────────────────────────────
     cnpj: str = Field(..., description="CNPJ com ou sem pontuação")
+
+    @field_validator("cnpj")
+    @classmethod
+    def validar_cnpj_manual(cls, v: str) -> str:
+        """Valida CNPJ na entrada manual."""
+        res = validar_cnpj(v)
+        if not res.ok:
+            raise ValueError(f"CNPJ Invalido: {', '.join(res.errors)}")
+        return re.sub(r'[\s.\-/]', '', v.strip())
     razao_social: str = Field(..., min_length=2, description="Razão social completa")
     regime: Literal["SIMPLES", "PRESUMIDO", "REAL", "MEI"] = Field(
         ..., description="Regime tributário"
     )
     cnae_principal: str = Field(..., description="CNAE principal (7 dígitos)")
     uf_origem: str = Field(..., description="UF de origem (2 letras)")
+
+    @field_validator("uf_origem")
+    @classmethod
+    def validar_uf_manual(cls, v: str) -> str:
+        """Valida UF na entrada manual."""
+        res = validar_uf(v)
+        if not res.ok:
+            raise ValueError(f"UF Invalida: {', '.join(res.errors)}")
+        return v.strip().upper()
+
+    @field_validator("cnae_principal")
+    @classmethod
+    def validar_cnae_manual(cls, v: str) -> str:
+        """Valida CNAE na entrada manual."""
+        res = validar_cnae(v)
+        if not res.ok:
+            raise ValueError(f"CNAE Invalido: {', '.join(res.errors)}")
+        return re.sub(r'[\s.\-/]', '', v.strip())
     faturamento_12m: Decimal = Field(..., ge=Decimal("0"), description="RBT12 em R$")
     folha_salarios_12m: Optional[Decimal] = Field(
         default=None, ge=Decimal("0"),
@@ -361,28 +351,6 @@ class BatchResult(BaseModel):
     erros: list[dict]            # {"empresa": str, "erro": str} — falhas individuais
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# MODELOS DE RESPONSE — Autenticação e administração
-# ─────────────────────────────────────────────────────────────────────────────
-
-class LoginResponse(BaseModel):
-    """Resposta do login com token JWT e dados básicos do usuário."""
-    access_token: str
-    token_type: str = "bearer"
-    username: str
-    role: str
-    must_change_password: bool = False  # True = redirecionar para troca de senha
-
-
-class UsuarioResponse(BaseModel):
-    """Dados públicos de um usuário — sem hashed_password."""
-    id: int
-    username: str
-    email: str
-    role: str
-    ativo: bool
-    created_at: str
-    ultimo_acesso: Optional[str]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -421,7 +389,6 @@ async def lifespan(app: FastAPI):
 # ─────────────────────────────────────────────────────────────────────────────
 # RATE LIMITING — protege login contra brute force e API contra abuso
 # ─────────────────────────────────────────────────────────────────────────────
-limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
     title="Motor Tributário Conect 2026-2033",
@@ -432,6 +399,14 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan,
 )
+
+from api.routers import auth, usuarios
+app.include_router(auth.router)
+app.include_router(usuarios.router)
+from api.routers import integracoes, auditoria
+app.include_router(integracoes.router)
+app.include_router(auditoria.router)
+
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -505,225 +480,6 @@ def perfil_cnae(
 # Futuramente, as rotas que consomem o planejamento_tributario.py serão injetadas aqui.
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ENDPOINTS — Autenticação (público: /auth/login)
-# ─────────────────────────────────────────────────────────────────────────────
-
-@app.post("/auth/login", response_model=LoginResponse, tags=["auth"])
-@limiter.limit("5/minute")
-def login(request: Request, req: LoginRequest):
-    """
-    Autentica usuário e retorna JWT Bearer token (exp 8h).
-    Rate limit: 5 tentativas por minuto por IP.
-
-    Erros HTTP:
-      401 — credenciais inválidas ou usuário inativo
-      429 — muitas tentativas (rate limit)
-    """
-    user = autenticar_usuario(req.username, req.password)
-    if user is None:
-        raise HTTPException(
-            status_code=401,
-            detail="Credenciais inválidas.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    token = gerar_token_jwt(
-        user_id=user.id,
-        username=user.username,
-        role=user.role,
-    )
-    return LoginResponse(
-        access_token=token,
-        token_type="bearer",
-        username=user.username,
-        role=user.role,
-        must_change_password=user.must_change_password,
-    )
-
-
-@app.get("/auth/me", tags=["auth"])
-def me(current_user: dict = Depends(get_current_user)):
-    """
-    Retorna dados básicos do usuário autenticado (extraídos do JWT).
-    Não consulta banco — usa apenas claims do token.
-    """
-    return {
-        "user_id": current_user.get("sub"),
-        "username": current_user.get("username"),
-        "role": current_user.get("role"),
-    }
-
-
-@app.post("/auth/refresh", tags=["auth"])
-def refresh_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-):
-    """
-    Renova JWT se restam menos de 2h para expirar.
-    Retorna novo token ou 304 se ainda não precisa renovar.
-    O frontend chama periodicamente (ex: a cada 30min).
-    """
-    novo = renovar_token_jwt(credentials.credentials)
-    if novo is None:
-        return JSONResponse(
-            status_code=304,
-            content={"detail": "Token ainda válido, renovação não necessária."},
-        )
-    return {"access_token": novo, "token_type": "bearer"}
-
-
-class TrocarSenhaRequest(BaseModel):
-    senha_atual: str = Field(..., min_length=1)
-    nova_senha: str = Field(..., min_length=8)
-
-
-@app.post("/auth/change-password", tags=["auth"])
-def change_password(
-    req: TrocarSenhaRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """
-    Permite que o usuário autenticado altere sua própria senha.
-    Verifica a senha atual antes de aceitar a nova.
-    Limpa o flag must_change_password após sucesso.
-
-    Erros HTTP:
-      400 — senha atual incorreta ou nova senha muito curta
-      404 — usuário não encontrado (inconsistência de banco)
-    """
-    user_id = int(current_user["sub"])
-    try:
-        sucesso = trocar_senha_proprio(user_id, req.senha_atual, req.nova_senha)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    if not sucesso:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
-    logger.info("Troca de senha confirmada | user_id=%s", user_id)
-    return {"detail": "Senha alterada com sucesso."}
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# ENDPOINTS — Administração (requer role == "admin")
-# ─────────────────────────────────────────────────────────────────────────────
-
-@app.post("/admin/usuarios", response_model=UsuarioResponse, tags=["admin"])
-@limiter.limit("10/minute")
-def criar_usuario_endpoint(
-    request: Request,
-    req: CriarUsuarioRequest,
-    _admin: dict = Depends(require_admin),
-):
-    """
-    Cria novo usuário no sistema. Requer role admin.
-
-    Erros HTTP:
-      400 — username ou e-mail já cadastrado
-      403 — usuário não é admin
-    """
-    try:
-        novo = criar_usuario(
-            username=req.username,
-            email=req.email,
-            senha_plain=req.password,
-            role=req.role,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-    return UsuarioResponse(
-        id=novo.id,
-        username=novo.username,
-        email=novo.email,
-        role=novo.role,
-        ativo=novo.ativo,
-        created_at=novo.created_at,
-        ultimo_acesso=novo.ultimo_acesso,
-    )
-
-
-@app.get("/admin/usuarios", response_model=list[UsuarioResponse], tags=["admin"])
-def listar_usuarios_endpoint(_admin: dict = Depends(require_admin)):
-    """
-    Lista todos os usuários cadastrados, ordenados por ID. Requer role admin.
-    """
-    usuarios = listar_usuarios()
-    return [
-        UsuarioResponse(
-            id=u.id,
-            username=u.username,
-            email=u.email,
-            role=u.role,
-            ativo=u.ativo,
-            created_at=u.created_at,
-            ultimo_acesso=u.ultimo_acesso,
-        )
-        for u in usuarios
-    ]
-
-
-@app.post("/admin/usuarios/{user_id}/desativar", tags=["admin"])
-def desativar_usuario_endpoint(
-    user_id: int,
-    admin: dict = Depends(require_admin),
-):
-    """
-    Desativa usuário por ID (soft delete — não apaga do banco). Requer role admin.
-
-    Erros HTTP:
-      404 — usuário não encontrado
-      403 — usuário não é admin
-      409 — bloqueado: último admin ativo não pode ser desativado
-    """
-    # Proteção: impede que o último admin ativo seja desativado
-    todos = listar_usuarios()
-    admins_ativos = [u for u in todos if u.role == "admin" and u.ativo]
-    alvo = next((u for u in todos if u.id == user_id), None)
-    if alvo and alvo.role == "admin" and alvo.ativo and len(admins_ativos) <= 1:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "Operação bloqueada: você é o único administrador ativo. "
-                "Promova outro usuário a admin antes de se desativar."
-            ),
-        )
-    sucesso = desativar_usuario(user_id)
-    if not sucesso:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Usuário id={user_id} não encontrado.",
-        )
-    return {"detail": f"Usuário id={user_id} desativado com sucesso."}
-
-
-class ResetSenhaRequest(BaseModel):
-    nova_senha: str = Field(..., min_length=8, description="Nova senha (mínimo 8 caracteres)")
-
-
-@app.post("/admin/usuarios/{user_id}/reset-senha", tags=["admin"])
-def reset_senha_endpoint(
-    user_id: int,
-    req: ResetSenhaRequest,
-    _admin: dict = Depends(require_admin),
-):
-    """
-    Redefine a senha de um usuário. Apenas admins.
-    A nova senha deve ter no mínimo 8 caracteres.
-
-    Erros HTTP:
-      400 — senha muito curta
-      404 — usuário não encontrado
-      403 — usuário não é admin
-    """
-    try:
-        sucesso = resetar_senha(user_id, req.nova_senha)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    if not sucesso:
-        raise HTTPException(status_code=404, detail=f"Usuário id={user_id} não encontrado.")
-    return {"detail": f"Senha do usuário id={user_id} redefinida com sucesso."}
-
-
-# ─────────────────────────────────────────────────────────────────────────────
 # ENDPOINTS — Dashboard Summary (preparação para o novo frontend)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -733,43 +489,24 @@ def dashboard_summary(_current_user: dict = Depends(get_current_user)):
     Retorna um resumo consolidado das atividades para o Dashboard Premium.
     Gera dados dinâmicos com base nas auditorias já realizadas no sistema.
     """
-    # Lógica de fallback: se não houver dados reais, retornamos bases sólidas para a demo
-    # Em uma fase futura, isso consultará o SQLite (motor_tributario.db)
+    try:
+        metrics = database.get_dashboard_metrics()
+    except Exception as exc:
+        logger.error("Erro ao carregar métricas do dashboard: %s", exc)
+        # Fallback para não quebrar a UI
+        return {
+            "stats": {"empresas_ativas": 0, "economia_apurada": "0,00", "alertas_risco": 0, "precisao": 0.0},
+            "recent_audits": []
+        }
+
+    # Dados de integração externa (Nibo/Sieg) ainda mockados (fase futura)
+    metrics["nibo_sync"] = [
+        {"nome": "Organização Moreira (Matriz)", "percentual": 100},
+        {"nome": "Cliente ABC Ltda", "percentual": 75},
+        {"nome": "Varejo Central", "percentual": 32}
+    ]
     
-    return {
-        "stats": {
-            "empresas_ativas": 42,
-            "economia_apurada": "184.290,00",
-            "alertas_risco": 12,
-            "precisao": 99.8
-        },
-        "nibo_sync": [
-            {"nome": "Organização Moreira (Matriz)", "percentual": 100},
-            {"nome": "Cliente ABC Ltda", "percentual": 75},
-            {"nome": "Varejo Central", "percentual": 32}
-        ],
-        "projection": {
-            "labels": ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"],
-            "simples_nacional": [12000, 12500, 11800, 13000, 12800, 13500, 14000, 12900, 13200, 14500, 15000, 16000],
-            "receita_reforma": [10000, 10500, 9800, 11000, 10800, 11500, 12000, 10900, 11200, 12500, 13000, 14000]
-        },
-        "recent_audits": [
-            {
-                "empresa": "Moreira Comércio", 
-                "periodo": "Mar/2026", 
-                "delta": "- R$ 1.240,50", 
-                "status": "APROVADO",
-                "tipo": "emerald"
-            },
-            {
-                "empresa": "Transportadora Jota", 
-                "periodo": "Mar/2026", 
-                "delta": "+ R$ 4.890,22", 
-                "status": "REVISAR",
-                "tipo": "accent"
-            }
-        ]
-    }
+    return metrics
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1082,125 +819,6 @@ def _validar_docs_por_regime(
     return faltando
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SIEG — Sincronização direta de XMLs (PARTE 2 do pareamento)
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-class SiegSincronizarRequest(BaseModel):
-    """
-    Request do endpoint POST /sieg/sincronizar.
-
-    Janela recomendada: 12 meses retroativos ao mês-corte (alinhada com
-    o período-base do diagnóstico). Use ano_base para baixar o ano inteiro
-    (atalho 01/01..31/12).
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    cnpj: str = Field(..., description="CNPJ (14 dígitos, com ou sem pontuação)")
-    data_inicio: Optional[str] = Field(None, description="ISO YYYY-MM-DD")
-    data_fim: Optional[str] = Field(None, description="ISO YYYY-MM-DD")
-    ano_base: Optional[int] = Field(
-        None,
-        ge=2020,
-        le=2033,
-        description="Atalho: baixa 01/01..31/12 do ano informado",
-    )
-    xml_type: int = Field(
-        1,
-        description="1=NFe (default), 2=CTe, 3=NFSe, 4=NFCe",
-    )
-
-
-@app.post(
-    "/sieg/sincronizar",
-    summary="Baixa XMLs da Sieg e persiste cifrados em auditoria_documentos",
-    tags=["Integrações"],
-)
-async def sieg_sincronizar(
-    payload: SiegSincronizarRequest,
-    current_user: dict = Depends(get_current_user),
-) -> JSONResponse:
-    """
-    Sincronização Sieg → storage_cifrado → DB.
-
-    Idempotente: re-executar a mesma janela não duplica registros. XMLs
-    já conhecidos (mesmo hash SHA-256) são pulados sem refazer I/O.
-
-    A API key da Sieg NÃO trafega no request — ela vem das 3 fontes
-    canônicas (env, arquivo protegido, AWS Secrets Manager).
-
-    Amparo: MAX_FISCAL_05 (auditoria documental obrigatória) +
-    LGPD Art. 37 (registro das operações de tratamento).
-    """
-    from datetime import date as _date
-
-    # ─ resolver janela ─
-    if payload.ano_base:
-        if payload.data_inicio or payload.data_fim:
-            raise HTTPException(
-                status_code=422,
-                detail="ano_base é mutuamente exclusivo com data_inicio/data_fim",
-            )
-        data_inicio = _date(payload.ano_base, 1, 1)
-        data_fim = _date(payload.ano_base, 12, 31)
-    else:
-        if not payload.data_inicio or not payload.data_fim:
-            raise HTTPException(
-                status_code=422,
-                detail="Forneça ano_base OU (data_inicio E data_fim)",
-            )
-        try:
-            data_inicio = _date.fromisoformat(payload.data_inicio)
-            data_fim = _date.fromisoformat(payload.data_fim)
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=422, detail=f"Data inválida: {exc}"
-            ) from exc
-
-    # Lazy imports — evita pagar o custo se o endpoint nunca for chamado
-    from integrations.sieg_adapter import (
-        XML_TYPES_VALIDOS,
-        SiegAdapter,
-        SiegError,
-    )
-    from integrations.sieg_credentials import (
-        SiegCredentialError,
-        get_sieg_api_key,
-    )
-    from integrations.sieg_ingestor import SiegIngestor
-
-    if payload.xml_type not in XML_TYPES_VALIDOS:
-        raise HTTPException(
-            status_code=422,
-            detail=f"xml_type inválido — esperado um de {list(XML_TYPES_VALIDOS)}",
-        )
-
-    try:
-        api_key = get_sieg_api_key()
-    except SiegCredentialError as exc:
-        logger.error("SIEG_API_KEY ausente — endpoint não pode operar")
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-
-    adapter = SiegAdapter(api_key=api_key)
-    ingestor = SiegIngestor(adapter)
-
-    try:
-        resultado = ingestor.sincronizar(
-            cnpj=payload.cnpj,
-            data_inicio=data_inicio,
-            data_fim=data_fim,
-            xml_type=payload.xml_type,
-            uploaded_by_user_id=current_user.get("id"),
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except SiegError as exc:
-        logger.error("Sieg sincronizar falhou: %s", exc)
-        raise HTTPException(status_code=502, detail=f"Sieg: {exc}") from exc
-
-    return JSONResponse(content=resultado.to_dict(), status_code=200)
 
 
 @app.get(
@@ -1511,15 +1129,15 @@ async def analise_pdf(
             "sped_efd_cofins_devido": str(efd_contrib_data.cofins_valor_devido) if efd_contrib_data else None,
         }
 
-        # ─── Observability layer (Akita Rails) ──────────────────────────────
+        # ─── Validações e crosschecks (módulo unificado) ────────────────────
         try:
             from decimal import Decimal as _D
 
-            from observability import anomalias, hmac_trilha, semaforo_das
+            from validacoes import avaliar_das, detectar_anomalias
 
             trilha = diagnostico.get("trilha_auditoria") or []
 
-            # 1. Anomaly detection
+            # 1. Detecção de anomalias
             rbt12_raw = diagnostico.get("rbt12") or diagnostico.get("_extracao", {}).get("rbt12")
             confianca_raw = (diagnostico.get("_extracao", {}) or {}).get("confianca")
             folha_raw = (diagnostico.get("_extracao", {}) or {}).get("folha_12m")
@@ -1535,7 +1153,7 @@ async def analise_pdf(
                 pis_nfe = getattr(nfe_data, "pis_total", None) or getattr(nfe_data, "total_pis", None)
                 cofins_nfe = getattr(nfe_data, "cofins_total", None) or getattr(nfe_data, "total_cofins", None)
 
-            alertas = anomalias.detectar(
+            alertas = detectar_anomalias(
                 rbt12=rbt12_dec,
                 rpa_mensal=rpa_dec,
                 confianca_extracao=conf_float,
@@ -1546,28 +1164,23 @@ async def analise_pdf(
                 cofins_nfe=cofins_nfe,
             )
             diagnostico["_anomalias"] = alertas
-            for alerta in alertas:
-                trilha.append(alerta)
+            trilha.extend(alertas)
 
             # 2. Semáforo DAS (quando calc e pago presentes)
             das_calc_raw = diagnostico.get("das_calculado") or diagnostico.get("valor_das")
             das_pago_raw = (diagnostico.get("_extracao", {}) or {}).get("das_pago_e_cac")
             if das_calc_raw and das_pago_raw:
                 try:
-                    semaforo = semaforo_das.avaliar(
-                        _D(str(das_calc_raw)),
-                        _D(str(das_pago_raw)),
-                    )
+                    semaforo = avaliar_das(_D(str(das_calc_raw)), _D(str(das_pago_raw)))
                     diagnostico["_semaforo_das"] = semaforo
                     trilha.append(semaforo)
                 except Exception as exc_sem:
                     logger.warning("Falha ao avaliar semáforo DAS: %s", exc_sem)
 
-            # 3. HMAC trilha signing (integridade de prova fiscal)
-            if trilha:
-                diagnostico["trilha_auditoria"] = hmac_trilha.assinar_trilha(trilha)
+            # HMAC removido daqui — assinatura apenas na persistência definitiva
+            diagnostico["trilha_auditoria"] = trilha
         except Exception as exc_obs:
-            logger.warning("Falha na camada de observability: %s", exc_obs)
+            logger.warning("Falha nas validacoes: %s", exc_obs)
 
         return JSONResponse(content=_serializar_decimal(payload))
 
@@ -1599,291 +1212,9 @@ async def analise_pdf(
 # Decifra todos os PDFs cifrados de um cliente e devolve um ZIP com:
 #   - originais/<nome>.pdf         (decifrados on-the-fly)
 #   - HASHES.txt                   (hash SHA-256 esperado de cada arquivo)
-#   - README.txt                   (metadados: quando, quem, LGPD Art. 37)
-#
-# Cada decifragem é registrada em AuditoriaAcessoDB (LGPD Art. 37).
-# Exige motivo explícito via query param.
-# ─────────────────────────────────────────────────────────────────────────────
-
-@app.get(
-    "/auditoria/prova/cnpj/{cnpj_digitos}",
-    summary="Gera dossiê de prova ZIP com PDFs decifrados de um cliente",
-    tags=["Auditoria"],
-)
-async def gerar_dossie_prova(
-    cnpj_digitos: str,
-    motivo: str = Query(
-        ...,
-        min_length=10,
-        max_length=500,
-        description="Motivo do acesso (LGPD Art. 37). Ex: 'Fiscalizacao RFB processo 123/2026'",
-    ),
-    current_user: dict = Depends(get_current_user),
-    request: Request = None,  # type: ignore[assignment]
-) -> StreamingResponse:
-    """
-    Monta o dossiê de prova de um cliente como ZIP binário:
-
-      dossie_<cnpj_anon>_<timestamp>.zip
-      ├── originais/
-      │   ├── pgdasd-extrato.pdf
-      │   ├── das_01_2026.pdf
-      │   └── ...
-      ├── HASHES.txt
-      └── README.txt
-
-    Cada PDF é decifrado on-the-fly via storage_cifrado.decifrar usando
-    a chave derivada do CNPJ. O registro de acesso é gravado em
-    AuditoriaAcessoDB com o motivo, user_id e IP (LGPD Art. 37).
-
-    Exige Bearer token JWT válido e motivo explícito. Retorna 404 se o
-    cliente não tem documentos, 500 se alguma decifragem falhar.
-    """
-    import io
-    import zipfile
-    from datetime import datetime as _dt
-    from pathlib import Path as _Path
-
-    from database import (
-        buscar_documentos_por_cnpj,
-        registrar_acesso_documento,
-    )
-    from services.storage_cifrado import anonimizar_cnpj, decifrar
-
-    # Normaliza CNPJ: remove qualquer não-dígito, exige 14 dígitos
-    apenas_digitos = "".join(c for c in (cnpj_digitos or "") if c.isdigit())
-    if len(apenas_digitos) != 14:
-        raise HTTPException(
-            status_code=422,
-            detail=f"CNPJ deve ter 14 digitos. Recebido: {len(apenas_digitos)}.",
-        )
-    # Formata para o formato canônico usado pelo extrator (XX.XXX.XXX/XXXX-XX)
-    cnpj_formatado = (
-        f"{apenas_digitos[:2]}.{apenas_digitos[2:5]}.{apenas_digitos[5:8]}"
-        f"/{apenas_digitos[8:12]}-{apenas_digitos[12:]}"
-    )
-    # Usamos o formato formatado para buscar (é o que está no DB),
-    # mas passamos os dígitos puros para storage_cifrado.decifrar
-    # (que normaliza internamente via HKDF sobre dígitos).
-    cnpj = cnpj_formatado
-
-    # Extrai user_id + IP para auditoria
-    try:
-        user_id = int(current_user.get("id")) if current_user else None
-    except (TypeError, ValueError):
-        user_id = None
-    ip = None
-    if request is not None:
-        try:
-            ip = request.client.host if request.client else None  # type: ignore[attr-defined]
-        except Exception:
-            ip = None
-
-    # Busca documentos do cliente (não purgados) — tenta primeiro o formato
-    # canônico, depois os dígitos puros (compat com entradas antigas)
-    docs = buscar_documentos_por_cnpj(cnpj_formatado)
-    if not docs:
-        docs = buscar_documentos_por_cnpj(apenas_digitos)
-    if not docs:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Nenhum documento de auditoria encontrado para o CNPJ {cnpj_formatado}.",
-        )
-
-    # Monta ZIP em memória
-    buffer = io.BytesIO()
-    cnpj_anon = anonimizar_cnpj(cnpj)
-    timestamp = _dt.now().strftime("%Y%m%d-%H%M%S")
-    hashes_txt = [
-        "# DOSSIE DE PROVA — Motor Tributario Conect",
-        f"# CNPJ anonimizado: {cnpj_anon}",
-        f"# Gerado em: {_dt.now().isoformat()}",
-        f"# Solicitante: user_id={user_id}",
-        f"# Motivo: {motivo}",
-        "#",
-        "# Verificacao: sha256sum originais/*.pdf deve bater com as linhas abaixo.",
-        "#",
-    ]
-    erros: list[str] = []
-
-    with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-        for doc in docs:
-            try:
-                plaintext = decifrar(
-                    _Path(doc.storage_path),
-                    cnpj,
-                    hash_esperado=doc.hash_sha256,
-                )
-                # Sanitiza nome (evita path traversal no ZIP)
-                nome_seguro = doc.nome_original.replace("/", "_").replace("\\", "_")
-                zf.writestr(f"originais/{nome_seguro}", plaintext)
-                hashes_txt.append(f"{doc.hash_sha256}  originais/{nome_seguro}")
-
-                # LGPD Art. 37: registra o acesso
-                registrar_acesso_documento(
-                    documento_id=doc.id,
-                    motivo=motivo,
-                    acessado_por_user_id=user_id,
-                    ip=ip,
-                )
-            except Exception as exc:
-                logger.error(
-                    "Falha ao decifrar doc_id=%s no dossie de %s: %s",
-                    doc.id, cnpj_anon, exc,
-                )
-                erros.append(f"{doc.nome_original}: {type(exc).__name__}")
-
-        # HASHES.txt
-        zf.writestr("HASHES.txt", "\n".join(hashes_txt).encode("utf-8"))
-
-        # README.txt
-        readme = [
-            "DOSSIE DE PROVA — Motor Tributario Conect",
-            "=" * 50,
-            "",
-            f"Cliente (CNPJ anonimizado): {cnpj_anon}",
-            f"Gerado em: {_dt.now().isoformat()}",
-            f"Documentos incluidos: {len(docs) - len(erros)}",
-            f"Falhas de decifragem: {len(erros)}",
-            "",
-            "Solicitante:",
-            f"  user_id: {user_id}",
-            f"  ip: {ip or 'N/A'}",
-            f"  motivo: {motivo}",
-            "",
-            "Conteudo do ZIP:",
-            "  originais/         PDFs decifrados, idênticos ao upload original",
-            "  HASHES.txt         SHA-256 esperado de cada arquivo",
-            "  README.txt         este arquivo",
-            "",
-            "Como verificar integridade:",
-            "  1. Extraia o ZIP",
-            "  2. Rode: sha256sum originais/*.pdf",
-            "  3. Compare com HASHES.txt — devem bater byte a byte",
-            "",
-            "Base legal:",
-            "  - LGPD Art. 37 (Lei 13.709/2018): registro de operacoes de tratamento",
-            "  - CTN Art. 173: prazo decadencial de 5 anos",
-            "  - CTN Art. 142: constituicao do credito exige prova documental",
-            "",
-            "Este dossie eh prova de que os dados analisados vieram EXATAMENTE",
-            "destes arquivos, no momento registrado. Qualquer divergencia entre",
-            "os PDFs aqui e os calculos do diagnostico eh responsabilidade de",
-            "quem enviou o arquivo, nao do contador que processou.",
-        ]
-        if erros:
-            readme.extend(["", "FALHAS DE DECIFRAGEM:", *[f"  - {e}" for e in erros]])
-        zf.writestr("README.txt", "\n".join(readme).encode("utf-8"))
-
-    buffer.seek(0)
-    filename = f"dossie_{cnpj_anon}_{timestamp}.zip"
-    logger.info(
-        "Dossie gerado | cnpj_anon=%s | docs=%d | erros=%d | user_id=%s",
-        cnpj_anon, len(docs), len(erros), user_id,
-    )
-    return StreamingResponse(
-        buffer,
-        media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# INTEGRA CONTADOR (Serpro/RFB) — PGDAS-D + DAS automatizados
-# ─────────────────────────────────────────────────────────────────────────────
 
-
-class IntegraSincronizarRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    cnpj: str = Field(..., description="CNPJ do cliente (14 dígitos, aceita pontuação)")
-    ano_base: Optional[int] = Field(
-        None, ge=2020, le=2033,
-        description="Ano completo (expande em 12 períodos). XOR com 'periodos'.",
-    )
-    periodos: Optional[list[str]] = Field(
-        None, description="Lista explícita YYYY-MM. XOR com 'ano_base'."
-    )
-    tipos: list[Literal["pgdasd", "das"]] = Field(
-        default_factory=lambda: ["pgdasd", "das"],
-        description="Subconjunto de serviços a puxar.",
-    )
-
-    def resolver_periodos(self) -> list[str]:
-        if self.ano_base is not None and self.periodos:
-            raise ValueError("Forneça 'ano_base' OU 'periodos', não ambos.")
-        if self.ano_base is None and not self.periodos:
-            raise ValueError("Forneça 'ano_base' ou 'periodos'.")
-        if self.ano_base is not None:
-            return [f"{self.ano_base}-{m:02d}" for m in range(1, 13)]
-        return list(self.periodos or [])
-
-
-@app.post("/integra/sincronizar", tags=["Integrações"])
-async def integra_sincronizar(
-    payload: IntegraSincronizarRequest,
-    current_user: dict = Depends(get_current_user),
-):
-    """
-    Puxa PGDAS-D e/ou DAS do Integra Contador (Serpro/RFB) para o CNPJ.
-
-    Requer credenciais configuradas no servidor via env vars
-    (INTEGRA_CERT_PATH, INTEGRA_CERT_PASSWORD, INTEGRA_CONTRATANTE_CNPJ,
-    INTEGRA_AUTOR_PEDIDO_DADOS_CNPJ) ou arquivo INI protegido.
-    """
-    try:
-        periodos = payload.resolver_periodos()
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-
-    # Lazy imports — mantém api_motor carregável sem cryptography/cert
-    try:
-        from integrations.integra_adapter import (
-            IntegraAdapter,
-            IntegraAuthError,
-            IntegraCertError,
-            IntegraError,
-        )
-        from integrations.integra_credentials import (
-            IntegraCredentialError,
-            get_integra_credenciais,
-        )
-        from integrations.integra_ingestor import IntegraIngestor
-    except ImportError as exc:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Integra Contador indisponível (imports): {exc}",
-        )
-
-    try:
-        credenciais = get_integra_credenciais()
-    except IntegraCredentialError as exc:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Integra Contador não configurado: {exc}",
-        )
-
-    adapter = IntegraAdapter(credenciais)
-    try:
-        ingestor = IntegraIngestor(adapter)
-        resultado = ingestor.sincronizar(
-            cnpj=payload.cnpj,
-            periodos=periodos,
-            tipos=tuple(payload.tipos),
-            uploaded_by_user_id=current_user.get("id"),
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
-    except IntegraCertError as exc:
-        raise HTTPException(status_code=503, detail=f"Certificado: {exc}")
-    except IntegraAuthError as exc:
-        raise HTTPException(status_code=502, detail=f"Autenticação Serpro: {exc}")
-    except IntegraError as exc:
-        raise HTTPException(status_code=502, detail=f"Integra Contador: {exc}")
-    finally:
-        adapter.close()
-
-    return {"ok": True, "resumo": resultado.to_dict()}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1895,3 +1226,4 @@ if _UI_DIR.is_dir():
     app.mount("/ui", StaticFiles(directory=str(_UI_DIR), html=True), name="ui")
 else:
     logger.warning("Pasta UI não encontrada em %s — interface web indisponível.", _UI_DIR)
+

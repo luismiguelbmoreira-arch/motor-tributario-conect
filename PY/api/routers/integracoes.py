@@ -1,0 +1,152 @@
+import logging
+from typing import Literal, Optional
+from fastapi import APIRouter, Depends, HTTPException, Form, UploadFile, File
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
+
+from api.dependencies import get_current_user
+
+logger = logging.getLogger("motor_conect.api")
+
+router = APIRouter(tags=["Integrações"])
+
+# --- SIEG ---
+
+class SiegSincronizarRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    cnpj: str = Field(..., description="CNPJ (14 dígitos, com ou sem pontuação)")
+    data_inicio: Optional[str] = Field(None, description="ISO YYYY-MM-DD")
+    data_fim: Optional[str] = Field(None, description="ISO YYYY-MM-DD")
+    ano_base: Optional[int] = Field(None, ge=2020, le=2033)
+    xml_type: int = Field(1, description="1=NFe (default), 2=CTe, 3=NFSe, 4=NFCe")
+
+@router.post("/sieg/sincronizar")
+async def sieg_sincronizar(
+    payload: SiegSincronizarRequest,
+    current_user: dict = Depends(get_current_user),
+) -> JSONResponse:
+    from datetime import date as _date
+    if payload.ano_base:
+        if payload.data_inicio or payload.data_fim:
+            raise HTTPException(status_code=422, detail="ano_base é mutuamente exclusivo com data_inicio/data_fim")
+        data_inicio = _date(payload.ano_base, 1, 1)
+        data_fim = _date(payload.ano_base, 12, 31)
+    else:
+        if not payload.data_inicio or not payload.data_fim:
+            raise HTTPException(status_code=422, detail="Forneça ano_base OU (data_inicio E data_fim)")
+        try:
+            data_inicio = _date.fromisoformat(payload.data_inicio)
+            data_fim = _date.fromisoformat(payload.data_fim)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=f"Data inválida: {exc}") from exc
+
+    from integrations.sieg_service import SiegCredentialError, SiegError, SiegService, XML_TYPES_VALIDOS
+
+    if payload.xml_type not in XML_TYPES_VALIDOS:
+        raise HTTPException(status_code=422, detail=f"xml_type inválido — esperado {list(XML_TYPES_VALIDOS)}")
+
+    try:
+        svc = SiegService()
+    except SiegCredentialError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    try:
+        resultado = svc.sincronizar(
+            cnpj=payload.cnpj,
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+            xml_type=payload.xml_type,
+            uploaded_by_user_id=current_user.get("id"),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except SiegError as exc:
+        raise HTTPException(status_code=502, detail=f"Sieg: {exc}") from exc
+
+    return JSONResponse(content=resultado.to_dict(), status_code=200)
+
+# --- INTEGRA CONTADOR ---
+
+class IntegraSincronizarRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    cnpj: str = Field(..., description="CNPJ do cliente")
+    ano_base: Optional[int] = Field(None, ge=2020, le=2033)
+    periodos: Optional[list[str]] = Field(None)
+    tipos: list[Literal["pgdasd", "das"]] = Field(default_factory=lambda: ["pgdasd", "das"])
+
+    def resolver_periodos(self) -> list[str]:
+        if self.ano_base is not None and self.periodos:
+            raise ValueError("Forneça 'ano_base' OU 'periodos', não ambos.")
+        if self.ano_base is None and not self.periodos:
+            raise ValueError("Forneça 'ano_base' ou 'periodos'.")
+        if self.ano_base is not None:
+            return [f"{self.ano_base}-{m:02d}" for m in range(1, 13)]
+        return list(self.periodos or [])
+
+@router.post("/integra/sincronizar")
+async def integra_sincronizar(
+    payload: IntegraSincronizarRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    try:
+        periodos = payload.resolver_periodos()
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    try:
+        from integrations.integra_adapter import (IntegraAdapter, IntegraAuthError, IntegraCertError, IntegraError)
+        from integrations.integra_credentials import IntegraCredentialError, get_integra_credenciais
+        from integrations.integra_ingestor import IntegraIngestor
+    except ImportError as exc:
+        raise HTTPException(status_code=503, detail=f"Integra Contador indisponível (imports): {exc}")
+
+    try:
+        credenciais = get_integra_credenciais()
+    except IntegraCredentialError as exc:
+        raise HTTPException(status_code=503, detail=f"Integra Contador não configurado: {exc}")
+
+    adapter = IntegraAdapter(credenciais)
+    try:
+        ingestor = IntegraIngestor(adapter)
+        resultado = ingestor.sincronizar(
+            cnpj=payload.cnpj,
+            periodos=periodos,
+            tipos=tuple(payload.tipos),
+            uploaded_by_user_id=current_user.get("id"),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except (IntegraCertError, IntegraAuthError, IntegraError) as exc:
+        raise HTTPException(status_code=502, detail=f"Integra Contador: {exc}")
+    finally:
+        adapter.close()
+    return {"ok": True, "resumo": resultado.to_dict()}
+
+# --- E-CAC ---
+try:
+    from integrations.ecac_scraper import EcacScraper, CertificateData, load_pfx_to_pem
+    _ECAC_AVAILABLE = True
+except ImportError:
+    _ECAC_AVAILABLE = False
+
+@router.post("/integracoes/ecac/sync")
+async def ecac_sync_a1(
+    cnpj: str = Form(...),
+    senha_cert: str = Form(...),
+    certificado_pfx: UploadFile = File(...)
+):
+    if not _ECAC_AVAILABLE:
+        raise HTTPException(status_code=501, detail="O módulo 'ecac_scraper' não está acessível no backend.")
+    try:
+        pfx_bytes = await certificado_pfx.read()
+        cert_data = load_pfx_to_pem(pfx_bytes, senha_cert)
+        scraper = EcacScraper(cert_data)
+        pdf_bytes = await scraper.get_pgdas_pdf(cnpj, "2026-01")
+        return {
+            "status": "success", 
+            "message": "Extração A1 do Gov.br concluída.",
+            "diagnostics": {"cnpj": cnpj, "pdf_bytes_length": len(pdf_bytes) if pdf_bytes else 0}
+        }
+    except Exception as e:
+        logger.error(f"Falha na extração A1 e-CAC: {e}")
+        raise HTTPException(status_code=503, detail=f"Integração Governamental: {str(e)}")

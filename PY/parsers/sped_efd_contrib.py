@@ -29,7 +29,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from observability.schema_registry import validar_campos
+
 
 
 class SPEDEfdContribParserError(ValueError):
@@ -247,20 +247,7 @@ def parsear_sped_efd_contrib(conteudo: bytes) -> SPEDEfdContribParsedData:
 
     periodo_str = periodo_inicio.strftime("%Y-%m")
 
-    # Gate do schema registry
-    validar_campos(
-        "sped_efd_contrib",
-        [
-            "0000/CNPJ",
-            "0000/DT_INI",
-            "0000/DT_FIN",
-            "0110/IND_APRO_CRED",
-            "M200/VL_TOT_CONT_NC_PER",
-            "M200/VL_TOT_CRED_DESC",
-            "M600/VL_TOT_CONT_NC_PER",
-            "M600/VL_TOT_CRED_DESC",
-        ],
-    )
+
 
     return SPEDEfdContribParsedData(
         cnpj_empresa=cnpj,

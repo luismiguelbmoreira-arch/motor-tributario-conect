@@ -1,0 +1,27 @@
+{
+    "fornecedora": {
+        "cnpj": "06.990.590/0001-23",
+        "razao_social": "EMPRESA SIMPLES B2B TESTE",
+        "regime": "SIMPLES",
+        "cnae_principal": "6201501",
+        "uf_origem": "SP",
+        "faturamento_12m": "500000.00",
+        "folha_salarios_12m": "150000.00",
+        "anexo_simples": null
+    },
+    "compradora": {
+        "tipo": "B2B_CONTRIBUINTE",
+        "percentual_b2b": "100",
+        "regime": "REAL",
+        "uf_destino": "SP"
+    },
+    "operacao": {
+        "data_emissao": "2026-06-15",
+        "valor_operacao": "10000.00",
+        "ncm_nbs": "00000000",
+        "forma_recebimento": "PIX_BOLETO",
+        "tinha_st_icms": false,
+        "reducao_cbs_ibs": "INTEGRAL",
+        "beneficio_fiscal_antigo": "0.00"
+    }
+}

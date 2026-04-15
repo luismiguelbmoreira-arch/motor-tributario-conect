@@ -41,67 +41,13 @@
       background: rgba(255, 255, 255, 0.02);
     }
 
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.25rem 0.75rem;
-      border-radius: 99px;
-      font-size: 0.7rem;
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-
-    .status-active { background: rgba(0, 179, 126, 0.1); color: var(--color-green-500); }
-    .status-inactive { background: rgba(226, 88, 88, 0.1); color: var(--color-red-500); }
-
-    /* Toasts */
-    .toast-container {
-      position: fixed;
-      bottom: 2rem;
-      right: 2rem;
-      z-index: 1000;
-    }
-    
-    .toast {
-      background: var(--color-gray-900);
-      border: 1px solid var(--border-subtle);
-      color: white;
-      padding: 1rem 1.5rem;
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-      margin-top: 0.5rem;
-      animation: fadeSlideUp 0.3s ease-out;
-    }
+    /* Toasts já são tratados pelo components.js, mantendo apenas fadeSlideUp se necessário nas animações customizadas */
   </style>
 </head>
 
 <body>
   <div class="app-container">
-    
-    <!-- Sidebar Shell (consistência visual) -->
-    <aside style="width: 280px; height: 100vh; background: rgba(5, 5, 5, 0.8); backdrop-filter: blur(20px); border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; position: sticky; top: 0;">
-      <div class="p-6 mb-8 flex-row items-center gap-3">
-        <div style="width: 32px; height: 32px; background: var(--action-primary); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
-          <i data-lucide="zap" style="color: white; width: 18px; height: 18px;"></i>
-        </div>
-        <h1 style="font-size: 1.1rem; font-weight: 700;">Motor Conect</h1>
-      </div>
-      <nav style="flex: 1;">
-        <a href="dashboard.html" style="display: flex; align-items: center; gap: 1rem; padding: 0.875rem 1.25rem; color: var(--text-secondary); text-decoration: none; border-radius: 10px; margin: 0.25rem 1rem;">
-          <i data-lucide="layout-grid" style="width: 18px;"></i> Dashboard
-        </a>
-        <a href="analise_unificada.html" style="display: flex; align-items: center; gap: 1rem; padding: 0.875rem 1.25rem; color: var(--text-secondary); text-decoration: none; border-radius: 10px; margin: 0.25rem 1rem;">
-          <i data-lucide="file-text" style="width: 18px;"></i> Nova Auditoria
-        </a>
-        <div class="mt-8 px-8 mb-2">
-          <p class="text-muted" style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">Gestão</p>
-        </div>
-        <a href="admin.html" style="display: flex; align-items: center; gap: 1rem; padding: 0.875rem 1.25rem; color: var(--color-green-500); background: rgba(0, 179, 126, 0.1); border: 1px solid rgba(0, 179, 126, 0.2); text-decoration: none; border-radius: 10px; margin: 0.25rem 1rem; font-weight: 600;">
-          <i data-lucide="users" style="width: 18px;"></i> Usuários
-        </a>
-      </nav>
-    </aside>
+    <!-- Sidebar injetada automaticamente pelo components.js -->
 
     <main class="main-content">
       
@@ -118,17 +64,17 @@
 
       <!-- Stats Grid -->
       <div class="flex-row gap-6 mb-8">
-        <div class="glass-card flex-1" style="padding: 1.25rem;">
-          <p class="text-muted" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Total</p>
-          <h4 class="text-h1" id="stat-total" style="font-size: 1.5rem;">--</h4>
+        <div class="glass-card flex-1 p-6">
+          <p class="text-muted">Total</p>
+          <h4 class="text-h1" id="stat-total">--</h4>
         </div>
-        <div class="glass-card flex-1" style="padding: 1.25rem;">
-          <p class="text-muted" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Ativos</p>
-          <h4 class="text-h1 text-success" id="stat-ativos" style="font-size: 1.5rem;">--</h4>
+        <div class="glass-card flex-1 p-6">
+          <p class="text-muted">Ativos</p>
+          <h4 class="text-h1 text-success" id="stat-ativos">--</h4>
         </div>
-        <div class="glass-card flex-1" style="padding: 1.25rem;">
-          <p class="text-muted" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 600;">Admins</p>
-          <h4 class="text-h1" id="stat-admins" style="font-size: 1.5rem; color: var(--color-blue-500);">--</h4>
+        <div class="glass-card flex-1 p-6">
+          <p class="text-muted">Admins</p>
+          <h4 class="text-h1 text-info" id="stat-admins">--</h4>
         </div>
       </div>
 
@@ -159,8 +105,7 @@
   </div>
 
   <!-- Modais -->
-  <!-- Criar Usuário -->
-  <div id="modalCriar" class="step-hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 100;">
+  <div id="modalCriar" class="step-hidden modal-overlay">
     <div class="glass-card" style="max-width: 450px; width: 100%;">
       <h3 class="text-h2 mb-6">Novo Usuário</h3>
       <div class="flex-col gap-4">
@@ -173,8 +118,8 @@
           <input type="email" id="new-email" class="input-field" placeholder="email@exemplo.com">
         </div>
         <div class="input-group">
-          <label class="input-label">Perfil</label>
-          <select id="new-role" class="input-field">
+          <label class="input-label" for="new-role">Perfil</label>
+          <select id="new-role" class="input-field" title="Selecione o perfil do usuário">
             <option value="usuario">Analista</option>
             <option value="admin">Administrador</option>
           </select>
@@ -191,25 +136,16 @@
     </div>
   </div>
 
-  <div id="toast-container" class="toast-container"></div>
-
+  <script src="components.js"></script>
   <script>
-    lucide.createIcons();
-
-    const API_BASE = window.location.origin;
-    const token = sessionStorage.getItem('token');
-
     async function loadUsers() {
       try {
-        const res = await fetch(`${API_BASE}/admin/usuarios`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const res = await mcFetch(`${window.location.origin}/admin/usuarios`);
         const users = await res.json();
         
         document.getElementById('table-loading').classList.add('step-hidden');
         document.getElementById('table-wrap').classList.remove('step-hidden');
 
-        // Stats
         document.getElementById('stat-total').innerText = users.length;
         document.getElementById('stat-ativos').innerText = users.filter(u => u.ativo).length;
         document.getElementById('stat-admins').innerText = users.filter(u => u.role === 'admin').length;
@@ -246,23 +182,14 @@
         `).join('');
         lucide.createIcons();
       } catch (err) {
-        showToast('Erro ao carregar usuários', 'error');
+        mcToast('Erro ao carregar usuários', 'error');
       }
     }
 
     function openModal(id) { document.getElementById(id).classList.replace('step-hidden', 'step-visible'); }
     function closeModal(id) { document.getElementById(id).classList.replace('step-visible', 'step-hidden'); }
 
-    function showToast(msg, type = 'success') {
-      const container = document.getElementById('toast-container');
-      const toast = document.createElement('div');
-      toast.className = 'toast';
-      toast.innerText = msg;
-      container.appendChild(toast);
-      setTimeout(() => toast.remove(), 4000);
-    }
-
-    // Call init
+    // Init
     loadUsers();
   </script>
 </body>

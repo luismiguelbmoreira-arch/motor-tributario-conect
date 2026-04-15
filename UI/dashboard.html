@@ -15,45 +15,6 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    /* Estilos específicos para o Shell que ainda não estão no design system base */
-    .sidebar {
-      width: 280px;
-      height: 100vh;
-      background: rgba(5, 5, 5, 0.8);
-      backdrop-filter: blur(20px);
-      border-right: 1px solid var(--border-subtle);
-      display: flex;
-      flex-direction: column;
-      position: sticky;
-      top: 0;
-      transition: var(--transition-spring);
-    }
-    
-    .nav-link {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      padding: 0.875rem 1.25rem;
-      color: var(--text-secondary);
-      text-decoration: none;
-      border-radius: 10px;
-      margin: 0.25rem 1rem;
-      transition: var(--transition-fast);
-      font-size: 0.9rem;
-      font-weight: 500;
-    }
-    
-    .nav-link:hover, .nav-link.active {
-      background: rgba(255, 255, 255, 0.05);
-      color: var(--text-primary);
-    }
-    
-    .nav-link.active {
-      background: rgba(0, 179, 126, 0.1);
-      color: var(--color-green-500);
-      border: 1px solid rgba(0, 179, 126, 0.2);
-    }
-    
     .stat-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -64,76 +25,12 @@
     .chart-box {
       min-height: 400px;
     }
-
-    /* Avatar UI */
-    .avatar {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: var(--color-gray-700);
-      border: 1px solid var(--border-subtle);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 600;
-      font-size: 0.75rem;
-    }
   </style>
 </head>
 
 <body>
   <div class="app-container">
-    
-    <!-- Sidebar / Navegação Mestre -->
-    <aside class="sidebar">
-      <div class="p-6 mb-8 flex-row items-center gap-3">
-        <div style="width: 32px; height: 32px; background: var(--action-primary); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
-          <i data-lucide="zap" style="color: white; width: 18px; height: 18px;"></i>
-        </div>
-        <div>
-          <h1 style="font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em;">Motor Conect</h1>
-          <p class="text-muted" style="font-size: 0.65rem; text-transform: uppercase;">Inteligência Contábil</p>
-        </div>
-      </div>
-
-      <nav style="flex: 1;">
-        <a href="dashboard.html" class="nav-link active">
-          <i data-lucide="layout-grid" style="width: 18px;"></i> Dashboard
-        </a>
-        <a href="analise_unificada.html" class="nav-link">
-          <i data-lucide="file-text" style="width: 18px;"></i> Nova Auditoria
-        </a>
-        <a href="#" class="nav-link">
-          <i data-lucide="history" style="width: 18px;"></i> Histórico
-        </a>
-        <a href="#" class="nav-link">
-          <i data-lucide="database" style="width: 18px;"></i> Integrações
-        </a>
-        
-        <div class="mt-8 px-8 mb-2">
-          <p class="text-muted" style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;">Gestão</p>
-        </div>
-        <a href="admin.html" class="nav-link">
-          <i data-lucide="users" style="width: 18px;"></i> Usuários
-        </a>
-        <a href="#" class="nav-link">
-          <i data-lucide="settings" style="width: 18px;"></i> Configurações
-        </a>
-      </nav>
-
-      <div class="p-6 border-t" style="border-color: var(--border-subtle);">
-        <div class="flex-row gap-3 items-center">
-          <div class="avatar" id="userAvatar">AD</div>
-          <div style="flex: 1; overflow: hidden;">
-            <p id="userName" style="font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Administrador</p>
-            <p id="userRole" class="text-muted" style="font-size: 0.7rem;">Manager</p>
-          </div>
-          <a href="login.html" class="text-muted" title="Sair">
-            <i data-lucide="log-out" style="width: 16px;"></i>
-          </a>
-        </div>
-      </div>
-    </aside>
+    <!-- Sidebar injetada automaticamente pelo components.js -->
 
     <!-- Área de Conteúdo -->
     <main class="main-content">
@@ -149,7 +46,7 @@
             <div class="spinner" style="width: 10px; height: 10px; border-width: 1px;"></div>
             <span class="text-success" style="font-size: 0.75rem; font-weight: 700;">LIVE ENGINE</span>
           </div>
-          <button class="btn btn-ghost" style="padding: 0.5rem;"><i data-lucide="bell" style="width: 18px;"></i></button>
+          <button class="btn btn-ghost btn-icon" title="Notificações"><i data-lucide="bell" style="width: 18px;"></i></button>
         </div>
       </header>
 
@@ -196,7 +93,7 @@
             <span class="text-muted" style="font-size: 0.75rem; font-weight: 600;">Auditado</span>
           </div>
           <p class="text-muted">Precisão do Motor</p>
-          <h4 class="text-h1">99.8%</h4>
+          <h4 class="text-h1" id="statPrecisao">99.8%</h4>
         </div>
       </div>
 
@@ -206,7 +103,7 @@
         <div class="glass-card chart-box">
           <div class="flex-row justify-between mb-8">
             <h3 class="text-h2" style="font-size: 1.1rem;">Projeção de Transição Tributária</h3>
-            <select class="input-field" style="width: auto; padding: 0.4rem 1rem; font-size: 0.75rem;">
+            <select class="input-field" title="Selecionar período da projeção" style="width: auto; padding: 0.4rem 1rem; font-size: 0.75rem;">
               <option>Próximos 12 meses</option>
               <option>Safra 2026 completa</option>
             </select>
@@ -227,78 +124,165 @@
 
           <div class="glass-card" style="flex: 1;">
             <h3 class="text-h2" style="font-size: 1rem; margin-bottom: 1rem;">Status Nibo Sync</h3>
-            <div class="flex-col gap-4">
-              <div class="flex-col gap-2">
-                <div class="flex-row justify-between"><span class="text-muted" style="font-size: 0.75rem;">Matriz Moreira</span> <span style="font-size: 0.75rem; font-weight: 700;">100%</span></div>
-                <div style="width: 100%; height: 4px; background: var(--color-gray-700); border-radius: 2px;">
-                  <div style="width: 100%; height: 100%; background: var(--color-green-500); border-radius: 2px;"></div>
-                </div>
-              </div>
-              <div class="flex-col gap-2">
-                <div class="flex-row justify-between"><span class="text-muted" style="font-size: 0.75rem;">Cliente ABC</span> <span style="font-size: 0.75rem; font-weight: 700;">72%</span></div>
-                <div style="width: 100%; height: 4px; background: var(--color-gray-700); border-radius: 2px;">
-                  <div style="width: 72%; height: 100%; background: var(--color-blue-500); border-radius: 2px;"></div>
-                </div>
-              </div>
+            <div class="flex-col gap-4" id="niboSyncList">
+              <p class="text-muted" style="font-size: 0.75rem;">Carregando...</p>
             </div>
-            <button class="btn btn-ghost w-full mt-8" style="font-size: 0.75rem;">Ver Conexões</button>
+            <button class="btn btn-ghost w-full mt-8" style="font-size: 0.75rem;" onclick="window.location.href='integracoes.html'">Ver Conexões</button>
           </div>
-        </div>
+      </div>
 
+      <!-- Atividades Recentes -->
+      <div class="glass-card mt-8">
+        <div class="flex-row justify-between items-center mb-6">
+          <h3 class="text-h2" style="font-size: 1.1rem;">Atividades Recentes</h3>
+          <a href="historico.html" class="text-accent" style="font-size: 0.75rem;">Ver histórico completo</a>
+        </div>
+        <div class="overflow-x">
+          <table class="w-full text-left" style="border-collapse: collapse;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--color-gray-700);">
+                <th class="py-4 text-muted" style="font-size: 0.75rem; text-transform: uppercase;">Empresa</th>
+                <th class="py-4 text-muted" style="font-size: 0.75rem; text-transform: uppercase;">Período</th>
+                <th class="py-4 text-muted" style="font-size: 0.75rem; text-transform: uppercase;">Delta (Economia)</th>
+                <th class="py-4 text-muted" style="font-size: 0.75rem; text-transform: uppercase;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="recentAuditsTable">
+              <!-- Populado via JS -->
+              <tr>
+                <td colspan="4" class="py-8 text-center text-muted">Carregando atividades...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
     </main>
   </div>
 
+  <script src="components.js"></script>
   <script>
-    lucide.createIcons();
-
-    // Mock inicial dos dados do usuário
-    const user = {
-      name: sessionStorage.getItem('username') || 'Administrador',
-      role: sessionStorage.getItem('role') || 'Manager'
-    };
-    document.getElementById('userName').innerText = user.name;
-    document.getElementById('userRole').innerText = user.role;
-    document.getElementById('userAvatar').innerText = user.name.substring(0,2).toUpperCase();
+    let projectionChart;
 
     // Inicialização do Gráfico
-    const ctx = document.getElementById('projectionChart').getContext('2d');
-    new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
-        datasets: [{
-          label: 'Simples Nacional (Atual)',
-          data: [12, 19, 3, 5, 2, 3, 10, 15, 8, 12, 20, 25],
-          borderColor: '#0a84ff',
-          backgroundColor: 'rgba(10, 132, 255, 0.1)',
-          fill: true,
-          tension: 0.4
-        }, {
-          label: 'IBS + CBS (Reforma)',
-          data: [10, 15, 5, 8, 4, 6, 12, 10, 5, 8, 15, 18],
-          borderColor: '#00b37e',
-          borderDash: [5, 5],
-          tension: 0.4
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { grid: { display: false }, ticks: { color: '#c4c4cc' } },
-          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#c4c4cc' } }
+    function initChart(labels, simplesData, reformaData) {
+      const ctx = document.getElementById('projectionChart').getContext('2d');
+      if (projectionChart) projectionChart.destroy();
+      
+      projectionChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels || ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+          datasets: [{
+            label: 'Simples Nacional (Atual)',
+            data: simplesData || [],
+            borderColor: '#0a84ff',
+            backgroundColor: 'rgba(10, 132, 255, 0.1)',
+            fill: true,
+            tension: 0.4
+          }, {
+            label: 'IBS + CBS (Reforma)',
+            data: reformaData || [],
+            borderColor: '#00b37e',
+            borderDash: [5, 5],
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { 
+            legend: { 
+              display: true, 
+              position: 'bottom',
+              labels: { color: '#c4c4cc', font: { size: 10 } }
+            } 
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#c4c4cc' } },
+            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#c4c4cc' } }
+          }
         }
-      }
-    });
-
-    // Lógica de update via API se disponível
-    async function loadStats() {
-      // Aqui entraria o fetch real para /dashboard/summary
-      // Por enquanto mantemos o dashboard visualmente premium com mock
+      });
     }
+
+    // Lógica de update via API dinâmica
+    async function loadStats() {
+      try {
+        const res = await mcFetch('/dashboard/summary');
+        if (!res || !res.ok) {
+          console.error("Falha ao carregar dashboard:", res?.status);
+          return;
+        }
+        const data = await res.json();
+
+        // Atualiza Stats Numericos
+        if (data.stats) {
+          document.getElementById('statEmpresas').textContent = data.stats.empresas_ativas;
+          document.getElementById('statEconomia').innerHTML = `<small>R$</small> ${data.stats.economia_apurada}`;
+          document.getElementById('statAlertas').textContent = data.stats.alertas_risco;
+          document.getElementById('statPrecisao').textContent = `${data.stats.precisao}%`;
+        }
+
+        // Atualiza Gráfico
+        if (data.projection) {
+          initChart(
+            data.projection.labels,
+            data.projection.simples_nacional,
+            data.projection.receita_reforma
+          );
+        }
+
+        // Atualiza Tabela de Atividades Recentes
+        if (data.recent_audits) {
+          const tbody = document.getElementById('recentAuditsTable');
+          if (data.recent_audits.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="py-8 text-center text-muted">Nenhuma auditoria realizada ainda.</td></tr>';
+          } else {
+            tbody.innerHTML = data.recent_audits.map(audit => `
+              <tr style="border-bottom: 1px solid rgba(255,255,255,0.02); transition: background 0.2s;" class="hover-row">
+                <td class="py-4 font-bold" style="font-size: 0.875rem;">${audit.empresa}</td>
+                <td class="py-4 text-muted" style="font-size: 0.875rem;">${audit.periodo}</td>
+                <td class="py-4 font-mono ${audit.tipo === 'emerald' ? 'text-success' : 'text-accent'}" style="font-size: 0.875rem;">
+                  ${audit.delta}
+                </td>
+                <td class="py-4">
+                  <span class="badge badge-${audit.tipo}" style="font-size: 0.65rem;">${audit.status}</span>
+                </td>
+              </tr>
+            `).join('');
+          }
+        }
+
+        // Atualiza Nibo Sync
+        if (data.nibo_sync) {
+          const list = document.getElementById('niboSyncList');
+          if (list) {
+            list.innerHTML = data.nibo_sync.map(item => {
+              const color = item.percentual >= 90
+                ? 'var(--color-green-500)'
+                : item.percentual >= 50
+                  ? 'var(--color-blue-500)'
+                  : 'var(--color-red-500)';
+              return `<div class="flex-col gap-2">
+                <div class="flex-row justify-between">
+                  <span class="text-muted" style="font-size: 0.75rem;">${item.nome}</span>
+                  <span style="font-size: 0.75rem; font-weight: 700;">${item.percentual}%</span>
+                </div>
+                <div style="width: 100%; height: 4px; background: var(--color-gray-700); border-radius: 2px;">
+                  <div style="width: ${item.percentual}%; height: 100%; background: ${color}; border-radius: 2px;"></div>
+                </div>
+              </div>`;
+            }).join('');
+          }
+        }
+      } catch (err) {
+        console.error("Falha ao carregar dashboard:", err);
+      }
+    }
+
+    // Inicializa com placeholders e depois carrega real
+    initChart();
     loadStats();
   </script>
 </body>

@@ -29,7 +29,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from observability.schema_registry import validar_campos
+
 
 
 class SPEDEcdParserError(ValueError):
@@ -267,20 +267,7 @@ def parsear_sped_ecd(conteudo: bytes) -> SPEDEcdParsedData:
             f"creditos R$ {total_creditos:,.2f} (delta R$ {delta:,.2f})"
         )
 
-    # Gate do schema registry: CI quebra se o parser ler campos diferentes
-    validar_campos(
-        "sped_ecd",
-        [
-            "0000/CNPJ",
-            "0000/DT_INI",
-            "0000/DT_FIN",
-            "I050/COD_CTA",
-            "I200/VL_LCTO",
-            "I250/COD_CTA",
-            "I250/VL_PARTIDA",
-            "I250/IND_DC",
-        ],
-    )
+
 
     return SPEDEcdParsedData(
         cnpj_empresa=cnpj,

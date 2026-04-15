@@ -25,7 +25,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from functools import cached_property
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from core.difal import calcular_difal
 from core.regimes.base import BaseRegimeEngine
@@ -45,6 +45,7 @@ from core.tabelas_simples import (
     obter_faixa_numero,
 )
 from validadores import validar_cnae, validar_cnpj, validar_ncm, validar_uf
+from schemas.motor import Atividade, EmpresaFornecedora, EmpresaCompradora, OperacaoFiscal
 
 logger = logging.getLogger("motor_conect.motor")
 
@@ -52,20 +53,13 @@ logger = logging.getLogger("motor_conect.motor")
 def _fmt_brl(valor: Any) -> str:
     """
     Formata valor monetário no padrão BR: R$ X.XXX,YY (ponto milhar, vírgula decimal).
-
-    Substitui o uso de f-strings com :,.2f que produzem formato US (R$ X,XXX.YY).
-    Usar SEMPRE este helper em mensagens, justificativas e trilhas de auditoria
-    que vão para humanos (UI, PDF). NÃO usar para serialização — para isso
-    use Decimal/str(Decimal) que mantém o ponto decimal nativo do Python.
-
-    REGRA À PROVA DE ERRO: nenhuma f-string {valor:,.2f} no projeto. Sempre _fmt_brl.
     """
     try:
         d = Decimal(str(valor or 0)).quantize(Decimal("0.01"), ROUND_HALF_UP)
     except Exception:
         return "R$ 0,00"
-    # Truque: formata em US, depois troca separadores
     return f"R$ {d:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
 
 # Fator R: limiar para migração Anexo V → Anexo III (LC 123/2006, Art. 18, § 24)
 FATOR_R_LIMIAR = Decimal("0.28")
@@ -79,264 +73,6 @@ CNAES_FATOR_R = frozenset({
     "7111100", "7112000",              # Arquitetura, Engenharia
     "7210000", "8599603",              # P&D, Treinamento
 })
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# FASE 1 — CLASSES DE DADOS (Pydantic V2)
-# ─────────────────────────────────────────────────────────────────────────────
-
-class Atividade(BaseModel):
-    """
-    Atividade individual do PGDAS-D para empresas multi-atividade.
-    LC 123/2006, Art. 18, §§ 1º e 3º — cada atividade tributada no Anexo correto.
-
-    Uso (ERR-008 — implementação futura):
-        EmpresaFornecedora(atividades=[
-            Atividade(receita=Decimal("95594.08"), anexo="III"),
-            Atividade(receita=Decimal("4929.43"),  anexo="I"),
-            Atividade(receita=Decimal("32970.57"), anexo="I",  icms_st=True),
-            Atividade(receita=Decimal("5650.00"),  anexo="III", iss_retido=True),
-        ])
-    """
-    receita: Decimal = Field(..., gt=Decimal("0"), description="Receita desta atividade no mês (RPA parcial)")
-    anexo: Literal["I", "II", "III", "IV", "V"] = Field(..., description="Anexo Simples desta atividade")
-    icms_st: bool = Field(default=False, description="ICMS retido por ST — zerado no DAS desta parcela")
-    iss_retido: bool = Field(default=False, description="ISS retido pelo tomador — zerado no DAS desta parcela")
-
-    @field_validator("receita", mode="before")
-    @classmethod
-    def converter_para_decimal(cls, v: Any) -> Decimal:
-        if isinstance(v, float):
-            return Decimal(str(v))
-        return Decimal(str(v)) if not isinstance(v, Decimal) else v
-
-
-class EmpresaFornecedora(BaseModel):
-    """
-    Dados do emitente (cliente do escritório — fornecedor na cadeia B2B).
-    Fase 1: Validação rigorosa de todos os campos.
-    """
-    cnpj: str = Field(..., description="CNPJ com ou sem pontuação")
-    razao_social: str = Field(..., min_length=2, description="Razão social completa")
-    regime: Literal["SIMPLES", "PRESUMIDO", "REAL", "MEI"] = Field(..., description="Regime tributário")
-    cnae_principal: str = Field(..., description="CNAE principal (7 dígitos)")
-    uf_origem: str = Field(..., description="UF de origem (2 letras)")
-    faturamento_12m: Decimal = Field(..., ge=Decimal("0"), description="RBT12 em R$")
-    folha_salarios_12m: Optional[Decimal] = Field(
-        default=None, ge=Decimal("0"),
-        description="Folha de salários 12 meses (necessário para Fator R)"
-    )
-    anexo_simples: Optional[Literal["I", "II", "III", "IV", "V"]] = Field(
-        default=None, description="Anexo Simples (auto-detectado se None)"
-    )
-    atividades: Optional[List["Atividade"]] = Field(
-        default=None,
-        description=(
-            "Atividades individuais para empresas multi-atividade (ERR-008). "
-            "Quando preenchido, calcular_das_mensal() aplicará o Anexo correto por atividade. "
-            "LC 123/2006, Art. 18, §3º. Implementação pendente de aprovação arquitetural."
-        )
-    )
-    receita_com_st_icms: Optional[Decimal] = Field(
-        default=None, ge=Decimal("0"),
-        description=(
-            "Parcela mensal da receita com ICMS-ST (Substituição Tributária). "
-            "Quando informado, o ICMS desta parcela é zerado no DAS (já retido pelo substituto). "
-            "LC 123/2006, Art. 13, § 1º, VII."
-        )
-    )
-    categoria_mei: Optional[Literal["COMERCIO", "INDUSTRIA", "SERVICOS", "COMERCIO_SERVICOS"]] = Field(
-        default=None,
-        description=(
-            "Categoria MEI — determina DAS fixo. "
-            "Obrigatório quando regime='MEI'. Default: SERVICOS. "
-            "LC 123/2006, Art. 18-A."
-        )
-    )
-    data_inicio_atividade: Optional[date] = Field(
-        default=None,
-        description=(
-            "Data de início de atividade da empresa. "
-            "Se empresa tem menos de 12 meses, RBT12 deve ser proporcionalizada. "
-            "LC 123/2006, Art. 3º, §2º."
-        )
-    )
-
-    @field_validator("cnpj")
-    @classmethod
-    def validar_campo_cnpj(cls, v: str) -> str:
-        resultado = validar_cnpj(v)
-        if not resultado:
-            raise ValueError(f"CNPJ inválido: {'; '.join(resultado.errors)}")
-        return v
-
-    @field_validator("cnae_principal")
-    @classmethod
-    def validar_campo_cnae(cls, v: str) -> str:
-        resultado = validar_cnae(v)
-        if not resultado:
-            raise ValueError(f"CNAE inválido: {'; '.join(resultado.errors)}")
-        import re
-        return re.sub(r'[\s.\-/]', '', v.strip())
-
-    @field_validator("uf_origem")
-    @classmethod
-    def validar_campo_uf(cls, v: str) -> str:
-        resultado = validar_uf(v)
-        if not resultado:
-            raise ValueError(f"UF inválida: {'; '.join(resultado.errors)}")
-        return v.strip().upper()
-
-    @field_validator("faturamento_12m", "folha_salarios_12m", mode="before")
-    @classmethod
-    def converter_para_decimal(cls, v: Any) -> Optional[Decimal]:
-        if v is None:
-            return None
-        if isinstance(v, float):
-            logger.warning("AVISO: Float detectado em campo monetário. Convertendo para Decimal.")
-            return Decimal(str(v))
-        return Decimal(str(v)) if not isinstance(v, Decimal) else v
-
-
-class EmpresaCompradora(BaseModel):
-    """
-    Dados do destinatário (comprador — pode ser B2B, B2C ou mix dos dois).
-    Fase 1: Define se crédito IBS/CBS é exigido.
-    Empresas que vendem para ambos (ex: loja de materiais, escritório contábil)
-    usam percentual_b2b para ponderar cenários.
-    """
-    tipo: Literal["B2B_CONTRIBUINTE", "B2C_CONSUMIDOR_FINAL", "MISTO"] = Field(
-        ..., description="Tipo do comprador (MISTO = atende B2B e B2C)"
-    )
-    percentual_b2b: Decimal = Field(
-        default=Decimal("100"),
-        ge=Decimal("0"), le=Decimal("100"),
-        description=(
-            "Percentual da receita que vem de clientes B2B (0-100). "
-            "Usado quando tipo='MISTO'. Ex: 70 = 70% B2B, 30% B2C."
-        )
-    )
-    regime: str = Field(default="NAO_INFORMADO", description="Regime tributário do comprador")
-    uf_destino: str = Field(..., description="UF de destino (2 letras)")
-
-    @field_validator("uf_destino")
-    @classmethod
-    def validar_campo_uf(cls, v: str) -> str:
-        resultado = validar_uf(v)
-        if not resultado:
-            raise ValueError(f"UF inválida: {'; '.join(resultado.errors)}")
-        return v.strip().upper()
-
-
-class OperacaoFiscal(BaseModel):
-    """
-    Dados da operação (NF-e, pedido, contrato).
-    Fase 1: Validação temporal e de NCM.
-    """
-    data_emissao: date = Field(..., description="Data de emissão do documento fiscal")
-    valor_operacao: Decimal = Field(..., gt=Decimal("0"), description="Valor da operação em R$")
-    ncm_nbs: str = Field(..., description="NCM/NBS (8 dígitos)")
-    c_class_trib: Optional[str] = Field(
-        default=None, description="Código de classificação tributária LC 214/2025"
-    )
-    tinha_st_icms: bool = Field(
-        default=False, description="Empresa possuía Substituição Tributária de ICMS"
-    )
-    reducao_cbs_ibs: Literal["INTEGRAL", "REDUCAO_30", "REDUCAO_60", "ISENTO"] = Field(
-        default="INTEGRAL",
-        description=(
-            "Nível de redução CBS/IBS conforme LC 214/2025: "
-            "INTEGRAL (sem redução), REDUCAO_30 (Art. 262 — profissionais liberais), "
-            "REDUCAO_60 (Art. 258 — saúde, educação, cesta básica ampliada), "
-            "ISENTO (Art. 264 — cesta básica nacional). "
-        )
-    )
-    beneficio_fiscal_antigo: Decimal = Field(
-        default=Decimal("0"), ge=Decimal("0"),
-        description="Isenção/benefício ICMS que será eliminado até 2032"
-    )
-    forma_recebimento: Literal["DINHEIRO", "PIX_BOLETO", "CARTAO"] = Field(
-        default="PIX_BOLETO", description="Forma de recebimento (impacta Split Payment)"
-    )
-    rpa_mensal: Optional[Decimal] = Field(
-        default=None, ge=Decimal("0"),
-        description=(
-            "Receita do Período de Apuração (RPA) do mês corrente. "
-            "Quando informado, usado como base do DAS em vez de RBT12/12. "
-            "Obrigatório para auditoria e-CAC com precisão ≤ R$5,00. "
-            "LC 123/2006, Art. 18, §1º — DAS calculado sobre RPA do mês."
-        )
-    )
-    lucro_real_mensal: Optional[Decimal] = Field(
-        default=None, ge=Decimal("0"),
-        description=(
-            "Lucro Real apurado no mês (R$). Usado pelo LucroRealEngine. "
-            "Se None, usa receita mensal como proxy conservador. "
-            "RIR/2018, Art. 228."
-        )
-    )
-    creditos_pis_cofins: Decimal = Field(
-        default=Decimal("0"), ge=Decimal("0"),
-        description=(
-            "Créditos PIS/COFINS não-cumulativo (R$). "
-            "Lei 10.637/2002 (PIS) + Lei 10.833/2003 (COFINS)."
-        )
-    )
-    # ─────────────────────────────────────────────────────────────────────────────
-    # Fase 5 (Stress Test) — Campos Adicionais para testes R14 a R17
-    # ─────────────────────────────────────────────────────────────────────────────
-    data_liquidacao: Optional[date] = Field(
-        default=None,
-        description="Data real do recebimento/liquidação. O Split Payment atua aqui, não na emissão."
-    )
-    qtd_itens: int = Field(
-        default=1, ge=1,
-        description="Quantidade de NCMs distintos na nota (impacta timeout no CGIBS)."
-    )
-    estorno_realizado: bool = Field(
-        default=False,
-        description="Sinaliza se a operação sofreu devolução de mercadoria após liquidação."
-    )
-    produto_importado: bool = Field(
-        default=False,
-        description=(
-            "True se conteúdo de importação > 40% (Res. SF 13/2012). "
-            "Afeta alíquota interestadual ICMS (4%) e cálculo do DIFAL."
-        )
-    )
-
-    @model_validator(mode="after")
-    def validar_liquidacao(self):
-        if self.data_liquidacao and self.data_liquidacao < self.data_emissao:
-            raise ValueError(f"Data de liquidação {self.data_liquidacao} não pode ser anterior à emissão {self.data_emissao}")
-        return self
-
-    @field_validator("ncm_nbs")
-    @classmethod
-    def validar_campo_ncm(cls, v: str) -> str:
-        resultado = validar_ncm(v)
-        if not resultado:
-            raise ValueError(f"NCM inválido: {'; '.join(resultado.errors)}")
-        import re
-        return re.sub(r'[\s.\-]', '', v.strip())
-
-    @field_validator("data_emissao")
-    @classmethod
-    def validar_data_transicional(cls, v: date) -> date:
-        if not (2026 <= v.year <= 2033):
-            raise ValueError(
-                f"Data {v} fora do período transicional LC 214/2025 (2026-2033). "
-                f"Para períodos fora da transição, usar motor legado."
-            )
-        return v
-
-    @field_validator("valor_operacao", "beneficio_fiscal_antigo", mode="before")
-    @classmethod
-    def converter_para_decimal(cls, v: Any) -> Decimal:
-        if isinstance(v, float):
-            logger.warning("AVISO: Float detectado em valor_operacao. Convertendo para Decimal.")
-            return Decimal(str(v))
-        return Decimal(str(v)) if not isinstance(v, Decimal) else v
 
 
 # ─────────────────────────────────────────────────────────────────────────────

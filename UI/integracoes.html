@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Motor Conect — Integrações</title>
+  
+  <!-- CSS Centralizado -->
+  <link rel="stylesheet" href="design_system.css">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    .integration-card { 
+      padding: 1.5rem; 
+      border-radius: 12px; 
+      border: 1px solid var(--border-subtle); 
+      background: rgba(255,255,255,0.02); 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+    }
+    .status-dot { 
+      width: 10px; 
+      height: 10px; 
+      border-radius: 50%; 
+      display: inline-block; 
+      margin-right: 0.5rem;
+    }
+    .status-online { 
+      background: var(--color-green-500); 
+      box-shadow: 0 0 10px var(--color-green-500); 
+    }
+    .status-offline { 
+      background: var(--color-red-500); 
+      box-shadow: 0 0 10px var(--color-red-500); 
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app-container">
+    <!-- Sidebar injetada automaticamente pelo components.js -->
+
+    <main class="main-content">
+      <header class="mb-8">
+        <h2 class="text-h1">Hub de Integrações</h2>
+        <p class="text-body mt-2">Conectores ativos para orquestração de dados fiscais (ETL e Webhooks).</p>
+      </header>
+
+      <div class="flex-col gap-4">
+        <div class="integration-card">
+          <div class="flex-row items-center gap-4">
+            <div style="background: rgba(10, 132, 255, 0.1); padding: 1rem; border-radius: 8px;">
+               <i data-lucide="cloud" style="color: var(--color-blue-500);"></i>
+            </div>
+            <div>
+              <h3 style="font-size: 1rem; font-weight: 600;">Claude 3 Vision (e-CAC)</h3>
+              <p class="text-muted" style="font-size: 0.75rem;">Motor de Extração Ótica de PGDAS e DRE</p>
+            </div>
+          </div>
+          <div class="flex-row items-center gap-4">
+            <span style="font-size: 0.8rem;"><span class="status-dot status-online"></span> Operante</span>
+            <button class="btn btn-ghost" onclick="mcToast('Teste de I/O iniciado...', 'info')">Testar I/O</button>
+          </div>
+        </div>
+
+        <div class="integration-card">
+          <div class="flex-row items-center gap-4">
+            <div style="background: rgba(0, 179, 126, 0.1); padding: 1rem; border-radius: 8px;">
+               <i data-lucide="shield" style="color: var(--color-green-500);"></i>
+            </div>
+            <div>
+              <h3 style="font-size: 1rem; font-weight: 600;">Portal e-CAC (Certificado A1)</h3>
+              <p class="text-muted" style="font-size: 0.75rem;">RPA de Extração Direta da Receita Federal</p>
+            </div>
+          </div>
+          <div class="flex-row items-center gap-4">
+             <span style="font-size: 0.8rem;"><span class="status-dot status-online"></span> Operante</span>
+            <button class="btn btn-ghost">Renovar A1</button>
+          </div>
+        </div>
+
+        <div class="integration-card">
+          <div class="flex-row items-center gap-4">
+            <div style="background: rgba(226, 88, 88, 0.1); padding: 1rem; border-radius: 8px;">
+               <i data-lucide="database" style="color: var(--color-red-500);"></i>
+            </div>
+            <div>
+              <h3 style="font-size: 1rem; font-weight: 600;">Nibo Sync</h3>
+              <p class="text-muted" style="font-size: 0.75rem;">Exportador de Lotes Fiscais</p>
+            </div>
+          </div>
+          <div class="flex-row items-center gap-4">
+            <span style="font-size: 0.8rem; color: var(--color-red-500);"><span class="status-dot status-offline"></span> Desconectado</span>
+            <button class="btn btn-primary" style="font-size: 0.8rem;">Reconectar</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="components.js"></script>
+</body>
+</html>

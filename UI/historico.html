@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Motor Conect — Histórico</title>
+  
+  <!-- CSS Centralizado -->
+  <link rel="stylesheet" href="design_system.css">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1.5rem;
+    }
+
+    th, td {
+      padding: 1rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 0.85rem;
+    }
+
+    th {
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app-container">
+    <!-- Sidebar injetada automaticamente pelo components.js -->
+
+    <main class="main-content">
+      <header class="mb-8">
+        <h2 class="text-h1">Histórico de Auditorias</h2>
+        <p class="text-body mt-2">Log auditável reduzido em conformidade com as regras bancárias (sem vazamento de dados sensíveis).</p>
+      </header>
+
+      <div class="glass-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Data/Hora</th>
+              <th>CNPJ (Ofuscado)</th>
+              <th>Regime Avaliado</th>
+              <th>Decisão Final</th>
+              <th style="text-align: right;">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>13 Abr 2026 14:32</td>
+              <td>00.000.***/0001-**</td>
+              <td>Simples Nacional c/ Opt-Out</td>
+              <td><span class="text-success">Recomendado</span></td>
+              <td style="text-align: right;"><button class="btn btn-ghost" style="padding: 0.2rem 0.5rem;" title="Ver Detalhes"><i data-lucide="eye" style="width: 16px;"></i></button></td>
+            </tr>
+            <tr>
+              <td>12 Abr 2026 09:15</td>
+              <td>12.345.***/0001-**</td>
+              <td>Lucro Presumido</td>
+              <td><span class="text-danger">Alerta de Risco</span></td>
+              <td style="text-align: right;"><button class="btn btn-ghost" style="padding: 0.2rem 0.5rem;" title="Ver Detalhes"><i data-lucide="eye" style="width: 16px;"></i></button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <script src="components.js"></script>
+</body>
+</html>

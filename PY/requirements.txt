@@ -36,3 +36,7 @@ pytest-cov>=5.0.0       # Cobertura de código — CI falha abaixo de 80%
 
 # ── Qualidade de código (dev) ──────────────────────────────────────────────────
 ruff>=0.4.0             # Linter + formatter (substitui flake8 + isort + black)
+
+# Orquestrador e-CAC Real
+playwright>=1.42.0
+pyopenssl>=24.0.0

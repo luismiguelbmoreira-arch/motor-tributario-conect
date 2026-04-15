@@ -1,0 +1,9 @@
+{
+  "extends": [
+    "development"
+  ],
+  "hints": {
+    "axe/style": "off",
+    "inline-script-style": "off"
+  }
+}

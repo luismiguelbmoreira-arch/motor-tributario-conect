@@ -113,9 +113,13 @@ class UsuarioNaoEncontradoError(Exception):
 
 def criar_tabela_users() -> None:
     """
-    Cria tabela `users` se não existir.
-    Chamado no lifespan da FastAPI e em scripts de inicialização.
+    Cria tabela `users` se não existir via SQLAlchemy Metadata.
+    Pula se DB_SKIP_INIT=1 (padrão para produção com Alembic).
     """
+    if os.environ.get("DB_SKIP_INIT") == "1":
+        logger.info("Pulo inicialização automática de users (DB_SKIP_INIT=1).")
+        return
+
     SQLModel.metadata.create_all(_auth_engine)
     logger.info("Tabela users criada/verificada.")
 

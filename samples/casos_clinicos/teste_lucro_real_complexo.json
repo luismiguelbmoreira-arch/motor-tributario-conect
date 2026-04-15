@@ -1,0 +1,30 @@
+{
+    "fornecedora": {
+        "cnpj": "06.990.590/0001-23",
+        "razao_social": "INDUSTRIA MULTINACIONAL SA",
+        "regime": "REAL",
+        "cnae_principal": "2829200",
+        "uf_origem": "SP",
+        "faturamento_12m": "80000000.00",
+        "folha_salarios_12m": "500000.00",
+        "anexo_simples": null
+    },
+    "compradora": {
+        "tipo": "B2B_CONTRIBUINTE",
+        "percentual_b2b": "100",
+        "regime": "REAL",
+        "uf_destino": "RJ"
+    },
+    "operacao": {
+        "data_emissao": "2026-08-20",
+        "valor_operacao": "150000.00",
+        "ncm_nbs": "84212990",
+        "forma_recebimento": "PIX_BOLETO",
+        "lucro_real_mensal": "35000.00",
+        "creditos_pis_cofins": "1200.00",
+        "produto_importado": true,
+        "tinha_st_icms": false,
+        "reducao_cbs_ibs": "INTEGRAL",
+        "beneficio_fiscal_antigo": "0.00"
+    }
+}

@@ -48,6 +48,8 @@ def db_em_memoria(monkeypatch):
         poolclass=StaticPool,
     )
     SQLModel.metadata.create_all(engine)
+    import database.connection
+    monkeypatch.setattr(database.connection, "engine", engine)
     monkeypatch.setattr(database, "engine", engine)
     yield engine
 
