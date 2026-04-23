@@ -1073,6 +1073,29 @@ aplica CBS/IBS cumulativo quando deveria ser monofásico no distribuidor.
 
 ---
 
+### ERR-040 — BOLETO em `FORMAS_PAGAMENTO_COM_PSP` não distingue registrado vs carteira simples
+**Data:** 23/04/2026
+**Severidade:** 🟢 Baixa (resíduo operacional — Circular Bacen 3.598/2012 tornou registro quase universal)
+**Amparo legal:** LC 214/2025 Art. 353 §1º + Circular Bacen 3.598/2012 (obrigatoriedade de registro de boletos)
+**Arquivo:** `PY/schemas/motor.py::FORMAS_PAGAMENTO_COM_PSP`
+**Descoberto em:** Auditoria Luiz Moreira pós-Fase 3.2
+
+**Descrição:**
+A constante FROZEN `FORMAS_PAGAMENTO_COM_PSP = frozenset({"PIX_VIA_PSP", "BOLETO", "CARTAO"})` hoje agrupa **todo boleto** como tendo PSP — dispara Split Payment a partir de 2027 sem exceção. Boleto de **carteira simples** (sem registro no banco, emitido diretamente pelo sacador) **não tem PSP no caminho** e, em leitura estrita do LC 214/2025 Art. 353 §1º, não deveria disparar retenção automática.
+
+**Impacto hoje:** baixíssimo. Circular Bacen 3.598/2012 tornou o registro de boletos **praticamente obrigatório** desde 2018 — Febraban reporta adoção > 99% no mercado. Boleto carteira simples é resquício operacional (pequenas cooperativas, sistemas legados). **Falha fechada = conservador = correto para o cliente** (retenção a mais retorna na apuração, retenção a menos vira passivo).
+
+**Quando vira relevante:** caso algum cliente real do escritório em 2027+ emita boleto carteira simples e o dossiê apresente retenção que o banco não aplicou, vira divergência de conciliação. Luiz sinaliza que é cenário **possível mas raro**.
+
+**Solução necessária (roadmap Fase 4+):**
+1. Granular o Literal de `forma_recebimento`: separar `BOLETO_REGISTRADO` (dispara Split) de `BOLETO_CARTEIRA` (não dispara).
+2. Ajustar `FORMAS_PAGAMENTO_COM_PSP` excluindo `BOLETO_CARTEIRA`.
+3. UI oferecer os 2 tipos de boleto no select.
+
+**Status:** ⏳ Pendente — baixa prioridade (sem frequência estatística relevante antes de 2027).
+
+---
+
 ## HISTÓRICO DE AUDITORIAS REAIS
 
 | Data | Empresa | CNPJ | Período | DAS e-CAC | DAS Motor | Delta | Status |

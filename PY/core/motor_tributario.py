@@ -213,6 +213,26 @@ class MotorReformaTributaria:
             detalhe=detalhe,
         )
 
+        # Fase 3.2.1 — Achado #3 do Luiz: MEI NÃO é contribuinte de IBS/CBS
+        # (LC 123/2006 Art. 18-A §4º V) — logo, a combinação B2B_CONTRIBUINTE
+        # + regime_comprador=MEI é semanticamente inconsistente. Emite alerta
+        # explícito na trilha para o auditor não assumir crédito B2B inexistente.
+        if self.compradora.tipo == "B2B_CONTRIBUINTE" and regime_c == "MEI":
+            self.trilha_auditoria.append({
+                "tipo": "ALERTA_MEI_NAO_CONTRIBUINTE",
+                "id": "MEI_INCOMPATIVEL_B2B_CONTRIBUINTE",
+                "titulo": "Comprador MEI marcado como B2B contribuinte — inconsistente",
+                "amparo_legal": "LC 123/2006 Art. 18-A §4º V + LC 214/2025 Art. 47 §2º",
+                "detalhe": (
+                    "MEI não é contribuinte de IBS/CBS — não apropria crédito "
+                    "nem emite crédito na cadeia. A combinação "
+                    "tipo=B2B_CONTRIBUINTE + regime=MEI é incoerente. "
+                    "Revise o cadastro do comprador — provavelmente B2C ou "
+                    "regime diferente."
+                ),
+                "timestamp": str(datetime.now()),
+            })
+
     def _registrar_passo(
         self, id: str, titulo: str, base: Any, deducoes: Any,
         aliquota: Any, valor: Any, lei: str, detalhe: str = "",
