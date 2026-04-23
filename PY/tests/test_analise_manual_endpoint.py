@@ -213,16 +213,62 @@ def test_sem_auth_rejeita_acesso(client):
 # ── Decimal end-to-end ───────────────────────────────────────────────────────
 
 def test_decimal_serializado_como_string_no_envelope(client):
-    """MAX_FISCAL_01 — Decimal nunca vira float na resposta."""
+    """
+    MAX_FISCAL_01 — Decimal nunca vira float na resposta.
+
+    Duas garantias (ERR-034):
+      1) Walk recursivo em TODO o envelope falha se encontrar QUALQUER float.
+         Protege contra drift silencioso quando motor adicionar chave nova.
+      2) Asserta presença de AO MENOS UM valor monetário reconhecível entre
+         as chaves canônicas, para evitar falso-positivo-tolerante (teste
+         que passaria mesmo sem nenhuma das chaves existir).
+    """
     resp = client.post("/analise/manual", json=_payload_minimo_simples())
     assert resp.status_code == 200, resp.text
-    raw = resp.text
-    # Confirma que valores monetários aparecem como strings decimais, não como
-    # floats JSON (que não têm aspas). Procura pelo faturamento_12m ou rbt12.
-    # Se qualquer valor monetário chave estiver presente, deve estar entre aspas.
     data = resp.json()
+
+    # ── 1) Walk recursivo — nenhum float escapa no envelope ────────────
+    def _walk_sem_float(obj, caminho="$"):
+        if isinstance(obj, float):
+            raise AssertionError(
+                f"Float detectado em {caminho} = {obj!r} — viola MAX_FISCAL_01. "
+                "Todo valor monetário deve serializar como string Decimal."
+            )
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                _walk_sem_float(v, f"{caminho}.{k}")
+        elif isinstance(obj, list):
+            for i, v in enumerate(obj):
+                _walk_sem_float(v, f"{caminho}[{i}]")
+
+    _walk_sem_float(data)
+
+    # ── 2) Ao menos um valor monetário canônico existe e é string ──────
     diag = data["diagnostico"]
-    # das_calculado ou aliq efetiva devem existir e ser strings
-    for chave in ("das_calculado", "das_mensal", "rbt12"):
-        if chave in diag and diag[chave] is not None:
-            assert isinstance(diag[chave], str), f"{chave} deveria ser string Decimal, veio {type(diag[chave])}"
+    chaves_monetarias_esperadas = (
+        "das_calculado", "das_mensal", "das_total",
+        "aliquota_efetiva", "valor_devido", "rbt12",
+    )
+    # Walk raso + busca aninhada em chaves comuns (empresa.rbt12, aliquotas.*)
+    encontrados = []
+    def _coletar(obj, prefixo=""):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if k in chaves_monetarias_esperadas:
+                    encontrados.append((f"{prefixo}.{k}".lstrip("."), v))
+                _coletar(v, f"{prefixo}.{k}")
+        elif isinstance(obj, list):
+            for i, v in enumerate(obj):
+                _coletar(v, f"{prefixo}[{i}]")
+    _coletar(diag)
+
+    assert encontrados, (
+        f"Nenhuma chave monetária canônica ({chaves_monetarias_esperadas}) "
+        "encontrada no diagnóstico. Se o motor foi renomeado, atualizar a lista."
+    )
+    for caminho, valor in encontrados:
+        if valor is None:
+            continue
+        assert isinstance(valor, str), (
+            f"{caminho} = {valor!r} deveria ser string Decimal, veio {type(valor).__name__}"
+        )

@@ -757,9 +757,19 @@ Três pontos de fallback em `resultado.html` redirecionavam para `analise.html` 
 
 ### ERR-031 — Handler `/analise/manual` quebrava com 500 ao serializar erros Pydantic
 **Data:** 23/04/2026
-**Severidade:** 🟡 Atenção
+**Severidade:** 🔴 Crítico (reclassificado em 23/04/2026 pelo parecer Luiz Moreira Fase 3)
+**Amparo legal violado:** LGPD Art. 37 (registro de operações) + CTN Art. 142 (motivação do lançamento)
 **Arquivo:** `PY/main.py` — `except PydanticValidationError` no `analise_manual`
 **Descoberto em:** Testes `test_analise_manual_endpoint.py` (Fase 3)
+
+**Nota de reclassificação (Luiz Moreira, 23/04/2026):**
+Severidade elevada de 🟡 para 🔴 Crítico. Motivo: o handler devolvia 500 sem
+corpo estruturado quando um erro de **caminho feliz semântico** (ex.: MEI>81k,
+data fora do período transicional) era levantado via `@model_validator`. Resultado
+prático: **a auditoria do usuário quebra silenciosamente** — nenhum `_erros[]`
+chega ao dossiê porque o diagnóstico nem chegou a ser criado. Em fiscalização,
+o registro é "cliente tentou rodar análise e sistema caiu" — LGPD Art. 37 exige
+log de tentativa, o 500 jogava tudo pra trace-stack sem persistência.
 
 **Descrição:**
 Quando um `@model_validator` de `OperacaoFiscal` levantava `ValueError` (ex.: `data_emissao=2025-12-31` fora do período LC 214/2025 Art. 348), o handler fazia `raise HTTPException(status_code=422, detail=exc.errors())`. Pydantic V2 inclui em `ctx.error` a exception original (`ValueError` ou `date` object) não-serializável via `json.dumps`. Resultado: o cliente recebia **500 TypeError "Object of type ValueError is not JSON serializable"** em vez de 422 claro com mensagem de erro.
@@ -769,6 +779,265 @@ Quando um `@model_validator` de `OperacaoFiscal` levantava `ValueError` (ex.: `d
 **Solução aplicada (Fase 3):** sanitizar erros via `jsonable_encoder(exc.errors(include_url=False, include_input=False))` antes de montar o `HTTPException.detail`. Ruído (URLs de docs Pydantic + input_value potencialmente PII) eliminado.
 
 **Status:** ✅ Corrigido na Fase 3 — Modo Manual de Verdade
+
+---
+
+### ERR-032 — `dataset.tocado` perdido no re-render do form manual após 422
+**Data:** 23/04/2026
+**Severidade:** 🟡 Atenção
+**Arquivo:** `UI/analise_unificada.html` — `renderInputForm` + listener global `input` capture
+**Descoberto em:** Auditoria Viciado pós-Fase 3
+
+**Descrição:**
+O listener global em capture marcava `dataset.tocado='1'` em `m-tipo-comprador` e
+`m-percentual-b2b` quando o usuário mexia nesses campos — flag usada pelo
+`onCnaeBlur` para não sobrescrever escolha explícita. Problema: quando
+`submitManual` pegava 422 do backend, `goToPhase(2)` reinjetava o form via
+`container.innerHTML`, descartando todos os nós antigos (e o `dataset.tocado`
+junto). Usuário retentava o submit, CNAE autofill sobrescrevia silenciosamente
+campos que ele havia ajustado antes. Efeito "o sistema me ignora".
+
+**Amparo:** não há lei específica, mas viola MAX_FISCAL_02 indiretamente
+(operador perde controle sobre decisões com base legal — auto-preencher
+indicação B2B/Anexo sem respeitar override manual).
+
+**Evidência:** listener em `analise_unificada.html:575-580` tocando em nós que
+viram fantasmas após `container.innerHTML = renderFormularioManual()` em `:270`.
+
+**Solução aplicada (Fase 3.1):**
+- Objeto `manualFormState = { tocado: Set, valores: {} }` em escopo de módulo
+- Listener captura valor + "tocado" a cada input/change e persiste em memória
+- `bindFormularioManual()` restaura valores e reaplica `dataset.tocado` no
+  render após re-inject, ANTES dos handlers condicionais (`onRegimeChange`,
+  `onTipoCompradorChange`) para não sobrepor seleção já feita.
+- Listener passou a filtrar por prefixo `m-` (evita contaminar outros forms).
+
+**Status:** ✅ Corrigido na Fase 3.1
+
+---
+
+### ERR-033 — `lista.innerHTML = erros.map(...)` com template literal — XSS latente
+**Data:** 23/04/2026
+**Severidade:** 🟡 Atenção
+**Amparo legal:** LGPD Art. 46 (segurança da informação) + OWASP A03:2021 (Injection)
+**Arquivo:** `UI/analise_unificada.html` — `submitManual()` linha 710 (antes do fix)
+**Descoberto em:** Auditoria Viciado pós-Fase 3
+
+**Descrição:**
+`lista.innerHTML = erros.map(e => '<li>${e}</li>').join('')`. Hoje as mensagens
+do array são hardcoded (strings fixas dos validators). **Risco imediato: zero.**
+Mas é armadilha latente: qualquer refactor futuro que interpole input do usuário
+(ex.: `'CNPJ ${cnpjRaw} inválido'`) vira XSS refletido — payload
+`<img src=x onerror=fetch('/exfil?t='+sessionStorage.token)>` no campo CNPJ
+exfiltra JWT.
+
+**Solução aplicada (Fase 3.1):**
+DOM builder puro — `document.createElement('li')` + `textContent = mensagem`
++ `appendChild`. `textContent` é imune a injeção por definição. Mesmo padrão
+já usado em `components.js::mcToast` (consistência).
+
+**Status:** ✅ Corrigido na Fase 3.1
+
+---
+
+### ERR-034 — `test_decimal_serializado_como_string_no_envelope` era falso-positivo-tolerante
+**Data:** 23/04/2026
+**Severidade:** 🟡 Atenção
+**Amparo:** MAX_FISCAL_01 — Decimal end-to-end
+**Arquivo:** `PY/tests/test_analise_manual_endpoint.py` — linhas 226-228 (antes do fix)
+**Descoberto em:** Auditoria Viciado pós-Fase 3
+
+**Descrição:**
+Loop `for chave in ("das_calculado", "das_mensal", "rbt12"): if chave in diag ...`
+passava mesmo se NENHUMA das 3 chaves existisse. Se o motor amanhã renomear
+(ex.: `das_calculado` → `das_apurado`), teste continua verde enquanto o contrato
+Decimal-como-string está quebrado.
+
+**Solução aplicada (Fase 3.1):**
+1. Walk recursivo `_walk_sem_float(obj)` varre TODO o envelope e falha se
+   encontrar QUALQUER `float` — drift silencioso impossível.
+2. Busca recursiva por chaves monetárias canônicas (ampliada: `das_calculado`,
+   `das_mensal`, `das_total`, `aliquota_efetiva`, `valor_devido`, `rbt12`) e
+   asserta que ao menos UMA foi encontrada (falso-positivo fechado).
+3. Caminho completo relatado no assertion error para debug rápido
+   (`"$.empresa.rbt12 = 1234.56 deveria ser string..."`).
+
+**Status:** ✅ Corrigido na Fase 3.1
+
+---
+
+### ERR-035 — Template HTML do formulário manual em string JS (~130 linhas inline)
+**Data:** 23/04/2026
+**Severidade:** 🟡 Atenção (manutenibilidade)
+**Arquivo:** `UI/analise_unificada.html` — `renderFormularioManual()` linhas ~281-490
+**Descoberto em:** Auditoria Viciado pós-Fase 3
+
+**Descrição:**
+O HTML do formulário está colado em template string dentro de JS. Sem lint
+de HTML, sem highlight adequado, cada campo novo exige edição em 2 pontos
+(Pydantic `AnaliseManualRequest` + template string). Quando adicionarmos
+Lucro Real completo, DIFAL interestadual, regime_comprador (Luiz pode pedir),
+etc., a manutenção fica cara e propensa a erro.
+
+**Solução necessária (roadmap — não P0):**
+Extrair para `UI/templates/formulario_manual.html`, carregar via fetch sob
+demanda na primeira entrada da Fase 2 (modo manual). Permite lint/validação
+HTML e revisão de markup fora do noise do JS.
+
+**Status:** ⏳ Pendente — próxima fase de UI (baixa prioridade).
+
+---
+
+### ERR-036 — `beneficio_fiscal_antigo` é campo DECORATIVO — viola MAX_FISCAL_01 e MAX_FISCAL_02
+**Data:** 23/04/2026
+**Severidade:** 🔴 Crítico
+**Amparo legal:** ADCT Art. 92-A §§ 3º e 4º (EC 132/2023) + LC 214/2025 Arts. 384-388 (Fundo de Compensação de Benefícios Fiscais)
+**Arquivo:** `PY/core/motor_tributario.py:1204-1213` + `UI/analise_unificada.html` (label do campo)
+**Descoberto em:** Auditoria Luiz Moreira pós-Fase 3
+
+**Descrição:**
+O frontend aceita valor monetário para `beneficio_fiscal_antigo`, a label diz
+"Isenção/benefício eliminado até 2032", e o usuário preenche esperando que o
+motor modele o cronograma de phase-out (20% ao ano a partir de 2029, ADCT
+Art. 92-A §3º). **Mas o valor nunca entra em cálculo.** Só dispara um alerta
+textual:
+
+```python
+if self.operacao.beneficio_fiscal_antigo > Decimal("0"):
+    alertas.append({..., "codigo": "BENEFICIO_FISCAL_EXTINCAO",
+        "mensagem": f"... será eliminado gradualmente até 2032 (LC 214/2025, Art. X)..."})
+```
+
+Duas violações graves:
+1. **MAX_FISCAL_01** — campo aceita "dedução" que o motor ignora. Base → Deduções → Alíquota → Valor quebrado: o usuário vê a dedução na entrada, zero dedução no cálculo.
+2. **MAX_FISCAL_02** — `Art. X` literal dentro da string de alerta. Base legal real é **LC 214/2025 Arts. 384-388 + ADCT Art. 92-A §§ 3º e 4º**. Placeholder sem amparo.
+
+**Impacto em fiscalização:** em cenário real onde o contador apresenta o parecer
+do motor como justificativa de recolhimento, a Receita pergunta "qual o valor do
+benefício fiscal antigo considerado no cálculo?" — resposta honesta: "zero, o
+campo é decorativo". Alegação de cálculo enganoso (Lei 8.137/1990 Art. 1º II) à
+vista.
+
+**Solução necessária (Fase 3.2 — sanitização fiscal):**
+Opção A (implementar phase-out):
+1. Modelar cronograma ADCT 92-A §3º (redução 20% ao ano a partir de 2029)
+2. Aplicar fator de redução sobre `beneficio_fiscal_antigo` conforme ano de `data_emissao`
+3. Subtrair do DAS/IVA calculado, registrar em `trilha_auditoria` com amparo
+4. Citar `LC 214/2025 Arts. 384-388 + ADCT Art. 92-A §3º` (substituir `Art. X`)
+
+Opção B (remover do escopo):
+1. Remover o campo de `AnaliseManualRequest` e da UI
+2. Deixar claro no disclaimer que o motor não modela benefícios fiscais extintos
+3. Apontar para consultoria especializada
+
+**Status:** ⏳ Pendente — blocker para Fase 4 (Luiz Moreira)
+
+---
+
+### ERR-037 — `regime_comprador` é campo ZUMBI no Pydantic
+**Data:** 23/04/2026
+**Severidade:** 🔴 Crítico
+**Amparo legal:** LC 214/2025 Art. 47 §2º (crédito por regime do adquirente)
+**Arquivo:** `UI/analise_unificada.html:741` (hardcoded "NAO_INFORMADO") + `PY/main.py:642` + `PY/schemas/motor.py::EmpresaCompradora`
+**Descoberto em:** Auditoria Luiz Moreira pós-Fase 3
+
+**Descrição:**
+Frontend envia `regime_comprador: "NAO_INFORMADO"` fixo. Backend aceita como
+string livre (`regime_comprador: str`), passa para `EmpresaCompradora.regime`,
+e **o motor nunca ramifica por esse campo** (`grep self.compradora.regime` em
+`PY/core/` → zero hits de lógica de cálculo).
+
+**Impacto fiscal:** **LC 214/2025 Art. 47 §2º** diferencia tratamento de crédito
+IBS/CBS conforme regime do adquirente:
+- Adquirente **Simples Nacional** → não apropria crédito
+- Adquirente **Lucro Real** → apropria integral
+- Adquirente **Lucro Presumido** → apropria parcial conforme hipótese
+
+Com "NAO_INFORMADO" fixo, o motor assume um caminho único. **Isso não é
+conservador — é omisso.** "NAO_INFORMADO" não tem assento em lei.
+
+**Solução necessária (Fase 3.2):**
+Opção A (expor na UI):
+1. Dropdown `regime_comprador` no bloco "Perfil do Comprador" com opções
+   SIMPLES | PRESUMIDO | REAL | MEI | NAO_INFORMADO
+2. Implementar lógica de crédito no motor conforme LC 214/2025 Art. 47 §2º
+3. Registrar em trilha_auditoria com amparo
+
+Opção B (explicitar pior caso):
+1. Manter "NAO_INFORMADO" no schema mas documentar que implica "sem crédito"
+   no cálculo (Art. 47 §2º aplicado de forma conservadora)
+2. Registrar na trilha: "regime_comprador não informado → assumido pior caso
+   (sem crédito) para proteção do emitente"
+
+**Status:** ⏳ Pendente — blocker para Fase 4 (Luiz Moreira)
+
+---
+
+### ERR-038 — `forma_recebimento` não distingue PIX-via-PSP de PIX-direto (Split Payment)
+**Data:** 23/04/2026
+**Severidade:** 🟡 Atenção (vira 🔴 em Ago/2026 com Ato CGIS)
+**Amparo legal:** LC 214/2025 Art. 353 caput + §§ 1º-3º + Art. 360 (regulamentação pendente)
+**Arquivo:** `PY/core/motor_tributario.py:911` + `PY/schemas/motor.py::OperacaoFiscal::forma_recebimento`
+**Descoberto em:** Auditoria Luiz Moreira pós-Fase 3
+
+**Descrição:**
+Motor classifica binariamente: eletrônico (`PIX_BOLETO`, `CARTAO`) vs `DINHEIRO`.
+Dispara Split Payment em todos os eletrônicos quando `ano >= 2027`. Mas
+LC 214/2025 Art. 353 caput prevê split apenas para "prestadores de serviços de
+pagamento" (PSPs — Mercado Pago, PagSeguro, Nubank PJ, etc.). PIX **direto
+banco-a-banco sem PSP** (conta-corrente empresarial) **não dispara split** até
+regulamentação específica.
+
+**Hoje o motor acerta por cima:** `PIX_BOLETO` dispara split em 2027+
+independentemente de ter PSP. Em cenário de PIX puro banco-a-banco, motor
+**superestima retenção** — o tomador vai reter mais do que devia.
+
+**Severidade:** 🟡 hoje porque Ato CGIS do Art. 360 ainda está pendente
+(prazo estimado Ago/2026). Após regulamentação, operadores vão poder provar
+ausência de PSP e motor virará passivo concreto — escala para 🔴.
+
+**Solução necessária (Fase 4 ou antes de Ago/2026):**
+1. Granular `forma_recebimento`: `DINHEIRO | PIX_DIRETO | PIX_VIA_PSP | BOLETO | CARTAO`
+2. Split só quando forma in {PIX_VIA_PSP, BOLETO_VIA_PSP, CARTAO} E ano >= 2027
+3. Registrar em trilha com amparo Art. 353 §1º e Ato CGIS (quando publicado)
+
+**Status:** ⏳ Pendente — monitorar publicação do Ato CGIS
+
+---
+
+### ERR-039 — `reducao_cbs_ibs` não cobre regime monofásico (combustíveis, cigarros, bebidas)
+**Data:** 23/04/2026
+**Severidade:** 🟡 Atenção
+**Amparo legal:** LC 214/2025 Arts. 172-174 (regime monofásico) + Art. 149 §2º III CF/88 (redação EC 132/2023)
+**Arquivo:** `PY/main.py:283` (Literal do campo) + `PY/core/motor_tributario.py:581-608` + `PY/schemas/motor.py::OperacaoFiscal`
+**Descoberto em:** Auditoria Luiz Moreira pós-Fase 3
+
+**Descrição:**
+O Literal atual é fechado em 4 opções: INTEGRAL, REDUCAO_30, REDUCAO_60, ISENTO.
+Cobre Arts. 258 (60%), 262 (30%), 264 (100%).
+
+**Não cobre regime monofásico** (Arts. 172-174 LC 214/2025 — combustíveis
+NCM 2710.xx, tabacos NCM 2402-2403, bebidas alcoólicas NCM 2203-2208, ativos
+financeiros). Monofásico é **regime próprio**: alíquota uniforme cobrada uma
+única vez no fornecedor/importador, não se encaixa em "INTEGRAL nem REDUCAO_X
+nem ISENTO".
+
+**Impacto em produção:** usuário de posto de combustível, distribuidora de
+bebidas ou tabacaria usa o formulário manual, escolhe "INTEGRAL" (única opção
+que parece fazer sentido) e recebe cálculo **radicalmente errado** — o motor
+aplica CBS/IBS cumulativo quando deveria ser monofásico no distribuidor.
+
+**Solução necessária (Fase 3.2):**
+1. Bloqueio preventivo: se `ncm_nbs` iniciar com NCMs monofásicas (prefixos
+   2710, 2402, 2403, 2203, 2204, 2205, 2206, 2207, 2208), levantar erro
+   explícito: "Regime monofásico — consulte regra específica LC 214/2025
+   Arts. 172-174. Este formulário não modela cálculo monofásico."
+2. Disclaimer no topo do formulário manual esclarecendo o escopo (Simples +
+   Presumido + Real + MEI, **exceto monofásicos**).
+3. Roadmap: implementar engine `regimes/monofasico.py` seguindo padrão dos
+   demais regimes com Guard Clause.
+
+**Status:** ⏳ Pendente — blocker para Fase 4 (Luiz Moreira)
 
 ---
 

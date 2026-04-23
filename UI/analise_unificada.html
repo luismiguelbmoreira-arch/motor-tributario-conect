@@ -489,6 +489,15 @@
       `;
     }
 
+    // Estado persistente entre re-renders do form manual.
+    // ERR-032 — dataset.tocado vivia no DOM e sumia quando o container
+    // era reinjetado (goToPhase(2) após erro 422). Agora mantemos em JS
+    // e reaplicamos no bind.
+    const manualFormState = {
+      tocado: new Set(),         // IDs que o usuário interveio
+      valores: Object.create(null), // último valor conhecido dos campos
+    };
+
     function bindFormularioManual() {
       // CNPJ: máscara ao digitar
       const cnpjEl = document.getElementById('m-cnpj');
@@ -498,13 +507,32 @@
       const cnaeEl = document.getElementById('m-cnae');
       if (cnaeEl) cnaeEl.addEventListener('blur', onCnaeBlur);
 
-      // Estado inicial dos blocos condicionais
+      // Reaplica valores e estado "tocado" de renders anteriores — o
+      // container do form é reconstruído via innerHTML em goToPhase(2),
+      // o que zera todos os nós. Precisamos restaurar o que o usuário
+      // já digitou antes do erro 422.
+      Object.keys(manualFormState.valores).forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const valor = manualFormState.valores[id];
+        if (el.type === 'checkbox') el.checked = !!valor;
+        else el.value = valor;
+        if (manualFormState.tocado.has(id)) el.dataset.tocado = '1';
+      });
+
+      // Estado inicial dos blocos condicionais — depois de restaurar valores,
+      // para não sobrepor seleção de regime/tipo já feita pelo usuário.
       onRegimeChange();
       onTipoCompradorChange();
 
-      // Troca o label do botão pra ação manual
+      // BUG-1 — garantir que o botão está destravado.
+      // mcWithSubmitLock usa dataset.mcLocked no nó DOM; quando goToPhase(2)
+      // reconstrói o container, o nó antigo é descartado ainda marcado como
+      // locked. O nó novo precisa começar limpo, independente do valor
+      // residual em btn.disabled (o HTML template não traz 'disabled').
       const btn = document.getElementById('btn-processar');
       if (btn) {
+        btn.dataset.mcLocked = '0';
         btn.disabled = false;
         btn.textContent = 'Gerar Diagnóstico Fiscal';
       }
@@ -572,10 +600,39 @@
     }
 
     // Marca campos quando o usuário intervém, para não sobrescrever via CNAE blur.
+    // ERR-032 — também persiste em manualFormState.tocado (escopo do módulo)
+    // para sobreviver ao re-render do container em goToPhase(2) após 422.
+    // Listener único no capture, registrado uma vez no load. Filtra por prefixo
+    // 'm-' (todo campo do form manual) para não contaminar campos de outros modos.
     document.addEventListener('input', (e) => {
-      if (!e.target || !e.target.id) return;
-      if (['m-tipo-comprador', 'm-percentual-b2b'].includes(e.target.id)) {
+      if (!e.target || !e.target.id || !e.target.id.startsWith('m-')) return;
+      const id = e.target.id;
+      // Campos onde o CNAE autofill deve respeitar a intervenção do usuário
+      if (['m-tipo-comprador', 'm-percentual-b2b', 'm-anexo-simples'].includes(id)) {
         e.target.dataset.tocado = '1';
+        manualFormState.tocado.add(id);
+      }
+      // Persiste último valor de QUALQUER campo do form manual para
+      // restauração no re-render (ERR-032).
+      if (e.target.type === 'checkbox') {
+        manualFormState.valores[id] = e.target.checked;
+      } else {
+        manualFormState.valores[id] = e.target.value;
+      }
+    }, true);
+
+    // Captura também mudanças em <select> (que não disparam 'input' em todos os browsers).
+    document.addEventListener('change', (e) => {
+      if (!e.target || !e.target.id || !e.target.id.startsWith('m-')) return;
+      const id = e.target.id;
+      if (['m-tipo-comprador', 'm-percentual-b2b', 'm-anexo-simples', 'm-regime'].includes(id)) {
+        e.target.dataset.tocado = '1';
+        manualFormState.tocado.add(id);
+      }
+      if (e.target.type === 'checkbox') {
+        manualFormState.valores[id] = e.target.checked;
+      } else {
+        manualFormState.valores[id] = e.target.value;
       }
     }, true);
 
@@ -702,12 +759,21 @@
         }
       }
 
-      // Exibe erros e aborta
+      // Exibe erros e aborta.
+      // ERR-033 — DOM builder em vez de innerHTML: hoje as mensagens são
+      // hardcoded, mas qualquer refactor futuro que incorpore input do
+      // usuário na mensagem viraria XSS refletido. textContent é imune.
       const box = document.getElementById('m-erros-globais');
       const lista = document.getElementById('m-erros-lista');
       if (erros.length) {
         if (box && lista) {
-          lista.innerHTML = erros.map(e => `<li style="color: var(--color-red-500);">${e}</li>`).join('');
+          while (lista.firstChild) lista.removeChild(lista.firstChild);
+          erros.forEach(mensagem => {
+            const li = document.createElement('li');
+            li.style.color = 'var(--color-red-500)';
+            li.textContent = mensagem;
+            lista.appendChild(li);
+          });
           box.classList.remove('hidden');
           box.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
