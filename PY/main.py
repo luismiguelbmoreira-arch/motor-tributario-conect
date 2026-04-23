@@ -256,8 +256,17 @@ class AnaliseManualRequest(BaseModel):
         default=Decimal("100"), ge=Decimal("0"), le=Decimal("100"),
         description="% da receita B2B (0-100). Usado quando tipo=MISTO."
     )
-    regime_comprador: str = Field(
-        default="NAO_INFORMADO", description="Regime tributário do comprador"
+    # ERR-037 — Literal fechado. Evita string livre ("NAO_INFORMADO" fixo
+    # enviado pelo frontend não é mais aceito como único valor). O motor
+    # registra o regime na trilha mesmo quando NAO_INFORMADO.
+    regime_comprador: Literal[
+        "SIMPLES", "PRESUMIDO", "REAL", "MEI", "NAO_INFORMADO"
+    ] = Field(
+        default="NAO_INFORMADO",
+        description=(
+            "Regime tributário do comprador "
+            "(LC 214/2025 Art. 47 §2º). NAO_INFORMADO = pior caso."
+        ),
     )
     uf_destino: str = Field(default="SP", description="UF de destino (2 letras; padrão: SP)")
 
@@ -267,8 +276,16 @@ class AnaliseManualRequest(BaseModel):
     )
     valor_operacao: Decimal = Field(..., gt=Decimal("0"), description="Valor da operação em R$")
     ncm_nbs: str = Field(default="00000000", description="NCM/NBS (8 dígitos; padrão: 00000000)")
-    forma_recebimento: Literal["DINHEIRO", "PIX_BOLETO", "CARTAO"] = Field(
-        default="PIX_BOLETO", description="Forma de recebimento (impacta Split Payment)"
+    # ERR-038 — Literal granular; Split Payment só dispara em formas com PSP
+    # (LC 214/2025 Art. 353 §1º). PIX_DIRETO (banco-a-banco) e DINHEIRO ficam fora.
+    forma_recebimento: Literal[
+        "DINHEIRO", "PIX_DIRETO", "PIX_VIA_PSP", "BOLETO", "CARTAO",
+    ] = Field(
+        default="PIX_VIA_PSP",
+        description=(
+            "Forma de recebimento — impacta Split Payment "
+            "(LC 214/2025 Art. 353 §1º). PIX_DIRETO/DINHEIRO não disparam."
+        ),
     )
     rpa_mensal: Optional[Decimal] = Field(
         default=None, ge=Decimal("0"),
@@ -284,10 +301,12 @@ class AnaliseManualRequest(BaseModel):
         default="INTEGRAL",
         description="Nível de redução CBS/IBS (LC 214/2025, Arts. 258-270)"
     )
-    beneficio_fiscal_antigo: Decimal = Field(
-        default=Decimal("0"), ge=Decimal("0"),
-        description="Isenção/benefício ICMS eliminado até 2032"
-    )
+    # ERR-036 — Campo `beneficio_fiscal_antigo` removido na Fase 3.2.
+    # Era DECORATIVO: o valor nunca entrava na base de cálculo. O phase-out
+    # do ADCT Art. 92-A §3º (redução 20%/ano a partir de 2029) exige tabela
+    # FROZEN por ano + fonte específica da categoria — entregue na fase que
+    # modelar benefícios ICMS herdados (Fase 4+). Pydantic extra="forbid"
+    # rejeita o campo com 422.
 
     # ── Empresa nova (< 12 meses) ──────────────────────────────────────────
     data_inicio_atividade: Optional[str] = Field(
@@ -653,6 +672,7 @@ def analise_manual(
             )
 
         # Monta OperacaoFiscal
+        # ERR-036 — `beneficio_fiscal_antigo` removido do schema.
         operacao = OperacaoFiscal(
             data_emissao=data_emissao_parsed,
             valor_operacao=req.valor_operacao,
@@ -661,7 +681,6 @@ def analise_manual(
             rpa_mensal=req.rpa_mensal,
             tinha_st_icms=req.tinha_st_icms,
             reducao_cbs_ibs=req.reducao_cbs_ibs,
-            beneficio_fiscal_antigo=req.beneficio_fiscal_antigo,
             lucro_real_mensal=req.lucro_real_mensal,
             creditos_pis_cofins=req.creditos_pis_cofins,
             produto_importado=req.produto_importado,

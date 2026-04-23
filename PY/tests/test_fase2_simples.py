@@ -31,7 +31,7 @@ def make_operacao(ano: int = 2026, valor: str = "10000.00") -> OperacaoFiscal:
         data_emissao=date(ano, 6, 1),
         valor_operacao=Decimal(valor),
         ncm_nbs="84099190",
-        forma_recebimento="PIX_BOLETO",
+        forma_recebimento="PIX_VIA_PSP",
     )
 
 

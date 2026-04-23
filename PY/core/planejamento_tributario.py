@@ -213,11 +213,11 @@ if __name__ == "__main__":
             "valor_operacao": "100000.00",
             "rpa_mensal": "100000.00",      
             "ncm_nbs": "00000000",
-            "forma_recebimento": "PIX_BOLETO",
+            "forma_recebimento": "PIX_VIA_PSP",
             # "lucro_real_mensal": "35000.00", -> APAGADO DE PROPÓSITO PARA TESTAR BLOQUEIO DE COMPLIANCE
             "tinha_st_icms": False,
-            "reducao_cbs_ibs": "REDUCAO_60", # Saúde tem 60% de redução na nova reforma
-            "beneficio_fiscal_antigo": "0.00"
+            "reducao_cbs_ibs": "REDUCAO_60",  # Saúde tem 60% de redução na nova reforma
+            # ERR-036 (Fase 3.2): campo beneficio_fiscal_antigo removido — era decorativo.
         }
     }
 

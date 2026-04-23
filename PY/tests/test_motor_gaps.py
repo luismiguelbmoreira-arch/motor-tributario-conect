@@ -38,7 +38,7 @@ def make_operacao(ano: int = 2026, valor: str = "10000.00",
         data_emissao=date(ano, 6, 1),
         valor_operacao=Decimal(valor),
         ncm_nbs="84099190",
-        forma_recebimento="PIX_BOLETO",
+        forma_recebimento="PIX_VIA_PSP",
     )
     if data_liquidacao:
         kwargs["data_liquidacao"] = data_liquidacao
@@ -339,7 +339,7 @@ class TestValidarDataTransicional:
                 data_emissao=date(2025, 12, 31),
                 valor_operacao=Decimal("10000.00"),
                 ncm_nbs="84099190",
-                forma_recebimento="PIX_BOLETO",
+                forma_recebimento="PIX_VIA_PSP",
             )
 
     def test_2034_invalido(self):
@@ -348,7 +348,7 @@ class TestValidarDataTransicional:
                 data_emissao=date(2034, 1, 1),
                 valor_operacao=Decimal("10000.00"),
                 ncm_nbs="84099190",
-                forma_recebimento="PIX_BOLETO",
+                forma_recebimento="PIX_VIA_PSP",
             )
 
     def test_2026_valido(self):
@@ -360,7 +360,7 @@ class TestValidarDataTransicional:
             data_emissao=date(2033, 12, 31),
             valor_operacao=Decimal("10000.00"),
             ncm_nbs="84099190",
-            forma_recebimento="PIX_BOLETO",
+            forma_recebimento="PIX_VIA_PSP",
         )
         assert op.data_emissao.year == 2033
 
@@ -370,7 +370,7 @@ class TestValidarDataTransicional:
             data_emissao=date(ano, 6, 1),
             valor_operacao=Decimal("10000.00"),
             ncm_nbs="84099190",
-            forma_recebimento="PIX_BOLETO",
+            forma_recebimento="PIX_VIA_PSP",
         )
         assert op.data_emissao.year == ano
 
@@ -392,7 +392,7 @@ class TestValidarLiquidacao:
                 data_liquidacao=date(2026, 6, 14),
                 valor_operacao=Decimal("10000.00"),
                 ncm_nbs="84099190",
-                forma_recebimento="PIX_BOLETO",
+                forma_recebimento="PIX_VIA_PSP",
             )
 
     def test_liquidacao_igual_a_emissao_valida(self):
@@ -401,7 +401,7 @@ class TestValidarLiquidacao:
             data_liquidacao=date(2026, 6, 15),
             valor_operacao=Decimal("10000.00"),
             ncm_nbs="84099190",
-            forma_recebimento="PIX_BOLETO",
+            forma_recebimento="PIX_VIA_PSP",
         )
         assert op.data_liquidacao == op.data_emissao
 
@@ -411,7 +411,7 @@ class TestValidarLiquidacao:
             data_liquidacao=date(2027, 1, 1),
             valor_operacao=Decimal("10000.00"),
             ncm_nbs="84099190",
-            forma_recebimento="PIX_BOLETO",
+            forma_recebimento="PIX_VIA_PSP",
         )
         assert op.data_liquidacao > op.data_emissao
 

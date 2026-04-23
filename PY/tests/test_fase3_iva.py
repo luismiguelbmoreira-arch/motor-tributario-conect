@@ -37,7 +37,7 @@ def make_motor(
     cnae: str = "4711302",        # Comércio → Anexo I
     ano: int = 2027,
     valor: str = "50000.00",
-    forma: str = "PIX_BOLETO",
+    forma: str = "PIX_VIA_PSP",
     tipo_comprador: str = "B2B_CONTRIBUINTE",
     folha: str = None,
 ) -> MotorReformaTributaria:
@@ -378,13 +378,13 @@ class TestSplitPayment:
 
     def test_split_inativo_em_2026(self):
         """2026: Split Payment ainda não está ativo (Art. 348 — apenas testes)."""
-        motor = make_motor(ano=2026, forma="PIX_BOLETO")
+        motor = make_motor(ano=2026, forma="PIX_VIA_PSP")
         resultado = motor.split_payment_impacto
         assert resultado["ativo"] is False, "Split deve ser inativo em 2026"
 
     def test_split_ativo_2027_pix(self):
         """2027: Split ativo para PIX. Retenção dinâmica = CBS + IBS. Art. 344."""
-        motor = make_motor(ano=2027, valor="50000.00", forma="PIX_BOLETO")
+        motor = make_motor(ano=2027, valor="50000.00", forma="PIX_VIA_PSP")
         resultado = motor.split_payment_impacto
         assert resultado["ativo"] is True
         retencao = Decimal(resultado["retencao_imediata"])
@@ -405,7 +405,7 @@ class TestSplitPayment:
         Correto: CBS 8,8% + IBS 0,1% = 8,9% (LC 214/2025, Art. 344+353).
         R$ 50.000 × 8,9% = R$ 4.450 — NÃO R$ 450.
         """
-        motor = make_motor(ano=2027, valor="50000.00", forma="PIX_BOLETO")
+        motor = make_motor(ano=2027, valor="50000.00", forma="PIX_VIA_PSP")
         resultado = motor.split_payment_impacto
         retencao = Decimal(resultado["retencao_imediata"])
         taxa_errada = Decimal("50000.00") * Decimal("0.009")  # R$ 450 — bug antigo
@@ -416,7 +416,7 @@ class TestSplitPayment:
 
     def test_split_2033_taxa_265(self):
         """2033: Split = CBS 8,8% + IBS 17,7% = 26,5%. Regime pleno."""
-        motor = make_motor(ano=2033, valor="50000.00", forma="PIX_BOLETO")
+        motor = make_motor(ano=2033, valor="50000.00", forma="PIX_VIA_PSP")
         resultado = motor.split_payment_impacto
         retencao = Decimal(resultado["retencao_imediata"])
         esperado = Decimal("50000.00") * (Decimal("0.088") + Decimal("0.177"))
@@ -428,7 +428,7 @@ class TestSplitPayment:
         """Retenção deve crescer de 2029 a 2033 junto com o fase-in do IBS."""
         retencao_anterior = Decimal("0")
         for ano in [2029, 2030, 2031, 2032, 2033]:
-            motor = make_motor(ano=ano, valor="50000.00", forma="PIX_BOLETO")
+            motor = make_motor(ano=ano, valor="50000.00", forma="PIX_VIA_PSP")
             r = motor.split_payment_impacto
             ret = Decimal(r["retencao_imediata"])
             assert ret > retencao_anterior, f"Split {ano} deve ser > Split {ano-1}"

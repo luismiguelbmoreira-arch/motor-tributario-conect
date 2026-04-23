@@ -124,6 +124,14 @@ class MotorReformaTributaria:
         # [MAX_FISCAL_03] Validação de Cronograma de Transição (Timeline Awareness)
         self._validar_timeline()
 
+        # [ERR-037] Registro informativo do regime do comprador na trilha.
+        # O campo é capturado e persistido na auditoria — mas a ramificação
+        # de cálculo por regime do adquirente (LC 214/2025 Art. 47 §2º:
+        # Simples não apropria crédito, Lucro Real apropria integral,
+        # Presumido parcial) é entregue na Fase 4+. Até lá, o motor segue
+        # PIOR CASO (sem crédito cruzado) para não inflar recomendação.
+        self._registrar_regime_comprador()
+
         # ── DISPATCHER DE REGIME ────────────────────────────────────────────
         # Instancia o engine correto e vincula à trilha unificada.
         # Guard Clause (Camada 2) ocorre dentro do engine — exceção gravada na trilha.
@@ -168,6 +176,41 @@ class MotorReformaTributaria:
             valor=f"Status: {status}",
             lei="LC 214/2025, Art. 360",
             detalhe=f"Ano de operação {ano} validado para motor transicional."
+        )
+
+    def _registrar_regime_comprador(self) -> None:
+        """
+        Registra regime do comprador capturado na entrada (ERR-037).
+
+        A trilha guarda o valor mesmo que o motor ainda não ramifique por ele.
+        A lógica de crédito cruzado por regime do adquirente (LC 214/2025
+        Art. 47 §2º) está prevista para Fase 4+ e será implementada com
+        tabela FROZEN e validação fiscal. Até lá, o cálculo segue PIOR CASO
+        (sem crédito cruzado) — registro explícito na trilha protege
+        contra alegação de que o dado foi ignorado.
+        """
+        regime_c = self.compradora.regime  # Literal — nunca None
+        conhecido = regime_c != "NAO_INFORMADO"
+        detalhe = (
+            f"Regime do comprador capturado: '{regime_c}'. "
+            "Aplicação em crédito cruzado (LC 214/2025 Art. 47 §2º) "
+            "prevista para fase posterior — motor usa PIOR CASO (sem crédito) "
+            "até lá."
+        ) if conhecido else (
+            "Regime do comprador NÃO INFORMADO — motor assume PIOR CASO "
+            "(sem crédito cruzado, LC 214/2025 Art. 47 §2º). Informe o "
+            "regime para habilitar a recomendação de crédito B2B na "
+            "Fase 4."
+        )
+        self._registrar_passo(
+            id="REGIME_COMPRADOR_CAPTURADO",
+            titulo="Regime do Comprador (captura informativa)",
+            base=f"Tipo: {self.compradora.tipo}",
+            deducoes="N/A",
+            aliquota="N/A",
+            valor=regime_c,
+            lei="LC 214/2025, Art. 47 §2º",
+            detalhe=detalhe,
         )
 
     def _registrar_passo(
@@ -900,15 +943,25 @@ class MotorReformaTributaria:
     @cached_property
     def split_payment_impacto(self) -> Dict[str, Any]:
         """
-        Split Payment: IBS/CBS retido na fonte pelo intermediador financeiro.
-        Ativo a partir de Jan/2027 para pagamentos eletrônicos (PIX, Boleto, Cartão).
-        DINHEIRO escapa da retenção (até regulamentação posterior).
-        LC 214/2025, Art. X (Split Payment).
+        Split Payment: IBS/CBS retido na fonte pelo PSP (Prestador de Serviço
+        de Pagamento). Ativo a partir de jan/2027.
+
+        ERR-038 — gating por forma de recebimento usa FORMAS_PAGAMENTO_COM_PSP
+        (schemas.motor). Split só dispara para pagamentos intermediados por
+        PSP (LC 214/2025 Art. 353 §1º):
+          - PIX_VIA_PSP, BOLETO, CARTAO → dispara retenção
+          - PIX_DIRETO, DINHEIRO        → escapa (sem intermediário PSP)
+
+        Fonte única da lista: schemas.motor.FORMAS_PAGAMENTO_COM_PSP.
         """
+        # Import local evita ciclo e mantém fonte única de verdade.
+        from schemas.motor import FORMAS_PAGAMENTO_COM_PSP
+
         ano = self.operacao.data_emissao.year
         forma = self.operacao.forma_recebimento
+        tem_psp = forma in FORMAS_PAGAMENTO_COM_PSP
 
-        if ano >= ANO_INICIO_SPLIT_PAYMENT and forma != "DINHEIRO":
+        if ano >= ANO_INICIO_SPLIT_PAYMENT and tem_psp:
             # Split Payment dinâmico: usa CBS+IBS do ano da operação (LC 214/2025, Art. 344)
             aliquotas_ano = self.get_aliquotas_iva_por_ano()
             # ERR-016: aplica fator de redução CBS/IBS (Arts. 258-264)
@@ -925,14 +978,18 @@ class MotorReformaTributaria:
                 deducoes="R$ 0,00",
                 aliquota=f"{(taxa_retencao*100):.2f}%",
                 valor=_fmt_brl(retencao),
-                lei="LC 214/2025, Art. 344 e Art. X",
-                detalhe=f"Forma de recebimento {forma} identificada como elegível."
+                lei="LC 214/2025, Art. 344 + Art. 353 §1º",
+                detalhe=(
+                    f"Forma de recebimento '{forma}' intermediada por PSP "
+                    "— LC 214/2025 Art. 353 §1º impõe retenção automática."
+                ),
             )
 
             return {
                 "ativo": True,
                 "ano_ativacao": ANO_INICIO_SPLIT_PAYMENT,
                 "forma_recebimento": forma,
+                "intermediado_por_psp": True,
                 "retencao_imediata": str(retencao),
                 "percentual_retencao": f"{taxa_retencao * 100:.2f}%",
                 "impacto_liquidez": "ALTO — IBS/CBS retido antes de cair na conta.",
@@ -941,13 +998,31 @@ class MotorReformaTributaria:
                 ) + " (anual)",
             }
 
+        # Motivo granular — separa (ano não ativo) de (forma sem PSP)
+        if ano < ANO_INICIO_SPLIT_PAYMENT:
+            motivo = (
+                f"Ano {ano} < {ANO_INICIO_SPLIT_PAYMENT} "
+                "(Split Payment ainda não ativo, LC 214/2025 Art. 344)."
+            )
+        elif forma == "DINHEIRO":
+            motivo = (
+                "Pagamento em DINHEIRO não passa por PSP — "
+                "fora do escopo de Split Payment (LC 214/2025 Art. 353 §1º)."
+            )
+        elif forma == "PIX_DIRETO":
+            motivo = (
+                "PIX direto banco-a-banco não tem PSP intermediário — "
+                "não dispara retenção automática (LC 214/2025 Art. 353 §1º). "
+                "Split Payment atinge apenas PIX via PSP."
+            )
+        else:
+            motivo = f"Forma '{forma}' fora do conjunto com PSP."
+
         return {
             "ativo": False,
-            "motivo": (
-                f"Ano {ano} < {ANO_INICIO_SPLIT_PAYMENT} (Split Payment ainda não ativo)."
-                if ano < ANO_INICIO_SPLIT_PAYMENT
-                else "Pagamento em DINHEIRO: não sujeito ao Split Payment em 2027."
-            ),
+            "forma_recebimento": forma,
+            "intermediado_por_psp": tem_psp,
+            "motivo": motivo,
             "retencao_imediata": "0.00",
             "impacto_liquidez": "ZERO",
         }
@@ -1200,17 +1275,12 @@ class MotorReformaTributaria:
                 ),
             })
 
-        # MÉDIO: Benefício fiscal antigo a ser extinto
-        if self.operacao.beneficio_fiscal_antigo > Decimal("0"):
-            alertas.append({
-                "nivel": "MEDIO",
-                "codigo": "BENEFICIO_FISCAL_EXTINCAO",
-                "mensagem": (
-                    f"Benefício fiscal de {_fmt_brl(self.operacao.beneficio_fiscal_antigo)} "
-                    f"será eliminado gradualmente até 2032 (LC 214/2025, Art. X). "
-                    f"Revisar precificação."
-                ),
-            })
+        # ERR-036 — Alerta BENEFICIO_FISCAL_EXTINCAO removido na Fase 3.2.
+        # Motivo: o campo `beneficio_fiscal_antigo` era DECORATIVO — o valor
+        # nunca entrava em base de cálculo. Alerta com "Art. X" literal,
+        # sem amparo real, viola MAX_FISCAL_02. Phase-out do ADCT Art. 92-A
+        # §3º (redução 20%/ano a partir de 2029) é fase posterior — precisa
+        # de tabela FROZEN por ano + validação fiscal do Luiz Moreira.
 
         # INFO: Substituição Tributária ICMS extinta
         if self.operacao.tinha_st_icms:

@@ -19,9 +19,8 @@
         "data_emissao": "2026-06-15",
         "valor_operacao": "10000.00",
         "ncm_nbs": "00000000",
-        "forma_recebimento": "PIX_BOLETO",
+        "forma_recebimento": "PIX_VIA_PSP",
         "tinha_st_icms": false,
-        "reducao_cbs_ibs": "INTEGRAL",
-        "beneficio_fiscal_antigo": "0.00"
+        "reducao_cbs_ibs": "INTEGRAL"
     }
 }

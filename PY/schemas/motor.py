@@ -15,6 +15,53 @@ import re
 
 logger = logging.getLogger("motor_conect.schemas")
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ERR-039 — Bloqueio preventivo de NCMs monofásicas (FROZEN)
+#
+# LC 214/2025 Arts. 172-174 institui regime monofásico específico para
+# combustíveis, cigarros e bebidas alcoólicas — cálculo da CBS/IBS ocorre
+# numa única etapa da cadeia (importador/produtor/distribuidor) e este motor
+# NÃO modela essa dinâmica. Aceitar NCM monofásica no formulário padrão
+# produziria cálculo cumulativo semanticamente errado em cadeia que deveria
+# ser monofásica — MAX_FISCAL_01 + Lei 8.137/1990 Art. 1º II.
+#
+# Comparação é feita por PREFIXO de 4 dígitos (capítulo NCM), pois o regime
+# monofásico abrange a posição inteira e não suas subposições específicas.
+# CF/88 Art. 149 §2º III + LC 214/2025 Art. 172-174.
+# ─────────────────────────────────────────────────────────────────────────────
+NCMS_MONOFASICAS_BLOQUEADAS: frozenset[str] = frozenset({
+    # Combustíveis e derivados de petróleo — LC 214/2025 Art. 172 I
+    "2710",
+    # Cigarros e produtos do tabaco — LC 214/2025 Art. 172 II
+    "2402", "2403",
+    # Bebidas alcoólicas — LC 214/2025 Art. 172 III
+    "2203",  # cerveja
+    "2204",  # vinho de uva
+    "2205",  # vermute
+    "2206",  # outras bebidas fermentadas
+    "2207",  # álcool etílico não desnaturado ≥ 80% vol. (para bebidas)
+    "2208",  # aguardentes, licores, destilados
+})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ERR-038 — Granularidade de forma de recebimento (FROZEN)
+#
+# Split Payment (LC 214/2025 Art. 353 §1º) só se aplica a pagamentos
+# intermediados por PSP — Prestador de Serviço de Pagamento. PIX direto
+# banco-a-banco NÃO tem PSP e portanto não dispara retenção automática.
+# Agrupar PIX_DIRETO e PIX_VIA_PSP sob o mesmo rótulo ("PIX_BOLETO")
+# superestima a retenção em pagamentos domésticos reais.
+# ─────────────────────────────────────────────────────────────────────────────
+FORMAS_PAGAMENTO_COM_PSP: frozenset[str] = frozenset({
+    # Formas que passam por PSP e disparam Split Payment a partir de 2027
+    # LC 214/2025 Art. 353 §1º
+    "PIX_VIA_PSP",  # Mercado Pago, PagSeguro, Stone, Nubank PJ, etc.
+    "BOLETO",       # Registrado/emitido via PSP do banco
+    "CARTAO",       # Credenciadoras/adquirentes (PSP por natureza)
+})
+
 class Atividade(BaseModel):
     """
     Atividade individual do PGDAS-D para empresas multi-atividade.
@@ -114,7 +161,17 @@ class EmpresaCompradora(BaseModel):
     percentual_b2b: Decimal = Field(
         default=Decimal("100"), ge=Decimal("0"), le=Decimal("100")
     )
-    regime: str = Field(default="NAO_INFORMADO")
+    # ERR-037 — regime do comprador sai de `str` livre para Literal fechado.
+    # Valor captado vira dado auditável na trilha (crédito cruzado LC 214/2025
+    # Art. 47 §2º fica previsto para Fase 4). "NAO_INFORMADO" é o default
+    # explícito — assume PIOR CASO (sem crédito).
+    regime: Literal["SIMPLES", "PRESUMIDO", "REAL", "MEI", "NAO_INFORMADO"] = Field(
+        default="NAO_INFORMADO",
+        description=(
+            "Regime tributário do comprador — LC 214/2025 Art. 47 §2º. "
+            "NAO_INFORMADO = pior caso (sem crédito cruzado)."
+        ),
+    )
     uf_destino: str = Field(..., description="UF de destino (2 letras)")
 
     @field_validator("uf_destino")
@@ -138,8 +195,16 @@ class OperacaoFiscal(BaseModel):
     c_class_trib: Optional[str] = Field(default=None)
     tinha_st_icms: bool = Field(default=False)
     reducao_cbs_ibs: Literal["INTEGRAL", "REDUCAO_30", "REDUCAO_60", "ISENTO"] = Field(default="INTEGRAL")
-    beneficio_fiscal_antigo: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
-    forma_recebimento: Literal["DINHEIRO", "PIX_BOLETO", "CARTAO"] = Field(default="PIX_BOLETO")
+    # ERR-038 — Literal granular separa PIX banco-a-banco de PIX via PSP.
+    # Split Payment só dispara para formas em FORMAS_PAGAMENTO_COM_PSP
+    # (LC 214/2025 Art. 353 §1º). Ver motor_tributario.split_payment_impacto.
+    forma_recebimento: Literal[
+        "DINHEIRO",
+        "PIX_DIRETO",    # banco-a-banco, sem PSP → NÃO dispara Split
+        "PIX_VIA_PSP",   # Mercado Pago/PagSeguro/etc → dispara Split
+        "BOLETO",        # registrado via PSP do banco → dispara Split
+        "CARTAO",        # credenciadora/adquirente → dispara Split
+    ] = Field(default="PIX_VIA_PSP")
     rpa_mensal: Optional[Decimal] = Field(default=None, ge=Decimal("0"))
     lucro_real_mensal: Optional[Decimal] = Field(default=None, ge=Decimal("0"))
     produto_importado: bool = Field(default=False)
@@ -173,9 +238,27 @@ class OperacaoFiscal(BaseModel):
         res = validar_ncm(v)
         if not res.ok:
             raise ValueError(f"NCM Invalido: {', '.join(res.errors)}")
-        return re.sub(r'[\s.\-]', '', v.strip())
+        limpo = re.sub(r'[\s.\-]', '', v.strip())
 
-    @field_validator("valor_operacao", "beneficio_fiscal_antigo", mode="before")
+        # ERR-039 — Bloqueio de NCM de regime monofásico.
+        # LC 214/2025 Arts. 172-174 (regime específico de combustíveis,
+        # tabacos e bebidas alcoólicas) + CF/88 Art. 149 §2º III.
+        # Este motor NÃO modela monofásico — aceitar gera cálculo
+        # semanticamente errado (MAX_FISCAL_01). Falha fechada é
+        # preferível a silenciar o erro no diagnóstico.
+        prefixo_cap = limpo[:4]
+        if prefixo_cap in NCMS_MONOFASICAS_BLOQUEADAS:
+            raise ValueError(
+                f"NCM {limpo} é de regime monofásico "
+                "(LC 214/2025 Arts. 172-174). "
+                "Este motor não modela cálculo monofásico. "
+                "Consulte regra específica para o setor "
+                "(combustíveis 2710, tabacos 2402/2403, "
+                "bebidas alcoólicas 2203-2208)."
+            )
+        return limpo
+
+    @field_validator("valor_operacao", mode="before")
     @classmethod
     def converter_para_decimal(cls, v: Any) -> Decimal:
         if isinstance(v, float):

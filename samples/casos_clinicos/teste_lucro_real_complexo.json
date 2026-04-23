@@ -19,12 +19,11 @@
         "data_emissao": "2026-08-20",
         "valor_operacao": "150000.00",
         "ncm_nbs": "84212990",
-        "forma_recebimento": "PIX_BOLETO",
+        "forma_recebimento": "PIX_VIA_PSP",
         "lucro_real_mensal": "35000.00",
         "creditos_pis_cofins": "1200.00",
         "produto_importado": true,
         "tinha_st_icms": false,
-        "reducao_cbs_ibs": "INTEGRAL",
-        "beneficio_fiscal_antigo": "0.00"
+        "reducao_cbs_ibs": "INTEGRAL"
     }
 }

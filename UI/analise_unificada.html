@@ -398,11 +398,13 @@
             <div class="input-group flex-1">
               <label class="input-label" for="m-forma-recebimento">Forma de Recebimento</label>
               <select id="m-forma-recebimento" class="input-field">
-                <option value="PIX_BOLETO" selected>PIX / Boleto</option>
-                <option value="CARTAO">Cartão (Split Payment)</option>
+                <option value="PIX_VIA_PSP" selected>PIX via PSP (Mercado Pago, PagSeguro, Nubank PJ...)</option>
+                <option value="PIX_DIRETO">PIX direto (banco a banco, sem PSP)</option>
+                <option value="BOLETO">Boleto</option>
+                <option value="CARTAO">Cartão</option>
                 <option value="DINHEIRO">Dinheiro</option>
               </select>
-              <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.25rem;">Cartão aciona Split Payment — LC 214/2025 Art. 353.</p>
+              <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.25rem;">Split Payment só dispara em formas intermediadas por PSP — LC 214/2025 Art. 353 §1º. PIX direto e dinheiro escapam.</p>
             </div>
             <div class="input-group flex-1">
               <label class="input-label" for="m-rpa-mensal">RPA Mensal (opcional)</label>
@@ -421,11 +423,6 @@
           </div>
 
           <div class="flex-row gap-4">
-            <div class="input-group flex-1">
-              <label class="input-label" for="m-beneficio-fiscal-antigo">Benefício Fiscal Antigo (ICMS)</label>
-              <input type="text" id="m-beneficio-fiscal-antigo" class="input-field" placeholder="R$ 0,00" oninput="aplicarMascaraBRL(this)" value="R$ 0,00">
-              <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.25rem;">Isenção/benefício eliminado até 2032.</p>
-            </div>
             <div class="input-group flex-1" style="display: flex; align-items: center; padding-top: 1.5rem;">
               <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                 <input type="checkbox" id="m-tinha-st-icms">
@@ -438,6 +435,14 @@
                 <span class="text-body" style="font-size: 0.85rem;">Produto importado (&gt;40% — Res. SF 13/2012)</span>
               </label>
             </div>
+          </div>
+
+          <!-- Disclaimer ERR-039 — NCMs monofásicas bloqueadas -->
+          <div class="p-3 rounded-xl" style="background: rgba(226, 152, 88, 0.08); border: 1px solid rgba(226, 152, 88, 0.4); font-size: 0.78rem; line-height: 1.4;">
+            <strong>Aviso:</strong> este formulário NÃO modela regime monofásico
+            (LC 214/2025 Arts. 172-174). NCMs de combustíveis (2710), tabacos
+            (2402, 2403) e bebidas alcoólicas (2203 a 2208) serão rejeitados
+            no envio — o cálculo cumulativo não se aplica a essas cadeias.
           </div>
         </div>
 
@@ -462,6 +467,23 @@
             <div class="input-group flex-1">
               <label class="input-label" for="m-uf-destino">UF de Destino</label>
               <input type="text" id="m-uf-destino" class="input-field" placeholder="SP" maxlength="2" style="text-transform: uppercase;" value="SP">
+            </div>
+          </div>
+
+          <!-- ERR-037 — regime do comprador captado explicitamente -->
+          <div class="flex-row gap-4">
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-regime-comprador">Regime do Comprador</label>
+              <select id="m-regime-comprador" class="input-field">
+                <option value="NAO_INFORMADO" selected>Não informado (pior caso — sem crédito)</option>
+                <option value="REAL">Lucro Real</option>
+                <option value="PRESUMIDO">Lucro Presumido</option>
+                <option value="SIMPLES">Simples Nacional</option>
+                <option value="MEI">MEI</option>
+              </select>
+              <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.25rem;">
+                Campo registrado na trilha de auditoria (LC 214/2025 Art. 47 §2º). A ramificação do crédito cruzado por regime do adquirente será liberada em fase posterior — por ora, o motor assume pior caso.
+              </p>
             </div>
           </div>
         </div>
@@ -785,7 +807,7 @@
       // Decimals viajam como STRING (o backend reidrata com Pydantic field_validator).
       const folha12m = decimalSafe((document.getElementById('m-folha-12m') || {}).value);
       const rpaMensal = decimalSafe((document.getElementById('m-rpa-mensal') || {}).value);
-      const beneficioAntigo = decimalSafe((document.getElementById('m-beneficio-fiscal-antigo') || {}).value) || '0';
+      // ERR-036: beneficio_fiscal_antigo REMOVIDO — era decorativo.
       const lucroReal = decimalSafe((document.getElementById('m-lucro-real-mensal') || {}).value);
       const creditosPisCofins = decimalSafe((document.getElementById('m-creditos-pis-cofins') || {}).value) || '0';
       const anexoSimples = (document.getElementById('m-anexo-simples') || {}).value || null;
@@ -804,16 +826,18 @@
         categoria_mei: categoriaMei || null,
         tipo_comprador: tipoComprador,
         percentual_b2b: percentualB2b,
-        regime_comprador: 'NAO_INFORMADO',
+        // ERR-037: regime do comprador capturado do dropdown (LC 214/2025 Art. 47 §2º).
+        regime_comprador: (document.getElementById('m-regime-comprador') || {}).value || 'NAO_INFORMADO',
         uf_destino: vUfDestino.limpo,
         data_emissao: vDataEmissao.limpo,
         valor_operacao: valorOperacao,
         ncm_nbs: vNcm.limpo,
-        forma_recebimento: (document.getElementById('m-forma-recebimento') || {}).value || 'PIX_BOLETO',
+        // ERR-038: default PIX_VIA_PSP (padrão comercial brasileiro).
+        forma_recebimento: (document.getElementById('m-forma-recebimento') || {}).value || 'PIX_VIA_PSP',
         rpa_mensal: rpaMensal || null,
         tinha_st_icms: !!(document.getElementById('m-tinha-st-icms') || {}).checked,
         reducao_cbs_ibs: (document.getElementById('m-reducao-cbs-ibs') || {}).value || 'INTEGRAL',
-        beneficio_fiscal_antigo: beneficioAntigo,
+        // ERR-036: beneficio_fiscal_antigo REMOVIDO do payload — extra="forbid" rejeitaria 422.
         lucro_real_mensal: lucroReal || null,
         creditos_pis_cofins: creditosPisCofins,
         produto_importado: !!(document.getElementById('m-produto-importado') || {}).checked,

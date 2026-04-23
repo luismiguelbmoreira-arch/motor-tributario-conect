@@ -930,7 +930,14 @@ Opção B (remover do escopo):
 2. Deixar claro no disclaimer que o motor não modela benefícios fiscais extintos
 3. Apontar para consultoria especializada
 
-**Status:** ⏳ Pendente — blocker para Fase 4 (Luiz Moreira)
+**Status:** ✅ Corrigido — Fase 3.2 (23/04/2026)
+
+**Resolução:** Opção B (remoção).
+- Campo `beneficio_fiscal_antigo` removido de `PY/schemas/motor.py::OperacaoFiscal`, de `PY/main.py::AnaliseManualRequest`, dos samples JSON e do demo `planejamento_tributario.py`.
+- Alerta `BENEFICIO_FISCAL_EXTINCAO` removido de `PY/core/motor_tributario.py` (bloco ~1203 na versão anterior).
+- Input e script da UI (`UI/analise_unificada.html`) também removidos.
+- Pydantic `extra="forbid"` agora retorna 422 se o campo for enviado (regressão blindada em `tests/test_fase32_sanitizacao.py::TestErr036BeneficioFiscalRemovido`).
+- Implementação do phase-out real (ADCT Art. 92-A §3º — redução 20%/ano a partir de 2029) adiada para fase posterior, quando for possível modelar com tabela FROZEN por ano + validação fiscal específica do Luiz Moreira.
 
 ---
 
@@ -969,7 +976,15 @@ Opção B (explicitar pior caso):
 2. Registrar na trilha: "regime_comprador não informado → assumido pior caso
    (sem crédito) para proteção do emitente"
 
-**Status:** ⏳ Pendente — blocker para Fase 4 (Luiz Moreira)
+**Status:** ✅ Corrigido parcialmente — Fase 3.2 (23/04/2026)
+
+**Resolução:** Opção A parcial (exposição sem lógica de cálculo).
+- `EmpresaCompradora.regime` virou `Literal["SIMPLES", "PRESUMIDO", "REAL", "MEI", "NAO_INFORMADO"]` (fim da string livre).
+- `AnaliseManualRequest.regime_comprador` segue o mesmo Literal.
+- Frontend (`UI/analise_unificada.html`) ganhou dropdown real no bloco "Perfil do Comprador" — fim do valor fixo `"NAO_INFORMADO"` no payload.
+- Motor registra o valor na `trilha_auditoria` em passo novo `REGIME_COMPRADOR_CAPTURADO` com amparo `LC 214/2025 Art. 47 §2º`. Quando `NAO_INFORMADO`, o passo avisa explicitamente que o motor assume PIOR CASO (sem crédito cruzado).
+- **Lógica de ramificação de crédito por regime do adquirente (Art. 47 §2º completo: Simples=zero, Real=integral, Presumido=parcial) fica para Fase 4+** — escopo desta Fase 3.2 era alinhar superfície, não introduzir feature nova. O dado já chega ao motor e fica disponível para quando a Fase 4 for aberta.
+- Regressão blindada em `tests/test_fase32_sanitizacao.py::TestErr037RegimeCompradorLiteral`.
 
 ---
 
@@ -1001,7 +1016,17 @@ ausência de PSP e motor virará passivo concreto — escala para 🔴.
 2. Split só quando forma in {PIX_VIA_PSP, BOLETO_VIA_PSP, CARTAO} E ano >= 2027
 3. Registrar em trilha com amparo Art. 353 §1º e Ato CGIS (quando publicado)
 
-**Status:** ⏳ Pendente — monitorar publicação do Ato CGIS
+**Status:** ✅ Corrigido — Fase 3.2 (23/04/2026) — reclassificado para 🔴 por Luiz Moreira
+
+**Resolução:** granularização completa.
+- `OperacaoFiscal.forma_recebimento` (e `AnaliseManualRequest.forma_recebimento`) migraram para o Literal `["DINHEIRO", "PIX_DIRETO", "PIX_VIA_PSP", "BOLETO", "CARTAO"]`. O valor legado `PIX_BOLETO` não é mais aceito (422).
+- Constante FROZEN `FORMAS_PAGAMENTO_COM_PSP = frozenset({"PIX_VIA_PSP", "BOLETO", "CARTAO"})` em `PY/schemas/motor.py`.
+- `motor_tributario.split_payment_impacto` agora dispara retenção **só** quando `ano >= ANO_INICIO_SPLIT_PAYMENT` **e** `forma in FORMAS_PAGAMENTO_COM_PSP`. `PIX_DIRETO` e `DINHEIRO` escapam.
+- Trilha: o passo `SPLIT_PAYMENT` cita `LC 214/2025, Art. 344 + Art. 353 §1º` no campo `lei`, com detalhe identificando que a forma passa por PSP. Quando inativo, o `motivo` é granular: separa "ano anterior ao início", "dinheiro" e "PIX direto banco-a-banco".
+- Retorno de `split_payment_impacto` ganhou `intermediado_por_psp: bool` (independente de ativo/inativo).
+- Frontend expandiu o `<select>` com as 5 opções.
+- Testes existentes (test_fase2_simples, test_fase3_iva, test_fase4_optout, test_motor_gaps) migraram de `PIX_BOLETO` para `PIX_VIA_PSP` — intenção semântica preservada.
+- Regressão blindada em `tests/test_fase32_sanitizacao.py::TestErr038FormaRecebimentoPSP`.
 
 ---
 
@@ -1037,7 +1062,14 @@ aplica CBS/IBS cumulativo quando deveria ser monofásico no distribuidor.
 3. Roadmap: implementar engine `regimes/monofasico.py` seguindo padrão dos
    demais regimes com Guard Clause.
 
-**Status:** ⏳ Pendente — blocker para Fase 4 (Luiz Moreira)
+**Status:** ✅ Corrigido — Fase 3.2 (23/04/2026)
+
+**Resolução:** bloqueio preventivo no Pydantic.
+- Constante FROZEN `NCMS_MONOFASICAS_BLOQUEADAS: frozenset[str]` em `PY/schemas/motor.py` cobrindo prefixos de capítulo `2710`, `2402`, `2403`, `2203`, `2204`, `2205`, `2206`, `2207`, `2208` — cada entrada com comentário de amparo (LC 214/2025 Art. 172 I/II/III).
+- `OperacaoFiscal.validar_campo_ncm` agora compara `limpo[:4]` contra o frozenset e levanta `ValueError` com mensagem citando **LC 214/2025 Arts. 172-174**. Retorna 422 antes de qualquer cálculo — não entra na trilha porque é erro de entrada.
+- Frontend (`UI/analise_unificada.html`) recebeu disclaimer no bloco "Operação Fiscal (NF-e)" listando os capítulos rejeitados.
+- Engine monofásica (`regimes/monofasico.py`) segue roadmap de fase posterior.
+- Regressão blindada em `tests/test_fase32_sanitizacao.py::TestErr039NcmMonofasicoBloqueado` (parametrizado em todos os 9 prefixos).
 
 ---
 

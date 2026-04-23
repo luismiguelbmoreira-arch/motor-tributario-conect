@@ -46,7 +46,7 @@ def motor_comercio_b2b(ano: int = 2026) -> MotorReformaTributaria:
             data_emissao=date(ano, 3, 15),
             valor_operacao=Decimal("50000.00"),
             ncm_nbs="84099190",
-            forma_recebimento="PIX_BOLETO",
+            forma_recebimento="PIX_VIA_PSP",
         ),
     )
 
@@ -68,7 +68,7 @@ def motor_servico_ti(ano: int = 2026, folha: str = "140000.00") -> MotorReformaT
             data_emissao=date(ano, 6, 1),
             valor_operacao=Decimal("20000.00"),
             ncm_nbs="85176290",
-            forma_recebimento="PIX_BOLETO",
+            forma_recebimento="PIX_VIA_PSP",
         ),
     )
 
@@ -89,7 +89,7 @@ def motor_industria_b2b(ano: int = 2026) -> MotorReformaTributaria:
             data_emissao=date(ano, 9, 1),
             valor_operacao=Decimal("100000.00"),
             ncm_nbs="73269090",
-            forma_recebimento="PIX_BOLETO",
+            forma_recebimento="PIX_VIA_PSP",
         ),
     )
 
@@ -349,7 +349,7 @@ def _motor_misto(pct_b2b: str, rbt12: str = "1800000.00") -> MotorReformaTributa
             data_emissao=date(2026, 6, 15),
             valor_operacao=Decimal("50000.00"),
             ncm_nbs="84099190",
-            forma_recebimento="PIX_BOLETO",
+            forma_recebimento="PIX_VIA_PSP",
         ),
     )
 
