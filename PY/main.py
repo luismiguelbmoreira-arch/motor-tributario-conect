@@ -668,8 +668,13 @@ def analise_manual(
         )
 
     except PydanticValidationError as exc:
-        # Pydantic detalha cada campo inválido — repassar ao cliente
-        raise HTTPException(status_code=422, detail=exc.errors())
+        # Pydantic detalha cada campo inválido — repassar ao cliente.
+        # Pydantic V2 pode incluir em `ctx.error` a exception original (ValueError,
+        # date, Decimal) que não são JSON-serializáveis pelo json.dumps do Starlette.
+        # Sanitizamos para primitivos antes de mandar.
+        from fastapi.encoders import jsonable_encoder
+        erros = exc.errors(include_url=False, include_input=False)
+        raise HTTPException(status_code=422, detail=jsonable_encoder(erros))
     except HTTPException:
         raise  # já tratada acima (data_emissao)
     except (ValueError, TypeError) as exc:

@@ -170,7 +170,7 @@
           <div id="input-content"></div>
           <div class="flex-row justify-between mt-12 pt-6 border-t" style="border-color: var(--border-subtle);">
             <button class="btn btn-ghost" onclick="goToPhase(1)">Voltar</button>
-            <button class="btn btn-primary" id="btn-processar" onclick="submitFiles()" disabled>Processar Documentação Fiscal</button>
+            <button class="btn btn-primary" id="btn-processar" onclick="submitDispatch()" disabled>Processar Documentação Fiscal</button>
           </div>
         </section>
 
@@ -201,6 +201,7 @@
   </div>
 
   <script src="components.js"></script>
+  <script src="js/validacao.js"></script>
   <script>
     let currentPhase = 1;
     let selectedMode = 'smart';
@@ -266,34 +267,317 @@
           <div id="submit-hint" class="mt-2" style="font-size: 0.8rem; color: var(--text-secondary);"></div>
         `;
       } else {
-        container.innerHTML = `
-          <div class="mb-8">
-            <h2 class="text-h1">Dados da Empresa</h2>
-            <p class="text-body text-muted">Preencha os campos para simular o diagnóstico fiscal.</p>
-          </div>
-          <div class="glass-card flex-col gap-6">
-            <div class="input-group">
-              <label class="input-label">CNPJ</label>
-              <input type="text" class="input-field" placeholder="00.000.000/0000-00">
-            </div>
-            <div class="flex-row gap-4">
-              <div class="input-group flex-1">
-                <label class="input-label" for="manual-regime">Regime Atual</label>
-                <select id="manual-regime" class="input-field" title="Selecione o regime tributário">
-                  <option>Simples Nacional</option>
-                  <option>Lucro Presumido</option>
-                </select>
-              </div>
-              <div class="input-group flex-1">
-                <label class="input-label">Faturamento Mensal (RPA)</label>
-                <input type="text" class="input-field" placeholder="R$ 0,00">
-              </div>
-            </div>
-          </div>
-        `;
+        container.innerHTML = renderFormularioManual();
+        bindFormularioManual();
       }
       lucide.createIcons();
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // FORMULÁRIO MANUAL — AnaliseManualRequest (Fase 3)
+    // Renderiza TODOS os campos do Pydantic em seções lógicas.
+    // Validação client-side redundante ao backend (Zero-Trust).
+    // ─────────────────────────────────────────────────────────────
+    function renderFormularioManual() {
+      const hoje = new Date();
+      const anoMin = hoje.getUTCFullYear() < 2026 ? 2026 : hoje.getUTCFullYear();
+      const dataDefault = `${Math.max(2026, anoMin)}-${String(hoje.getUTCMonth() + 1).padStart(2, '0')}-${String(hoje.getUTCDate()).padStart(2, '0')}`;
+      return `
+        <div class="mb-8">
+          <h2 class="text-h1">Simulação Manual — Dados da Empresa</h2>
+          <p class="text-body text-muted">Preencha os campos para gerar o diagnóstico tributário. Cálculo segue LC 123/2006 + LC 214/2025.</p>
+        </div>
+
+        <!-- BLOCO 1 — Identificação da Empresa -->
+        <div class="glass-card flex-col gap-5 mb-6">
+          <h3 class="text-h2" style="font-size: 1rem; margin-bottom: 0.5rem;">Identificação da Empresa</h3>
+
+          <div class="flex-row gap-4">
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-cnpj">CNPJ <span style="color: var(--color-red-500);">*</span></label>
+              <input type="text" id="m-cnpj" class="input-field" placeholder="00.000.000/0000-00" maxlength="18" autocomplete="off">
+              <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.25rem;" id="m-cnpj-hint"></p>
+            </div>
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-razao-social">Razão Social <span style="color: var(--color-red-500);">*</span></label>
+              <input type="text" id="m-razao-social" class="input-field" placeholder="Ex: Empresa Exemplo LTDA" autocomplete="off">
+            </div>
+          </div>
+
+          <div class="flex-row gap-4">
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-regime">Regime Tributário <span style="color: var(--color-red-500);">*</span></label>
+              <select id="m-regime" class="input-field" onchange="onRegimeChange()">
+                <option value="SIMPLES">Simples Nacional</option>
+                <option value="PRESUMIDO">Lucro Presumido</option>
+                <option value="REAL">Lucro Real</option>
+                <option value="MEI">MEI</option>
+              </select>
+            </div>
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-cnae">CNAE Principal <span style="color: var(--color-red-500);">*</span></label>
+              <input type="text" id="m-cnae" class="input-field" placeholder="7 dígitos (ex: 4757100)" maxlength="7" inputmode="numeric" autocomplete="off">
+              <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.25rem;" id="m-cnae-hint">Preenche Anexo + perfil B2B ao sair do campo.</p>
+            </div>
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-uf-origem">UF de Origem <span style="color: var(--color-red-500);">*</span></label>
+              <input type="text" id="m-uf-origem" class="input-field" placeholder="SP" maxlength="2" style="text-transform: uppercase;" autocomplete="off">
+            </div>
+          </div>
+
+          <div class="flex-row gap-4">
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-faturamento-12m">Faturamento 12m — RBT12 <span style="color: var(--color-red-500);">*</span></label>
+              <input type="text" id="m-faturamento-12m" class="input-field" placeholder="R$ 0,00" oninput="aplicarMascaraBRL(this)">
+              <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.25rem;">LC 123/2006 Art. 3º §1º — receita bruta acumulada 12 meses.</p>
+            </div>
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-folha-12m">Folha 12m (opcional — Fator R)</label>
+              <input type="text" id="m-folha-12m" class="input-field" placeholder="R$ 0,00" oninput="aplicarMascaraBRL(this)">
+              <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.25rem;">LC 123/2006 Art. 18 §§5º-K a 5º-M.</p>
+            </div>
+          </div>
+
+          <div class="flex-row gap-4">
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-anexo-simples">Anexo Simples (opcional)</label>
+              <select id="m-anexo-simples" class="input-field">
+                <option value="">Auto-detectar pelo CNAE + Fator R</option>
+                <option value="I">Anexo I — Comércio</option>
+                <option value="II">Anexo II — Indústria</option>
+                <option value="III">Anexo III — Serviços (Fator R ≥28%)</option>
+                <option value="IV">Anexo IV — Construção / outros</option>
+                <option value="V">Anexo V — Serviços (Fator R &lt;28%)</option>
+              </select>
+            </div>
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-data-inicio">Início de Atividade (opcional)</label>
+              <input type="date" id="m-data-inicio" class="input-field" max="${dataDefault}">
+              <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.25rem;">Se &lt;12m, RBT12 proporcionalizada (LC 123/2006 Art. 3º §2º).</p>
+            </div>
+          </div>
+
+          <!-- MEI-only -->
+          <div class="flex-row gap-4 mei-only" style="display: none;">
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-categoria-mei">Categoria MEI <span style="color: var(--color-red-500);">*</span></label>
+              <select id="m-categoria-mei" class="input-field">
+                <option value="">Selecione…</option>
+                <option value="COMERCIO">Comércio</option>
+                <option value="INDUSTRIA">Indústria</option>
+                <option value="SERVICOS">Serviços</option>
+                <option value="COMERCIO_SERVICOS">Comércio + Serviços</option>
+              </select>
+              <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.25rem;">LC 123/2006 Art. 18-A §§3º I-III — define DAS fixo.</p>
+            </div>
+            <div class="input-group flex-1" style="visibility: hidden;"></div>
+          </div>
+        </div>
+
+        <!-- BLOCO 2 — Operação Fiscal (NF-e) -->
+        <div class="glass-card flex-col gap-5 mb-6">
+          <h3 class="text-h2" style="font-size: 1rem; margin-bottom: 0.5rem;">Operação Fiscal (NF-e)</h3>
+
+          <div class="flex-row gap-4">
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-data-emissao">Data de Emissão <span style="color: var(--color-red-500);">*</span></label>
+              <input type="date" id="m-data-emissao" class="input-field" min="2026-01-01" max="2033-12-31" value="${dataDefault}">
+              <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.25rem;">Período transicional LC 214/2025 Art. 348.</p>
+            </div>
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-valor-operacao">Valor da Operação <span style="color: var(--color-red-500);">*</span></label>
+              <input type="text" id="m-valor-operacao" class="input-field" placeholder="R$ 0,00" oninput="aplicarMascaraBRL(this)">
+            </div>
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-ncm-nbs">NCM/NBS</label>
+              <input type="text" id="m-ncm-nbs" class="input-field" placeholder="8 dígitos" maxlength="8" inputmode="numeric" value="00000000">
+            </div>
+          </div>
+
+          <div class="flex-row gap-4">
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-forma-recebimento">Forma de Recebimento</label>
+              <select id="m-forma-recebimento" class="input-field">
+                <option value="PIX_BOLETO" selected>PIX / Boleto</option>
+                <option value="CARTAO">Cartão (Split Payment)</option>
+                <option value="DINHEIRO">Dinheiro</option>
+              </select>
+              <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.25rem;">Cartão aciona Split Payment — LC 214/2025 Art. 353.</p>
+            </div>
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-rpa-mensal">RPA Mensal (opcional)</label>
+              <input type="text" id="m-rpa-mensal" class="input-field" placeholder="R$ 0,00" oninput="aplicarMascaraBRL(this)">
+              <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.25rem;">Receita do período — LC 123/2006 Art. 18 §1º.</p>
+            </div>
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-reducao-cbs-ibs">Redução CBS/IBS</label>
+              <select id="m-reducao-cbs-ibs" class="input-field">
+                <option value="INTEGRAL" selected>Integral (sem redução)</option>
+                <option value="REDUCAO_30">Redução 30% — profissionais liberais (Art. 262)</option>
+                <option value="REDUCAO_60">Redução 60% — cesta básica, saúde, educação (Art. 258)</option>
+                <option value="ISENTO">Isento — cesta básica nacional (Art. 264)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flex-row gap-4">
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-beneficio-fiscal-antigo">Benefício Fiscal Antigo (ICMS)</label>
+              <input type="text" id="m-beneficio-fiscal-antigo" class="input-field" placeholder="R$ 0,00" oninput="aplicarMascaraBRL(this)" value="R$ 0,00">
+              <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.25rem;">Isenção/benefício eliminado até 2032.</p>
+            </div>
+            <div class="input-group flex-1" style="display: flex; align-items: center; padding-top: 1.5rem;">
+              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" id="m-tinha-st-icms">
+                <span class="text-body" style="font-size: 0.85rem;">Empresa possuía Substituição Tributária de ICMS</span>
+              </label>
+            </div>
+            <div class="input-group flex-1" style="display: flex; align-items: center; padding-top: 1.5rem;">
+              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" id="m-produto-importado">
+                <span class="text-body" style="font-size: 0.85rem;">Produto importado (&gt;40% — Res. SF 13/2012)</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- BLOCO 3 — Comprador -->
+        <div class="glass-card flex-col gap-5 mb-6">
+          <h3 class="text-h2" style="font-size: 1rem; margin-bottom: 0.5rem;">Perfil do Comprador</h3>
+
+          <div class="flex-row gap-4">
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-tipo-comprador">Tipo <span style="color: var(--color-red-500);">*</span></label>
+              <select id="m-tipo-comprador" class="input-field" onchange="onTipoCompradorChange()">
+                <option value="B2B_CONTRIBUINTE">B2B — Contribuinte de IVA</option>
+                <option value="B2C_CONSUMIDOR_FINAL">B2C — Consumidor final</option>
+                <option value="MISTO">Misto — B2B e B2C</option>
+              </select>
+            </div>
+            <div class="input-group flex-1 misto-only" style="display: none;">
+              <label class="input-label" for="m-percentual-b2b">% Receita B2B (0-100)</label>
+              <input type="number" id="m-percentual-b2b" class="input-field" min="0" max="100" step="0.01" value="100">
+              <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.25rem;">Só habilitado quando tipo = Misto. LC 214/2025 Art. 47 II.</p>
+            </div>
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-uf-destino">UF de Destino</label>
+              <input type="text" id="m-uf-destino" class="input-field" placeholder="SP" maxlength="2" style="text-transform: uppercase;" value="SP">
+            </div>
+          </div>
+        </div>
+
+        <!-- BLOCO 4 — Lucro Real (condicional) -->
+        <div class="glass-card flex-col gap-5 mb-6 lucro-real-only" style="display: none;">
+          <h3 class="text-h2" style="font-size: 1rem; margin-bottom: 0.5rem;">Lucro Real (quando aplicável)</h3>
+          <div class="flex-row gap-4">
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-lucro-real-mensal">Lucro Real Mensal</label>
+              <input type="text" id="m-lucro-real-mensal" class="input-field" placeholder="R$ 0,00" oninput="aplicarMascaraBRL(this)">
+              <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.25rem;">Se vazio, usa receita mensal como proxy.</p>
+            </div>
+            <div class="input-group flex-1">
+              <label class="input-label" for="m-creditos-pis-cofins">Créditos PIS/COFINS</label>
+              <input type="text" id="m-creditos-pis-cofins" class="input-field" placeholder="R$ 0,00" oninput="aplicarMascaraBRL(this)" value="R$ 0,00">
+            </div>
+          </div>
+        </div>
+
+        <div id="m-erros-globais" class="hidden p-4 rounded-xl mb-4" style="background: rgba(226, 88, 88, 0.08); border: 1px solid var(--color-red-500);">
+          <p class="text-body" style="color: var(--color-red-500); font-weight: 600;">Revise os campos destacados antes de prosseguir:</p>
+          <ul id="m-erros-lista" style="margin-top: 0.5rem; padding-left: 1.25rem; font-size: 0.85rem;"></ul>
+        </div>
+      `;
+    }
+
+    function bindFormularioManual() {
+      // CNPJ: máscara ao digitar
+      const cnpjEl = document.getElementById('m-cnpj');
+      if (cnpjEl) cnpjEl.addEventListener('input', () => aplicarMascaraCNPJ(cnpjEl));
+
+      // CNAE: auto-fill ao blur (redundante com backend — só UX)
+      const cnaeEl = document.getElementById('m-cnae');
+      if (cnaeEl) cnaeEl.addEventListener('blur', onCnaeBlur);
+
+      // Estado inicial dos blocos condicionais
+      onRegimeChange();
+      onTipoCompradorChange();
+
+      // Troca o label do botão pra ação manual
+      const btn = document.getElementById('btn-processar');
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Gerar Diagnóstico Fiscal';
+      }
+    }
+
+    function onRegimeChange() {
+      const regime = (document.getElementById('m-regime') || {}).value;
+      document.querySelectorAll('.mei-only').forEach(el => {
+        el.style.display = regime === 'MEI' ? '' : 'none';
+      });
+      document.querySelectorAll('.lucro-real-only').forEach(el => {
+        el.style.display = regime === 'REAL' ? '' : 'none';
+      });
+    }
+
+    function onTipoCompradorChange() {
+      const tipo = (document.getElementById('m-tipo-comprador') || {}).value;
+      document.querySelectorAll('.misto-only').forEach(el => {
+        el.style.display = tipo === 'MISTO' ? '' : 'none';
+      });
+      if (tipo !== 'MISTO') {
+        const pct = document.getElementById('m-percentual-b2b');
+        if (pct) pct.value = '100';
+      }
+    }
+
+    async function onCnaeBlur() {
+      const cnaeEl = document.getElementById('m-cnae');
+      const hint = document.getElementById('m-cnae-hint');
+      if (!cnaeEl || !hint) return;
+      const res = validaCNAE(cnaeEl.value);
+      if (!res.ok) {
+        hint.textContent = res.erro;
+        hint.style.color = 'var(--color-red-500)';
+        return;
+      }
+      cnaeEl.value = res.limpo;
+      hint.textContent = 'Consultando…';
+      hint.style.color = 'var(--text-secondary)';
+      try {
+        const resp = await mcFetch(`/cnae/${res.limpo}/perfil`, { timeout: 10000 });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+        // Sugere Anexo
+        const anexoSel = document.getElementById('m-anexo-simples');
+        if (anexoSel && data.anexo_sugerido && !anexoSel.value) {
+          anexoSel.value = data.anexo_sugerido;
+        }
+        // Sugere tipo_comprador + % B2B — só se usuário não mexeu
+        const tipoSel = document.getElementById('m-tipo-comprador');
+        if (tipoSel && data.perfil_sugerido && tipoSel.dataset.tocado !== '1') {
+          tipoSel.value = data.perfil_sugerido;
+          onTipoCompradorChange();
+        }
+        const pctInp = document.getElementById('m-percentual-b2b');
+        if (pctInp && typeof data.percentual_b2b_estimado === 'number' && pctInp.dataset.tocado !== '1') {
+          pctInp.value = String(data.percentual_b2b_estimado);
+        }
+        hint.textContent = `Sugerido: Anexo ${data.anexo_sugerido || '—'} | B2B ~${data.percentual_b2b_estimado || '—'}% (ajuste conforme realidade).`;
+        hint.style.color = 'var(--color-green-500)';
+      } catch (err) {
+        hint.textContent = 'Não foi possível sugerir perfil do CNAE (informe manualmente).';
+        hint.style.color = 'var(--text-secondary)';
+      }
+    }
+
+    // Marca campos quando o usuário intervém, para não sobrescrever via CNAE blur.
+    document.addEventListener('input', (e) => {
+      if (!e.target || !e.target.id) return;
+      if (['m-tipo-comprador', 'm-percentual-b2b'].includes(e.target.id)) {
+        e.target.dataset.tocado = '1';
+      }
+    }, true);
 
     function processAnalysis() {
       document.querySelectorAll('.phase').forEach(p => p.classList.remove('active'));
@@ -338,6 +622,178 @@
       }
     }
 
+    // Dispatcher: modo smart → submitFiles(); modo manual → submitManual().
+    async function submitDispatch() {
+      if (selectedMode === 'manual') return submitManual();
+      return submitFiles();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // SUBMIT MANUAL — Fase 3
+    // Monta AnaliseManualRequest, faz POST /analise/manual,
+    // persiste diagnóstico em sessionStorage e redireciona.
+    // Validação client-side é REDUNDANTE com Pydantic (Zero-Trust).
+    // ─────────────────────────────────────────────────────────────
+    async function submitManual() {
+      const erros = [];
+
+      // ── Validação client-side ────────────────────────────────
+      const cnpjRaw = (document.getElementById('m-cnpj') || {}).value || '';
+      const vCnpj = validaCNPJ(cnpjRaw);
+      if (!vCnpj.ok) erros.push('CNPJ: ' + vCnpj.erro);
+
+      const razaoSocial = ((document.getElementById('m-razao-social') || {}).value || '').trim();
+      if (razaoSocial.length < 2) erros.push('Razão Social deve ter ao menos 2 caracteres.');
+
+      const regime = (document.getElementById('m-regime') || {}).value || '';
+      if (!['SIMPLES', 'PRESUMIDO', 'REAL', 'MEI'].includes(regime)) {
+        erros.push('Regime tributário inválido.');
+      }
+
+      const vCnae = validaCNAE((document.getElementById('m-cnae') || {}).value || '');
+      if (!vCnae.ok) erros.push('CNAE: ' + vCnae.erro);
+
+      const vUfOrigem = validaUF((document.getElementById('m-uf-origem') || {}).value || '');
+      if (!vUfOrigem.ok) erros.push('UF de Origem: ' + vUfOrigem.erro);
+
+      const faturamento12m = decimalSafe((document.getElementById('m-faturamento-12m') || {}).value);
+      if (!faturamento12m || Number(faturamento12m) < 0) {
+        erros.push('Faturamento 12m (RBT12) é obrigatório e não pode ser negativo.');
+      }
+
+      const vDataEmissao = validaData2026_2033((document.getElementById('m-data-emissao') || {}).value || '');
+      if (!vDataEmissao.ok) erros.push('Data de Emissão: ' + vDataEmissao.erro);
+
+      const valorOperacao = decimalSafe((document.getElementById('m-valor-operacao') || {}).value);
+      if (!valorOperacao || Number(valorOperacao) <= 0) {
+        erros.push('Valor da Operação é obrigatório e deve ser maior que zero.');
+      }
+
+      const vNcm = validaNCM((document.getElementById('m-ncm-nbs') || {}).value || '00000000');
+      if (!vNcm.ok) erros.push('NCM/NBS: ' + vNcm.erro);
+
+      const tipoComprador = (document.getElementById('m-tipo-comprador') || {}).value || '';
+      if (!['B2B_CONTRIBUINTE', 'B2C_CONSUMIDOR_FINAL', 'MISTO'].includes(tipoComprador)) {
+        erros.push('Tipo de Comprador inválido.');
+      }
+
+      const percentualB2bRaw = (document.getElementById('m-percentual-b2b') || {}).value;
+      const percentualB2b = percentualB2bRaw === '' || percentualB2bRaw === undefined ? '100' : decimalSafe(percentualB2bRaw);
+      if (!percentualB2b || Number(percentualB2b) < 0 || Number(percentualB2b) > 100) {
+        erros.push('% B2B deve estar entre 0 e 100.');
+      }
+      // Guard espelho ao @model_validator — ERR-024
+      if (tipoComprador !== 'MISTO' && Number(percentualB2b) !== 100) {
+        erros.push("percentual_b2b só pode diferir de 100 quando tipo='MISTO' (LC 214/2025 Art. 47 II).");
+      }
+
+      const vUfDestino = validaUF((document.getElementById('m-uf-destino') || {}).value || 'SP');
+      if (!vUfDestino.ok) erros.push('UF de Destino: ' + vUfDestino.erro);
+
+      // Guards MEI — espelho ao @model_validator (ERR-024)
+      let categoriaMei = null;
+      if (regime === 'MEI') {
+        categoriaMei = (document.getElementById('m-categoria-mei') || {}).value || '';
+        if (!['COMERCIO', 'INDUSTRIA', 'SERVICOS', 'COMERCIO_SERVICOS'].includes(categoriaMei)) {
+          erros.push('Categoria MEI é obrigatória (LC 123/2006 Art. 18-A §§3º I-III).');
+        }
+        if (faturamento12m && Number(faturamento12m) > 81000) {
+          erros.push('MEI com faturamento 12m > R$ 81.000 — desenquadrado para Simples (LC 123/2006 Art. 18-A §1º).');
+        }
+      }
+
+      // Exibe erros e aborta
+      const box = document.getElementById('m-erros-globais');
+      const lista = document.getElementById('m-erros-lista');
+      if (erros.length) {
+        if (box && lista) {
+          lista.innerHTML = erros.map(e => `<li style="color: var(--color-red-500);">${e}</li>`).join('');
+          box.classList.remove('hidden');
+          box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        return;
+      }
+      if (box) box.classList.add('hidden');
+
+      // ── Monta payload ────────────────────────────────────────
+      // Decimals viajam como STRING (o backend reidrata com Pydantic field_validator).
+      const folha12m = decimalSafe((document.getElementById('m-folha-12m') || {}).value);
+      const rpaMensal = decimalSafe((document.getElementById('m-rpa-mensal') || {}).value);
+      const beneficioAntigo = decimalSafe((document.getElementById('m-beneficio-fiscal-antigo') || {}).value) || '0';
+      const lucroReal = decimalSafe((document.getElementById('m-lucro-real-mensal') || {}).value);
+      const creditosPisCofins = decimalSafe((document.getElementById('m-creditos-pis-cofins') || {}).value) || '0';
+      const anexoSimples = (document.getElementById('m-anexo-simples') || {}).value || null;
+      const dataInicio = (document.getElementById('m-data-inicio') || {}).value || null;
+
+      const payload = {
+        cnpj: vCnpj.limpo,
+        razao_social: razaoSocial,
+        regime: regime,
+        cnae_principal: vCnae.limpo,
+        uf_origem: vUfOrigem.limpo,
+        faturamento_12m: faturamento12m,
+        folha_salarios_12m: folha12m || null,
+        anexo_simples: anexoSimples || null,
+        data_inicio_atividade: dataInicio || null,
+        categoria_mei: categoriaMei || null,
+        tipo_comprador: tipoComprador,
+        percentual_b2b: percentualB2b,
+        regime_comprador: 'NAO_INFORMADO',
+        uf_destino: vUfDestino.limpo,
+        data_emissao: vDataEmissao.limpo,
+        valor_operacao: valorOperacao,
+        ncm_nbs: vNcm.limpo,
+        forma_recebimento: (document.getElementById('m-forma-recebimento') || {}).value || 'PIX_BOLETO',
+        rpa_mensal: rpaMensal || null,
+        tinha_st_icms: !!(document.getElementById('m-tinha-st-icms') || {}).checked,
+        reducao_cbs_ibs: (document.getElementById('m-reducao-cbs-ibs') || {}).value || 'INTEGRAL',
+        beneficio_fiscal_antigo: beneficioAntigo,
+        lucro_real_mensal: lucroReal || null,
+        creditos_pis_cofins: creditosPisCofins,
+        produto_importado: !!(document.getElementById('m-produto-importado') || {}).checked,
+      };
+
+      // Remove chaves null — backend já tem defaults, não enviar lixo.
+      Object.keys(payload).forEach(k => { if (payload[k] === null) delete payload[k]; });
+
+      // ── POST /analise/manual ─────────────────────────────────
+      await mcWithSubmitLock('btn-processar', async () => {
+        processAnalysis();
+        try {
+          const resp = await mcFetch('/analise/manual', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            timeout: 60000,
+          });
+          if (!resp.ok) {
+            let detalhe = '';
+            try {
+              const body = await resp.json();
+              detalhe = typeof body.detail === 'string'
+                ? body.detail
+                : JSON.stringify(body.detail).slice(0, 300);
+            } catch { detalhe = 'HTTP ' + resp.status; }
+            throw new Error(detalhe || ('HTTP ' + resp.status));
+          }
+          const envelope = await resp.json();
+
+          // Persiste para resultado.html — padrão unificado manual/pdf.
+          sessionStorage.setItem('diagnostico', JSON.stringify(envelope.diagnostico || {}));
+          const pii = envelope.pii || {};
+          sessionStorage.setItem('analise_empresa', pii.razao_social || razaoSocial);
+          sessionStorage.setItem('analise_cnpj', pii.cnpj || vCnpj.limpo);
+
+          window.location.href = 'resultado.html';
+        } catch (err) {
+          console.error('motor-conect: falha na análise manual');
+          const msg = (err && err.message) ? err.message.slice(0, 220) : 'Falha na análise.';
+          mcToast(msg, 'error');
+          goToPhase(2);
+        }
+      });
+    }
+
     async function submitFiles() {
       const termoCheckbox = document.getElementById('termo-aceite-checkbox');
       if (!termoCheckbox || !termoCheckbox.checked) {
@@ -375,11 +831,14 @@
           }
           const payload = await resp.json();
 
+          // Persiste envelope unificado e redireciona pra resultado.html.
+          // Fase 3 — mesmo padrão do submitManual, front único independente do modo.
+          sessionStorage.setItem('diagnostico', JSON.stringify(payload.diagnostico || payload));
           const pii = payload.pii || {};
           if (pii.razao_social) sessionStorage.setItem('analise_empresa', pii.razao_social);
           if (pii.cnpj) sessionStorage.setItem('analise_cnpj', pii.cnpj);
 
-          finishAnalysis(payload.diagnostico || payload);
+          window.location.href = 'resultado.html';
         } catch (err) {
           // Loga neutro (sem vazar stack/PII) e volta o usuário pra fase de input
           console.error('motor-conect: falha ao processar documentos');

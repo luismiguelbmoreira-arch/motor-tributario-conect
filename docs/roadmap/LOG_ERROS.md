@@ -723,6 +723,55 @@ emitem NF-e/CT-e em operação B2B)".
 
 ---
 
+### ERR-029 — Smart flow `finishAnalysis` descartava payload real e mostrava HTML fake
+**Data:** 23/04/2026
+**Severidade:** 🔴 Crítico
+**Arquivo:** `UI/analise_unificada.html` — `submitFiles()` + `finishAnalysis()`
+**Descoberto em:** Auditoria Fase 3 — durante mapeamento do fluxo manual
+
+**Descrição:**
+O handler de upload PDF (`submitFiles`) fazia `mcFetch('/analise/pdf')`, recebia o envelope `{diagnostico, pii}` real do backend e passava para `finishAnalysis(payload.diagnostico || payload)`. A função `finishAnalysis()` ignorava o parâmetro e renderizava HTML estático com números Lorem Ipsum (R$ 42.900, 12.42%, 9.85%). O contador via sempre o mesmo resultado independente do PDF — regressão grave de confiança.
+
+**Evidência:** `finishAnalysis()` sem parâmetro nomeado, `content.innerHTML = '...texto fixo...'`. Nenhuma chamada a `sessionStorage.setItem('diagnostico', ...)` no arquivo inteiro.
+
+**Solução aplicada (Fase 3):** `submitFiles` agora persiste `sessionStorage.setItem('diagnostico', JSON.stringify(payload.diagnostico))` e redireciona para `resultado.html`, padrão unificado com o novo `submitManual`. Função `finishAnalysis` legada removida do fluxo pós-upload.
+
+**Status:** ✅ Corrigido na Fase 3 — Modo Manual de Verdade
+
+---
+
+### ERR-030 — Redirect quebrado em resultado.html: `analise.html` não existe
+**Data:** 23/04/2026
+**Severidade:** 🟡 Atenção
+**Arquivo:** `UI/resultado.html` — linhas 711, 719, 1674
+**Descoberto em:** Auditoria Fase 3
+
+**Descrição:**
+Três pontos de fallback em `resultado.html` redirecionavam para `analise.html` (sem token, sem diagnóstico, ou JSON corrompido). Arquivo `analise.html` não existe — foi renomeado para `analise_unificada.html` em refactor anterior. Usuário em estado degradado caía em 404 do static files.
+
+**Solução aplicada (Fase 3):** `replace_all` global trocando `analise.html` → `analise_unificada.html` nos 3 pontos.
+
+**Status:** ✅ Corrigido na Fase 3 — Modo Manual de Verdade
+
+---
+
+### ERR-031 — Handler `/analise/manual` quebrava com 500 ao serializar erros Pydantic
+**Data:** 23/04/2026
+**Severidade:** 🟡 Atenção
+**Arquivo:** `PY/main.py` — `except PydanticValidationError` no `analise_manual`
+**Descoberto em:** Testes `test_analise_manual_endpoint.py` (Fase 3)
+
+**Descrição:**
+Quando um `@model_validator` de `OperacaoFiscal` levantava `ValueError` (ex.: `data_emissao=2025-12-31` fora do período LC 214/2025 Art. 348), o handler fazia `raise HTTPException(status_code=422, detail=exc.errors())`. Pydantic V2 inclui em `ctx.error` a exception original (`ValueError` ou `date` object) não-serializável via `json.dumps`. Resultado: o cliente recebia **500 TypeError "Object of type ValueError is not JSON serializable"** em vez de 422 claro com mensagem de erro.
+
+**Evidência:** traceback na suite nova `test_data_emissao_fora_periodo_transicional_retorna_422`.
+
+**Solução aplicada (Fase 3):** sanitizar erros via `jsonable_encoder(exc.errors(include_url=False, include_input=False))` antes de montar o `HTTPException.detail`. Ruído (URLs de docs Pydantic + input_value potencialmente PII) eliminado.
+
+**Status:** ✅ Corrigido na Fase 3 — Modo Manual de Verdade
+
+---
+
 ## HISTÓRICO DE AUDITORIAS REAIS
 
 | Data | Empresa | CNPJ | Período | DAS e-CAC | DAS Motor | Delta | Status |

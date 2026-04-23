@@ -708,7 +708,7 @@
 
       const raw = sessionStorage.getItem('diagnostico');
       if (!raw) {
-        window.location.href = 'analise.html';
+        window.location.href = 'analise_unificada.html';
         return;
       }
 
@@ -716,7 +716,7 @@
       try {
         diagnostico = JSON.parse(raw);
       } catch (e) {
-        window.location.href = 'analise.html';
+        window.location.href = 'analise_unificada.html';
         return;
       }
 
@@ -1671,7 +1671,7 @@
         sessionStorage.removeItem('diagnostico');
         sessionStorage.removeItem('analise_empresa');
         sessionStorage.removeItem('analise_cnpj');
-        window.location.href = 'analise.html';
+        window.location.href = 'analise_unificada.html';
       }
     }
 
