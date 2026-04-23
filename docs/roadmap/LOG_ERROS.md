@@ -1096,6 +1096,74 @@ A constante FROZEN `FORMAS_PAGAMENTO_COM_PSP = frozenset({"PIX_VIA_PSP", "BOLETO
 
 ---
 
+### ERR-041 — PII do cliente persistia em sessionStorage entre páginas
+**Data:** 23/04/2026
+**Severidade:** 🔴 Crítico — LGPD Art. 6º V (minimização), Art. 46 (segurança), Art. 48 (incidente)
+**Arquivo:** `UI/analise_unificada.html`, `UI/resultado.html`
+**Descoberto em:** Auditoria de Segurança Fase 4 (Viciado)
+**Descrição:** `submitManual` e `submitFiles` gravavam `analise_empresa` (razão social) e `analise_cnpj` em sessionStorage — disponível para qualquer script da mesma origem, violando minimização. `resultado.html` lia direto de sessionStorage.
+**Evidência:** `UI/analise_unificada.html:872-875,926-929` com `sessionStorage.setItem('analise_cnpj', ...)`. `UI/resultado.html:709,778,790,1163,1683,1702-1703` com `sessionStorage.getItem('diagnostico'|'analise_empresa'|'analise_cnpj')`.
+**Solução implementada (Fase 4):**
+1. Novo `PY/services/analise_buffer.py` — buffer in-memory com TTL 10min, ownership por user_id (IDOR-safe), id opaco hex 32 chars via `secrets.token_hex`.
+2. Novo `GET /analise/sessao/{analise_id}` em `PY/main.py` — devolve 404 em id inexistente, expirado ou de outro user (não vaza existência).
+3. `/analise/manual` e `/analise/pdf` retornam `analise_id` no envelope (além de `diagnostico` e `pii`).
+4. Frontend (`components.js`, `analise_unificada.html`, `resultado.html`) guarda só `analise_id` em sessionStorage; PII vive em `window.__MC_SESSION__` (memória).
+5. Helpers `mcSessionSet/Get/Clear` centralizam o acesso — impede regressão.
+6. `resultado.html` hidrata via `GET /analise/sessao/{id}` no DOMContentLoaded.
+**Status:** ✅ Corrigido (933 testes verdes — +17 buffer + endpoint + 6 refresh).
+
+---
+
+### ERR-042 — JWT expirava silenciosamente; operador era deslogado no meio de análise
+**Data:** 23/04/2026
+**Severidade:** 🔴 Crítico — UX + LGPD Art. 46 (segurança de sessão)
+**Arquivo:** `UI/components.js`
+**Descoberto em:** Auditoria de Segurança Fase 4 (Viciado)
+**Descrição:** JWT expirava em 8h sem mecanismo de refresh antes do prazo. Operador em análise longa era deslogado no próximo clique — perda de trabalho, risco de digitar PII no login errado, possível tentação de armazenar senha em local inseguro.
+**Evidência:** Ausência de chamada a `/auth/refresh` em qualquer página. `renovar_token_jwt` existia mas nunca era disparado pelo frontend.
+**Solução implementada (Fase 4):**
+1. `components.js::setupJwtRefreshLoop()` — `setInterval` 60s + `visibilitychange` listener (para aba inativa throttled).
+2. `mcCheckAndRefreshToken()` decodifica `exp` do JWT client-side; se restam <5min chama `POST /auth/refresh`.
+3. Atualiza `sessionStorage.token` quando `renewed=true`.
+4. `mcLogoutLimpar()` faz `clearInterval` do timer — sem leak em logout.
+5. Novo `PY/tests/test_auth_refresh.py` — 6 testes: token recente (não renova), token <2h (renova), token inválido (401), token expirado (401), sem Authorization (≠304), schema do response.
+**Status:** ✅ Corrigido.
+
+---
+
+### ERR-043 — Logs do frontend vazavam objetos de erro crus
+**Data:** 23/04/2026
+**Severidade:** 🟡 Atenção — LGPD Art. 37 (registro)
+**Arquivo:** `UI/dashboard.html`
+**Descoberto em:** Auditoria de Segurança Fase 4 (Viciado)
+**Descrição:** `dashboard.html:214,280` fazia `console.error("Falha ao carregar dashboard:", res?.status)` e `console.error("Falha ao carregar dashboard:", err)`. Em produção, `err` cru pode conter URL + headers (potencial token JWT) + payload com PII.
+**Evidência:** Grep `console\.(error|log|warn)\s*\(` encontrou 4 logs com variáveis cruas em `UI/**`.
+**Solução implementada:** Padronização em `motor-conect: <descrição neutra> — ver suporte`, sem emissão de `err`/`res` crus.
+**Status:** ✅ Corrigido — todos os `console.error` agora seguem padrão neutro.
+
+---
+
+### ERR-044 — Alerts técnicos em resultado.html com copy não-humano
+**Data:** 23/04/2026
+**Severidade:** 🟡 Atenção — UX + profissionalização
+**Arquivo:** `UI/resultado.html`
+**Descoberto em:** Auditoria de Segurança Fase 4 (Viciado)
+**Descrição:** 5 ocorrências de `alert(...)` em `baixarDossieProva` e `downloadPDF` — UX inferior + impossibilidade de styling + trava thread do browser. Copy com "HTTP" e "Falha" cru.
+**Evidência:** Grep `alert\s*\(` encontrou `UI/resultado.html:1166,1179,1198,1214,1730`.
+**Solução implementada:** Migração pra `mcToast(msg, type)` com copy amigável.
+**Status:** ✅ Corrigido — zero `alert()` em `UI/**`.
+
+---
+
+### PENDÊNCIA — Fase Fiscal posterior: Hardening Luiz #7 (guarda rpa_mensal vs faturamento_12m/12)
+**Registrada em:** 23/04/2026
+**Origem:** Luiz classificou como "blocker Fase 4" antes do Luis Miguel redefinir Fase 4 como Segurança/LGPD.
+**Descrição:** Validar que `rpa_mensal <= faturamento_12m/12 * 1.5` — hoje nada bloqueia operador a digitar RPA inconsistente com o RBT12.
+**Escopo:** Fiscal, NÃO de segurança. Aguarda fase fiscal posterior (após blindar ERR-005, ERR-037, ERR-039).
+**Status:** ⏳ Pendente.
+
+---
+
 ## HISTÓRICO DE AUDITORIAS REAIS
 
 | Data | Empresa | CNPJ | Período | DAS e-CAC | DAS Motor | Delta | Status |

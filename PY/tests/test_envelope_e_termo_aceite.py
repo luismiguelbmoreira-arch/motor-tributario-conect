@@ -301,9 +301,42 @@ class TestHtmlTermoAceite:
         assert "Tudo pronto" in bloco
 
     def test_js_ler_pii_do_envelope(self, html):
-        """submitFiles deve consumir payload.pii.cnpj e .razao_social."""
+        """
+        submitFiles deve consumir payload.pii.cnpj e .razao_social e
+        persistir em memória (window.__MC_SESSION__) — NUNCA em sessionStorage.
+        Fase 4 Segurança/LGPD: PII fora do storage do browser (Art. 6º V).
+        """
         idx = html.find("function submitFiles")
         bloco = html[idx:idx + 3000]
         assert "payload.pii" in bloco or "pii.razao_social" in bloco
-        assert "analise_empresa" in bloco
-        assert "analise_cnpj" in bloco
+        # Fase 4: PII sai do sessionStorage e vai pra window.__MC_SESSION__.
+        # O que antes era analise_empresa/analise_cnpj agora é session.empresa/cnpj
+        # em memória — mas o id opaco (analise_id) passa pelo sessionStorage.
+        assert "__MC_SESSION__" in bloco or "mcSession" in bloco, (
+            "submitFiles deve hidratar PII em window.__MC_SESSION__ (memória), "
+            "não em sessionStorage (LGPD Art. 6º V — minimização)."
+        )
+        assert "analise_id" in bloco, (
+            "Frontend deve receber analise_id opaco do backend e guardá-lo "
+            "em sessionStorage (ID opaco não é PII)."
+        )
+
+    def test_js_nao_persiste_pii_em_sessionstorage(self, html):
+        """
+        Fase 4 Segurança/LGPD (ERR-040): submitFiles/submitManual NÃO podem
+        chamar sessionStorage.setItem com 'analise_empresa' ou 'analise_cnpj'.
+        PII vive só em memória.
+        """
+        # Junta os dois fluxos (manual e pdf)
+        idx_manual = html.find("async function submitManual")
+        idx_files = html.find("async function submitFiles")
+        blocos = []
+        if idx_manual > 0:
+            blocos.append(html[idx_manual:idx_manual + 3500])
+        if idx_files > 0:
+            blocos.append(html[idx_files:idx_files + 3500])
+        conteudo = "\n".join(blocos)
+        assert "sessionStorage.setItem('analise_empresa'" not in conteudo
+        assert "sessionStorage.setItem('analise_cnpj'" not in conteudo
+        assert 'sessionStorage.setItem("analise_empresa"' not in conteudo
+        assert 'sessionStorage.setItem("analise_cnpj"' not in conteudo

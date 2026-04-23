@@ -868,17 +868,25 @@
           }
           const envelope = await resp.json();
 
-          // Persiste para resultado.html — padrão unificado manual/pdf.
-          sessionStorage.setItem('diagnostico', JSON.stringify(envelope.diagnostico || {}));
+          // Fase 4 Segurança/LGPD (Art. 6º V minimização):
+          // PII (cnpj, razao_social) e diagnóstico NÃO vão pra sessionStorage.
+          // Backend gerou analise_id opaco no buffer; frontend guarda só o id.
+          // O resultado.html chama GET /analise/sessao/{id} e hidrata em memória.
           const pii = envelope.pii || {};
-          sessionStorage.setItem('analise_empresa', pii.razao_social || razaoSocial);
-          sessionStorage.setItem('analise_cnpj', pii.cnpj || vCnpj.limpo);
+          if (envelope.analise_id) {
+            sessionStorage.setItem('analise_id', envelope.analise_id);
+          }
+          // Fallback: se o buffer falhou no backend, mantém PII em memória da
+          // mesma página (resultado.html pode pegar se a navegação não ocorrer).
+          mcSessionSet('diagnostico', envelope.diagnostico || {});
+          mcSessionSet('cnpj', pii.cnpj || vCnpj.limpo);
+          mcSessionSet('razao_social', pii.razao_social || razaoSocial);
 
           window.location.href = 'resultado.html';
         } catch (err) {
-          console.error('motor-conect: falha na análise manual');
-          const msg = (err && err.message) ? err.message.slice(0, 220) : 'Falha na análise.';
-          mcToast(msg, 'error');
+          // Log neutro — err cru pode conter PII (URL, payload) em cases raros.
+          console.error('motor-conect: falha na analise manual — ver suporte');
+          mcToast('Nao foi possivel processar a analise. Tente novamente.', 'error');
           goToPhase(2);
         }
       });
@@ -921,18 +929,23 @@
           }
           const payload = await resp.json();
 
-          // Persiste envelope unificado e redireciona pra resultado.html.
-          // Fase 3 — mesmo padrão do submitManual, front único independente do modo.
-          sessionStorage.setItem('diagnostico', JSON.stringify(payload.diagnostico || payload));
+          // Fase 4 Segurança/LGPD (Art. 6º V minimização):
+          // PII fora de sessionStorage. Backend devolveu analise_id opaco;
+          // frontend guarda o id e resultado.html hidrata via GET /analise/sessao/{id}.
+          // Fallback in-memory cobre o raro caso do buffer backend ter falhado.
           const pii = payload.pii || {};
-          if (pii.razao_social) sessionStorage.setItem('analise_empresa', pii.razao_social);
-          if (pii.cnpj) sessionStorage.setItem('analise_cnpj', pii.cnpj);
+          if (payload.analise_id) {
+            sessionStorage.setItem('analise_id', payload.analise_id);
+          }
+          mcSessionSet('diagnostico', payload.diagnostico || payload);
+          if (pii.razao_social) mcSessionSet('razao_social', pii.razao_social);
+          if (pii.cnpj) mcSessionSet('cnpj', pii.cnpj);
 
           window.location.href = 'resultado.html';
         } catch (err) {
-          // Loga neutro (sem vazar stack/PII) e volta o usuário pra fase de input
-          console.error('motor-conect: falha ao processar documentos');
-          mcToast('Não foi possível processar os documentos. Tente novamente.', 'error');
+          // Log neutro — nunca expor err cru (pode conter URL/body com PII).
+          console.error('motor-conect: falha ao processar documentos — ver suporte');
+          mcToast('Nao foi possivel processar os documentos. Tente novamente.', 'error');
           goToPhase(2);
         }
       });

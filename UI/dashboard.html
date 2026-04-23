@@ -211,7 +211,9 @@
       try {
         const res = await mcFetch('/dashboard/summary');
         if (!res || !res.ok) {
-          console.error("Falha ao carregar dashboard:", res?.status);
+          // Fase 4: log neutro — res.status pode ser útil no DevTools, mas
+          // nunca vazamos para o operador via alert/toast. Sem PII no log.
+          console.error('motor-conect: falha ao carregar dashboard — ver suporte');
           return;
         }
         const data = await res.json();
@@ -277,7 +279,8 @@
           }
         }
       } catch (err) {
-        console.error("Falha ao carregar dashboard:", err);
+        // Fase 4: log neutro, sem expor err cru (pode conter URL/headers).
+        console.error('motor-conect: falha ao carregar dashboard — ver suporte');
       }
     }
 

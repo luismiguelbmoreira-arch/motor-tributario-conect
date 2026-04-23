@@ -697,27 +697,52 @@
     }
 
     // ─────────────────────────────────────────────
-    // INICIALIZAÇÃO
+    // INICIALIZAÇÃO (Fase 4 Segurança/LGPD)
     // ─────────────────────────────────────────────
-    document.addEventListener('DOMContentLoaded', function () {
+    // Fluxo de hidratação — PII fora de sessionStorage (Art. 6º V):
+    //   1. Verifica token.
+    //   2. Tenta window.__MC_SESSION__ (mesma página do submit — raro: navegação
+    //      acontece antes). Se vier algo, usa direto.
+    //   3. Pega analise_id opaco do sessionStorage → GET /analise/sessao/{id}
+    //      com JWT → envelope {diagnostico, pii} → hidrata mcSession em memória.
+    //   4. Se nada disso funciona, volta pra analise_unificada.html.
+    document.addEventListener('DOMContentLoaded', async function () {
       const token = sessionStorage.getItem('token');
       if (!token) {
         window.location.href = 'login.html';
         return;
       }
 
-      const raw = sessionStorage.getItem('diagnostico');
-      if (!raw) {
-        window.location.href = 'analise_unificada.html';
-        return;
-      }
+      // 1) Tenta memória (caminho raro — navegação mata window em geral)
+      let diagnostico = mcSessionGet('diagnostico');
 
-      let diagnostico;
-      try {
-        diagnostico = JSON.parse(raw);
-      } catch (e) {
-        window.location.href = 'analise_unificada.html';
-        return;
+      // 2) Caminho padrão — hidrata do buffer backend
+      if (!diagnostico) {
+        const analiseId = sessionStorage.getItem('analise_id');
+        if (!analiseId) {
+          window.location.href = 'analise_unificada.html';
+          return;
+        }
+        try {
+          const resp = await mcFetch('/analise/sessao/' + encodeURIComponent(analiseId));
+          if (!resp.ok) {
+            // 404 = sessão expirou ou id inexistente. 401 já foi tratado por mcFetch.
+            sessionStorage.removeItem('analise_id');
+            window.location.href = 'analise_unificada.html';
+            return;
+          }
+          const envelope = await resp.json();
+          diagnostico = envelope.diagnostico || {};
+          const pii = envelope.pii || {};
+          mcSessionSet('diagnostico', diagnostico);
+          if (pii.cnpj) mcSessionSet('cnpj', pii.cnpj);
+          if (pii.razao_social) mcSessionSet('razao_social', pii.razao_social);
+        } catch (err) {
+          // Log neutro — err cru pode vazar detalhes
+          console.error('motor-conect: falha ao hidratar sessao — ver suporte');
+          window.location.href = 'analise_unificada.html';
+          return;
+        }
       }
 
       renderDiagnostico(diagnostico);
@@ -774,8 +799,10 @@
     function renderDiagnostico(d) {
       renderAnomalias(d);
       renderSemaforoDAS(d);
-      // Header empresa
-      const nomeEmpresa = sessionStorage.getItem('analise_empresa') || d.empresa?.razao_social || 'Empresa';
+      // Fase 4 Segurança/LGPD: PII vem de window.__MC_SESSION__ (memória).
+      // Fallback pra razao_social embutida no diagnostico caso a hidratação
+      // do buffer backend ainda não tenha ocorrido (caminho legado).
+      const nomeEmpresa = mcSessionGet('razao_social') || d.empresa?.razao_social || 'Empresa';
       document.getElementById('header-empresa').textContent = nomeEmpresa;
 
       const agora = new Date();
@@ -787,7 +814,7 @@
 
       // Cards de resumo
       document.getElementById('card-regime').textContent = regime;
-      document.getElementById('card-cnpj').textContent = formatCNPJ(sessionStorage.getItem('analise_cnpj') || '--');
+      document.getElementById('card-cnpj').textContent = formatCNPJ(mcSessionGet('cnpj') || '--');
       document.getElementById('card-rbt12').textContent = formatBRL(d.empresa?.rbt12);
       document.getElementById('card-aliquota').textContent = formatPct(d.aliquotas?.efetiva_das_total);
 
@@ -1159,11 +1186,12 @@
     }
 
     async function baixarDossieProva() {
+      // Fase 4: token + PII lidos só via storage/memória blindados.
       const token = sessionStorage.getItem('token');
-      const cnpjRaw = sessionStorage.getItem('analise_cnpj') || '';
-      const cnpjDigitos = cnpjRaw.replace(/\D/g, '');
+      const cnpjRaw = mcSessionGet('cnpj') || '';
+      const cnpjDigitos = (cnpjRaw || '').replace(/\D/g, '');
       if (!token || cnpjDigitos.length !== 14) {
-        alert('Não foi possível identificar o CNPJ para gerar o dossiê.');
+        mcToast('Nao foi possivel identificar o CNPJ para gerar o dossie.', 'error');
         return;
       }
 
@@ -1176,7 +1204,7 @@
       );
       if (!motivo) return;
       if (motivo.trim().length < 10) {
-        alert('Motivo precisa ter pelo menos 10 caracteres (LGPD Art. 37).');
+        mcToast('Motivo precisa ter pelo menos 10 caracteres (LGPD Art. 37).', 'error');
         return;
       }
 
@@ -1195,10 +1223,10 @@
         // mcFetch injeta JWT e trata 401 globalmente (redireciona pro login)
         const resp = await mcFetch(window.location.origin + url, { timeout: 60000 });
         if (resp.status === 404) {
-          alert('Nenhum documento de auditoria encontrado para este CNPJ. O dossiê só é gerado para diagnósticos feitos via upload de PDFs.');
+          mcToast('Nenhum documento de auditoria para este CNPJ. O dossie so e gerado em analises com upload de PDFs.', 'error');
           return;
         }
-        if (!resp.ok) throw new Error('Falha ao gerar dossiê: HTTP ' + resp.status);
+        if (!resp.ok) throw new Error('falha http');
 
         const blob = await resp.blob();
         const blobUrl = URL.createObjectURL(blob);
@@ -1211,7 +1239,9 @@
         a.remove();
         URL.revokeObjectURL(blobUrl);
       } catch (err) {
-        alert('Não foi possível gerar o dossiê. Tente novamente em instantes.');
+        // Log neutro — err cru pode conter URL com dígitos do CNPJ
+        console.error('motor-conect: falha ao gerar dossie — ver suporte');
+        mcToast('Nao foi possivel gerar o dossie. Tente novamente em instantes.', 'error');
       } finally {
         btn.disabled = false;
         btn.innerHTML = html;
@@ -1668,9 +1698,9 @@
         'Se necessário para registro, exporte o PDF antes de prosseguir.'
       );
       if (ok) {
-        sessionStorage.removeItem('diagnostico');
-        sessionStorage.removeItem('analise_empresa');
-        sessionStorage.removeItem('analise_cnpj');
+        // Fase 4 Segurança/LGPD: limpa id opaco + PII em memória.
+        sessionStorage.removeItem('analise_id');
+        if (typeof mcSessionClear === 'function') mcSessionClear();
         window.location.href = 'analise_unificada.html';
       }
     }
@@ -1679,10 +1709,12 @@
     // DOWNLOAD PDF
     // ─────────────────────────────────────────────
     async function downloadPDF() {
+      // Fase 4 Segurança/LGPD: lê diagnóstico + PII da memória (window.__MC_SESSION__).
+      // sessionStorage só tem o token JWT e o analise_id opaco.
       const token = sessionStorage.getItem('token');
-      const diagnosticoStr = sessionStorage.getItem('diagnostico');
+      const diagnostico = mcSessionGet('diagnostico');
 
-      if (!token || !diagnosticoStr) return;
+      if (!token || !diagnostico) return;
 
       const btn = document.getElementById('btn-baixar-pdf');
       const originalText = btn.innerHTML;
@@ -1697,10 +1729,9 @@
       `;
 
       // LGPD: PII (cnpj, razao_social) trafega separado, nunca dentro do diagnostico
-      const diagnostico = JSON.parse(diagnosticoStr);
       const pii = {
-        razao_social: sessionStorage.getItem('analise_empresa') || '',
-        cnpj: sessionStorage.getItem('analise_cnpj') || '',
+        razao_social: mcSessionGet('razao_social') || '',
+        cnpj: mcSessionGet('cnpj') || '',
       };
 
       try {
@@ -1713,7 +1744,7 @@
         });
 
         if (!response.ok) {
-          throw new Error('Falha ao gerar PDF');
+          throw new Error('falha http');
         }
 
         const blob = await response.blob();
@@ -1727,7 +1758,8 @@
         URL.revokeObjectURL(url);
 
       } catch (err) {
-        alert('Não foi possível gerar o PDF. Tente novamente em instantes.');
+        console.error('motor-conect: falha ao gerar PDF — ver suporte');
+        mcToast('Nao foi possivel gerar o PDF. Tente novamente em instantes.', 'error');
       } finally {
         btn.disabled = false;
         btn.innerHTML = originalText;

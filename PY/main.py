@@ -451,6 +451,29 @@ def _serializar_decimal(obj: Any) -> Any:
     return obj
 
 
+def _extrair_user_id(current_user: Optional[dict]) -> Optional[int]:
+    """
+    Extrai user_id (int > 0) do dict de autenticação.
+
+    Aceita tanto o formato nativo do verificar_token ({"sub": "1", ...})
+    quanto fixtures de teste que usam {"id": 1, ...}. Retorna None se
+    nenhum deles estiver presente ou for inválido — nunca lança.
+
+    Esta tolerância é necessária porque get_current_user pode ser
+    sobrescrito em testes via dependency_overrides com payload próprio.
+    """
+    if not current_user:
+        return None
+    candidato = current_user.get("sub") or current_user.get("id")
+    if candidato is None:
+        return None
+    try:
+        user_id = int(candidato)
+    except (TypeError, ValueError):
+        return None
+    return user_id if user_id > 0 else None
+
+
 def _registrar_erro_parser(origem: str, exc: Exception, diagnostico: dict) -> None:
     """
     Registra falha não-fatal de parser em logger + diagnostico._erros.
@@ -612,7 +635,7 @@ def dashboard_summary(_current_user: dict = Depends(get_current_user)):
 @app.post("/analise/manual", response_model=DiagnosticoResponse, tags=["analise"])
 def analise_manual(
     req: AnaliseManualRequest,
-    _current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Executa cálculo tributário completo sem extração de PDF.
@@ -718,6 +741,28 @@ def analise_manual(
                 "razao_social": fornecedora.razao_social,
             },
         }
+
+        # Fase 4 Segurança/LGPD: guarda envelope em buffer in-memory e devolve
+        # analise_id opaco. Frontend guarda só o id em sessionStorage (não-PII)
+        # e hidrata PII em memória via GET /analise/sessao/{id}.
+        # LGPD Art. 6º V (minimização) — PII fora do storage do browser.
+        try:
+            from services.analise_buffer import get_buffer
+            user_id = _extrair_user_id(current_user)
+            if user_id is not None:
+                analise_id = get_buffer().armazenar(
+                    envelope=_serializar_decimal(payload),
+                    user_id=user_id,
+                )
+                payload["analise_id"] = analise_id
+        except Exception as exc_buf:
+            # Buffer é best-effort — falha nele NÃO quebra o /analise/manual.
+            # Frontend detecta ausência de analise_id e cai em modo legado.
+            logger.warning(
+                "Falha ao armazenar analise em buffer | tipo=%s",
+                type(exc_buf).__name__,
+            )
+
         return JSONResponse(content=_serializar_decimal(payload))
 
     except (ValueError, RuntimeError) as exc:
@@ -731,6 +776,53 @@ def analise_manual(
             status_code=500,
             detail="Erro interno no motor de cálculo — contate o suporte.",
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GET /analise/sessao/{analise_id} — Hidratação do resultado em memória
+#
+# Fase 4 Segurança/LGPD: frontend guarda só um id opaco em sessionStorage.
+# Aqui ele troca o id pelo envelope {diagnostico, pii}. PII nunca passa no
+# storage do browser — vive apenas em memória (window.__MC_SESSION__).
+#
+# Ownership obrigatório (ERR-018 IDOR):
+#   Buffer valida que user_id do JWT == dono do envelope. Caso contrário,
+#   devolve 404 — mesma resposta que "id inexistente", para não vazar a
+#   existência do registro a terceiros.
+#
+# TTL curto (10 min padrão): cobre navegação + geração de PDF/dossiê.
+# Após expirar, frontend faz redirect para /analise_unificada.html (nova análise).
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/analise/sessao/{analise_id}", tags=["analise"])
+def obter_analise_sessao(
+    analise_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Devolve envelope {diagnostico, pii} de uma sessão de análise ativa.
+
+    Códigos:
+      200 — sessão válida, dono correto, envelope devolvido
+      401 — sem JWT / token inválido (tratado por get_current_user)
+      404 — sessão inexistente, expirada OU pertence a outro user
+            (mesma resposta de propósito — ownership IDOR-safe)
+    """
+    # Sanitização leve: o id gerado é hex 32 chars, não deve conter nada além.
+    # Rejeita cedo para evitar dores com ids longos vindos de atacantes.
+    if not analise_id or len(analise_id) > 64 or not analise_id.isalnum():
+        raise HTTPException(status_code=404, detail="Sessão de análise não encontrada.")
+
+    user_id = _extrair_user_id(current_user)
+    if user_id is None:
+        # Sem user_id válido, ownership não faz sentido — responde 404.
+        raise HTTPException(status_code=404, detail="Sessão de análise não encontrada.")
+
+    from services.analise_buffer import get_buffer
+    envelope = get_buffer().recuperar(analise_id, user_id)
+    if envelope is None:
+        raise HTTPException(status_code=404, detail="Sessão de análise não encontrada.")
+    return JSONResponse(content=envelope)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1299,6 +1391,23 @@ async def analise_pdf(
                 "tipo": type(exc_obs).__name__,
                 "mensagem": str(exc_obs),
             })
+
+        # Fase 4 Segurança/LGPD: analise_id opaco no envelope.
+        # Mesmo padrão de /analise/manual — PII vive só em memória do backend
+        # e na memória (window.__MC_SESSION__) do frontend depois da hidratação.
+        try:
+            from services.analise_buffer import get_buffer
+            if user_id is not None:
+                analise_id = get_buffer().armazenar(
+                    envelope=_serializar_decimal(payload),
+                    user_id=user_id,
+                )
+                payload["analise_id"] = analise_id
+        except Exception as exc_buf:
+            logger.warning(
+                "Falha ao armazenar analise PDF em buffer | tipo=%s",
+                type(exc_buf).__name__,
+            )
 
         return JSONResponse(content=_serializar_decimal(payload))
 

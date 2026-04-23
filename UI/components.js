@@ -14,6 +14,16 @@
 (function () {
   'use strict';
 
+  // ─── Fase 4 Segurança/LGPD — Constantes ──────────────────────────
+  // Intervalo entre checagens de expiração do JWT. 60s equilibra carga e
+  // responsividade (browser pode throttle aba de fundo — tratamos em visibilitychange).
+  const JWT_CHECK_INTERVAL_MS = 60 * 1000;
+  // Janela de antecipação: se o token expira em menos disso, aciona refresh.
+  const JWT_REFRESH_WINDOW_S = 5 * 60;
+  // Referência do setInterval de refresh — guardada no escopo do módulo para
+  // poder ser limpa no logout. Nunca vira global.
+  let _jwtRefreshTimerId = null;
+
   // ─── Configuração do Menu ─────────────────────────────────────────
   // Estrutura canônica: adicionar/remover links AQUI e todas as páginas refletem.
   const NAV_ITEMS = [
@@ -120,15 +130,42 @@
   }
 
   // ─── Logout handler ───────────────────────────────────────────────
+  // Blindado para LGPD Art. 46 (segurança) + Art. 6º V (minimização):
+  //   1. sessionStorage.clear()  — remove token, username, role, analise_id.
+  //   2. localStorage.clear()    — defesa em profundidade (hoje não usamos,
+  //                                mas ninguém garante que uma lib futura use).
+  //   3. window.__MC_SESSION__   — zera a PII que vive em memória.
+  //   4. clearInterval do refresh — evita leak de timer após navegação.
+  //   5. Redirect para login.
+  function mcLogoutLimpar() {
+    try { sessionStorage.clear(); } catch (_) { /* storage indisponível */ }
+    try { localStorage.clear(); } catch (_) { /* idem */ }
+    if (window.__MC_SESSION__) {
+      try { delete window.__MC_SESSION__; } catch (_) {
+        // Navegadores antigos podem não aceitar delete em window — sobrescreve.
+        window.__MC_SESSION__ = null;
+      }
+    }
+    if (_jwtRefreshTimerId !== null) {
+      clearInterval(_jwtRefreshTimerId);
+      _jwtRefreshTimerId = null;
+    }
+  }
+  // Exposição pública para que outras páginas possam disparar logout blindado
+  // sem duplicar lógica (ex.: timeout detectado no resultado.html).
+  window.mcLogout = function () {
+    mcLogoutLimpar();
+    if (currentPage() !== 'login.html') {
+      window.location.href = 'login.html';
+    }
+  };
+
   function setupLogout() {
     const btn = document.getElementById('mc-logout');
     if (!btn) return;
     btn.addEventListener('click', function (e) {
       e.preventDefault();
-      // ERR-019 — LGPD Art. 46: limpa TUDO (inclui analise_empresa, analise_cnpj,
-      // diagnostico). removeItem campo a campo deixava PII do cliente anterior.
-      sessionStorage.clear();
-      window.location.href = 'login.html';
+      window.mcLogout();
     });
   }
 
@@ -231,9 +268,10 @@
     // 401 global → sessão morta. Limpa TUDO e manda pro login.
     // ERR-019 — LGPD Art. 46: removeItem campo a campo deixava analise_empresa,
     // analise_cnpj e diagnostico vivos → vazamento de PII entre contas no
-    // mesmo browser. sessionStorage.clear() é atômico e não esquece chave.
+    // mesmo browser. Fase 4: mcLogoutLimpar() inclui window.__MC_SESSION__
+    // e clearInterval do refresh timer, não só sessionStorage.
     if (response.status === 401 && !skipAuthRedirect) {
-      sessionStorage.clear();
+      mcLogoutLimpar();
       if (currentPage() !== 'login.html') {
         window.location.href = 'login.html';
       }
@@ -277,6 +315,133 @@
     }
   };
 
+  // ─── Fase 4 — Decode de JWT client-side (apenas payload, sem validar) ──
+  //
+  // O backend é a autoridade de assinatura — aqui só lemos o `exp` claim
+  // para decidir o timing do refresh. Tentativa de forjar JWT no frontend
+  // não engana o backend. Retorna null se token mal-formado.
+  //
+  // Formato JWT: header.payload.signature (3 partes, base64url).
+  function mcDecodeJwtPayload(token) {
+    if (!token || typeof token !== 'string') return null;
+    const partes = token.split('.');
+    if (partes.length !== 3) return null;
+    try {
+      // base64url → base64 padrão (-/+, _/=)
+      let b64 = partes[1].replace(/-/g, '+').replace(/_/g, '/');
+      while (b64.length % 4) b64 += '=';
+      const json = atob(b64);
+      return JSON.parse(json);
+    } catch (_) {
+      return null;
+    }
+  }
+  window.mcDecodeJwtPayload = mcDecodeJwtPayload;
+
+  // ─── Fase 4 — Refresh automático de JWT ───────────────────────────────
+  //
+  // A cada JWT_CHECK_INTERVAL_MS, decodifica o token em sessionStorage e:
+  //   - Se exp ausente/token malformado → força logout (fail-closed).
+  //   - Se já expirou → força logout.
+  //   - Se faltam menos de JWT_REFRESH_WINDOW_S → chama POST /auth/refresh.
+  //     * 200 + renewed=true  → atualiza sessionStorage.token.
+  //     * 200 + renewed=false → nada a fazer (backend achou que não precisa).
+  //     * 401 → token já foi rejeitado, mcFetch mandou pro logout.
+  //     * outro erro → silencioso. Tenta de novo no próximo tick.
+  //
+  // O setInterval para quando a aba morre (browser). No logout, limpamos
+  // explicitamente via mcLogoutLimpar() para evitar leak.
+  async function mcCheckAndRefreshToken() {
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+      // Sem token → deixa o authGuard cuidar. Aqui não força redirect pra
+      // evitar loop em páginas públicas.
+      return;
+    }
+    const payload = mcDecodeJwtPayload(token);
+    if (!payload || typeof payload.exp !== 'number') {
+      // Token mal-formado: fail-closed, manda pro login.
+      window.mcLogout();
+      return;
+    }
+    const agoraS = Math.floor(Date.now() / 1000);
+    const restante = payload.exp - agoraS;
+    if (restante <= 0) {
+      // Já expirou — não tenta refresh (backend vai rejeitar de qualquer forma).
+      window.mcLogout();
+      return;
+    }
+    if (restante > JWT_REFRESH_WINDOW_S) {
+      // Token ainda confortável. Nada a fazer.
+      return;
+    }
+    // Janela de refresh — solicita novo token ao backend.
+    try {
+      const resp = await window.mcFetch('/auth/refresh', {
+        method: 'POST',
+        timeout: 15000,
+      });
+      if (!resp.ok) {
+        // mcFetch já tratou 401 (limpou sessão + redirect). Outros erros:
+        // silencioso — tenta de novo no próximo tick.
+        return;
+      }
+      const body = await resp.json();
+      if (body && body.renewed && typeof body.access_token === 'string') {
+        sessionStorage.setItem('token', body.access_token);
+      }
+    } catch (_) {
+      // Falha de rede ou timeout — sem toast (não dá pra pedir pro operador
+      // "tentar de novo" por renovação silenciosa). Próximo tick tenta.
+    }
+  }
+  window.mcCheckAndRefreshToken = mcCheckAndRefreshToken;
+
+  function setupJwtRefreshLoop() {
+    // Só inicia em páginas autenticadas. login.html não precisa.
+    const page = currentPage();
+    if (page === 'login.html') return;
+    if (_jwtRefreshTimerId !== null) return;  // já rodando — idempotente
+
+    // Primeira checagem imediata, depois periódica. Se o operador voltou
+    // pra aba após 1h, não esperamos mais 60s pra detectar que expirou.
+    mcCheckAndRefreshToken().catch(function () { /* silencia */ });
+    _jwtRefreshTimerId = setInterval(function () {
+      mcCheckAndRefreshToken().catch(function () { /* silencia */ });
+    }, JWT_CHECK_INTERVAL_MS);
+
+    // Tab inativa → browser pode throttle setInterval. Ao voltar ao foco,
+    // força uma checagem imediata.
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') {
+        mcCheckAndRefreshToken().catch(function () { /* silencia */ });
+      }
+    });
+  }
+
+  // ─── Fase 4 — Session store em memória (PII fora do storage) ──────────
+  //
+  // window.__MC_SESSION__ é o único local onde CNPJ, razão social e
+  // diagnóstico completo podem viver no frontend. sessionStorage guarda
+  // apenas:
+  //   - token         (JWT — necessário sobreviver a F5)
+  //   - username/role (não-PII, usado pelo header)
+  //   - analise_id    (UUID opaco do buffer backend — não identifica)
+  //
+  // Helpers mcSessionSet/get/clear encapsulam o acesso e garantem que
+  // nenhum caller grava direto em sessionStorage.
+  window.__MC_SESSION__ = window.__MC_SESSION__ || {};
+  window.mcSessionSet = function (key, value) {
+    if (!window.__MC_SESSION__) window.__MC_SESSION__ = {};
+    window.__MC_SESSION__[key] = value;
+  };
+  window.mcSessionGet = function (key) {
+    return window.__MC_SESSION__ ? window.__MC_SESSION__[key] : undefined;
+  };
+  window.mcSessionClear = function () {
+    window.__MC_SESSION__ = {};
+  };
+
   // ─── Boot ─────────────────────────────────────────────────────────
   // Roda assim que o DOM estiver pronto
   if (document.readyState === 'loading') {
@@ -289,6 +454,7 @@
     authGuard();
     injectSidebar();
     setupLogout();
+    setupJwtRefreshLoop();
   }
 
 })();

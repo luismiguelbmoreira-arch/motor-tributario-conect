@@ -8,6 +8,13 @@
       "port": 8000
     },
     {
+      "name": "API Uvicorn Direct (Fase 4 dev)",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", "8000", "--log-level", "warning"],
+      "cwd": "PY",
+      "port": 8000
+    },
+    {
       "name": "UI estática (só frontend)",
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8001", "--directory", "UI"],
