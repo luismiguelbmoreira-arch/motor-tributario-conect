@@ -27,7 +27,8 @@ from .models import (
     EmpresaHistoricoDB,
     AuditoriaDocumentoDB,
     AuditoriaAcessoDB,
-    AlertaDB
+    AlertaDB,
+    AuditoriaTentativaAcessoDB
 )
 
 # 4. Repositórios (CRUD)
@@ -73,6 +74,7 @@ __all__ = [
     "RegimeTributario", "NivelAlerta", "StatusAlerta", "StatusAuditoria",
     "EmpresaDB", "AtividadeDB", "DiagnosticoDB", "EmpresaHistoricoDB",
     "AuditoriaDocumentoDB", "AuditoriaAcessoDB", "AlertaDB",
+    "AuditoriaTentativaAcessoDB",
     "salvar_empresa", "buscar_empresa_por_cnpj", "listar_empresas",
     "registrar_historico_empresa", "buscar_historico_empresa", "purge_empresa",
     "salvar_diagnostico", "buscar_diagnosticos_por_empresa", "validar_competencia",

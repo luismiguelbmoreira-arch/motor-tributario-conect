@@ -150,3 +150,60 @@ class AlertaDB(SQLModel, table=True):
     resolvido_por: Optional[str] = Field(default=None, max_length=100)
     acao_tomada: Optional[str] = Field(default=None, sa_column=Column(TEXT, nullable=True))
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class AuditoriaTentativaAcessoDB(SQLModel, table=True):
+    """
+    Tabela de auditoria de tentativas de acesso cruzado (IDOR horizontal).
+
+    Registra toda vez que um `user_id_tentando` foi bloqueado ao tentar
+    acessar um recurso (sessão de análise, integração externa, etc.)
+    cujo dono é outro usuário. Diferente de `AuditoriaAcessoDB`, que
+    registra ACESSOS LEGÍTIMOS a documentos cifrados, esta tabela
+    registra INCIDENTES DE SEGURANÇA (tentativas bloqueadas).
+
+    Amparo:
+      - LGPD Art. 7º VI — IP armazenado em cleartext (legítimo interesse,
+        segurança da informação — não é dado pessoal sensível por si só).
+      - LGPD Art. 37 — registro de operações de tratamento.
+      - LGPD Art. 46 §1º — obrigação de medidas de segurança.
+      - LGPD Art. 48 — evidência em caso de incidente reportável à ANPD
+        (72h); a tabela é a base de prova.
+      - CTN Art. 195 — retenção mínima de 5 anos alinhada à obrigação
+        fiscal de conservação de documentos (consistente com
+        `auditoria_documentos`).
+
+    Consumidores previstos:
+      - Fase 4.1 — `/analise/sessao/{id}` (ERR-018.a já corrigido; aqui
+        apenas persiste o registro da tentativa para prova).
+      - Fase 5 — `/integracoes/ecac/sync`, `sieg_sincronizar`,
+        `integra_sincronizar`, dossiê de prova (ERR-018.b pendente).
+    """
+
+    __tablename__ = "auditoria_tentativas_acesso"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Prefixo de 8 chars do id do recurso tentado (analise_id hex, etc.).
+    # Não armazenamos o id completo para não recriar o vetor de IDOR via
+    # dump da tabela — o prefixo é suficiente para correlação em incidente.
+    analise_id_prefix: str = Field(max_length=8, index=True)
+
+    # User que tentou o acesso (sempre existe — o endpoint é autenticado).
+    user_id_tentando: int = Field(foreign_key="users.id", index=True)
+
+    # User dono do recurso. Pode ser None apenas em endpoints futuros onde
+    # o id existe mas está desvinculado de um dono identificável. No uso
+    # atual (/analise/sessao), um mismatch sempre tem dono != tentando.
+    user_id_dono: Optional[int] = Field(default=None, foreign_key="users.id")
+
+    # IP de origem em cleartext (LGPD Art. 7º VI — legítimo interesse).
+    # IPv6 tem no máximo 39 chars (ex: ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff);
+    # 45 cobre IPv6-mapped-IPv4 (::ffff:192.168.0.1 = 45).
+    ip: str = Field(max_length=45)
+
+    tentado_em: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+    # Endpoint que disparou a tentativa (ex: "/analise/sessao",
+    # "/integracoes/ecac/sync"). Usado para correlação e relatório.
+    endpoint: str = Field(max_length=255, index=True)

@@ -164,3 +164,56 @@ def test_response_schema_tem_campos_esperados(client):
     assert isinstance(body["access_token"], str) and body["access_token"]
     assert body["token_type"] == "bearer"
     assert isinstance(body["renewed"], bool)
+
+
+# ── Rate limit (ressalva Luiz Fase 4.1 #1) ───────────────────────────────────
+
+@pytest.fixture(name="client_rate_limit_isolado")
+def client_rate_limit_isolado_fixture():
+    """
+    TestClient com rate limiter zerado por teste. O slowapi Limiter guarda
+    contadores em memória global — sem reset, um teste contamina o próximo.
+    """
+    from api.dependencies import limiter
+    with TestClient(app) as client:
+        limiter.reset()
+        yield client
+        limiter.reset()
+
+
+def test_refresh_rate_limit_11a_chamada_retorna_429(client_rate_limit_isolado):
+    """
+    10 chamadas/minuto é o teto do @limiter.limit. A 11ª na mesma janela
+    deve retornar 429 (Too Many Requests). IP de origem = 127.0.0.1
+    (TestClient). Amparo: LGPD Art. 46 (segurança proporcional).
+    """
+    client = client_rate_limit_isolado
+    token = _gerar_token_com_exp(1, "admin", "admin", horas=5.0)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 10 chamadas válidas
+    for i in range(10):
+        resp = client.post("/auth/refresh", headers=headers)
+        assert resp.status_code == 200, f"Chamada {i + 1} falhou: {resp.status_code} {resp.text}"
+
+    # 11ª chamada — rate limit dispara
+    resp_11 = client.post("/auth/refresh", headers=headers)
+    assert resp_11.status_code == 429, (
+        f"Esperado 429 na 11ª chamada, veio {resp_11.status_code}: {resp_11.text}"
+    )
+
+
+def test_refresh_rate_limit_nao_bloqueia_10_chamadas_seguidas(client_rate_limit_isolado):
+    """
+    O teto é 10/minuto — as 10 primeiras NÃO podem ser bloqueadas.
+    Teste oposto ao anterior: garante que o limite é 10, não 5 ou 9.
+    """
+    client = client_rate_limit_isolado
+    token = _gerar_token_com_exp(1, "admin", "admin", horas=5.0)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    for i in range(10):
+        resp = client.post("/auth/refresh", headers=headers)
+        assert resp.status_code == 200, (
+            f"Chamada {i + 1} não deveria ser rate-limited: {resp.status_code} {resp.text}"
+        )

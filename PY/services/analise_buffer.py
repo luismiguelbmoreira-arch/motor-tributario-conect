@@ -165,6 +165,37 @@ class AnaliseBuffer:
                 return None
             return entrada.envelope
 
+    def get_dono(self, analise_id: str) -> Optional[int]:
+        """
+        Retorna o `user_id` dono do envelope, SEM validar ownership.
+
+        Uso exclusivo de endpoints que precisam distinguir "id inexistente
+        ou expirado" (404 legítimo) de "id existe mas é de outro user"
+        (IDOR — requer auditoria). NÃO expor publicamente no response —
+        este método vaza a existência do id a quem o chama.
+
+        Política:
+          - id inexistente → None
+          - id expirado    → None (e remove oportunisticamente)
+          - id válido      → user_id do dono
+
+        Amparo: LGPD Art. 46 §1º — o handler precisa discriminar IDOR de
+        404 legítimo para registrar evidência (LGPD Art. 48).
+        """
+        if not analise_id or not isinstance(analise_id, str):
+            return None
+
+        agora = time.monotonic()
+        with self._lock:
+            entrada = self._data.get(analise_id)
+            if entrada is None:
+                return None
+            if entrada.expira_em <= agora:
+                # Expirou — limpa e trata como inexistente
+                del self._data[analise_id]
+                return None
+            return entrada.user_id
+
     def remover(self, analise_id: str, user_id: int) -> bool:
         """
         Remove explicitamente (logout, nova análise, direito LGPD de eliminação).

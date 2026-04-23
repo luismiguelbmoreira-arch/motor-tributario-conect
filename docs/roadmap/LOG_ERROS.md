@@ -351,10 +351,19 @@ Implementação da classe `Atividade` e suporte a loop em `calcular_das_mensal()
 
 ---
 
-### ERR-018 — /integracoes/ecac/sync não valida ownership de CNPJ (IDOR horizontal)
+### ERR-018 — IDOR horizontal em endpoints que aceitam CNPJ (análise + integrações)
 > **Nota de renumeração (23/04/2026):** originalmente registrado como ERR-013,
 > em colisão com o ERR-013 de "Data de Início de Atividade" (já corrigido em
 > 03/04/2026). Renumerado para ERR-018 para preservar rastreabilidade.
+>
+> **Nota de desmembramento (Fase 4 — 23/04/2026):** o ERR-018 original tratava
+> de um único endpoint (`/integracoes/ecac/sync`). Durante a Fase 4
+> Segurança/LGPD, um vetor IDOR **análogo** foi identificado e corrigido em
+> `/analise/sessao` (hidratação do resultado a partir do buffer in-memory).
+> Para manter a rastreabilidade separada por superfície de ataque, o item
+> foi desmembrado em **ERR-018.a** (`/analise/sessao` — ✅ corrigido na Fase 4)
+> e **ERR-018.b** (`/integracoes/ecac/sync` — ⏳ pendente para Fase 5).
+> O cabeçalho original abaixo permanece intacto como contexto histórico.
 
 **Data:** 23/04/2026
 **Severidade:** 🔴 Crítico
@@ -389,8 +398,70 @@ relação User↔Empresa no DB.
 **PRAZO:** antes de qualquer deploy multi-tenant. Não pode entrar em produção
 compartilhada sem isso.
 
-**Status:** ⏳ Pendente — não bloqueia Fase 1 (vetor anônimo fechado), mas
-bloqueia qualquer liberação multi-tenant.
+**Status:** 🔀 Desmembrado — ver ERR-018.a (corrigido Fase 4) e ERR-018.b (pendente Fase 5) abaixo.
+
+---
+
+### ERR-018.a — IDOR em `/analise/sessao/{analise_id}` (hidratação do resultado)
+**Data:** 23/04/2026
+**Severidade:** 🔴 Crítico
+**Amparo legal violado:** LGPD Art. 46 (segurança) + Art. 6º V (minimização) + CTN Art. 198 (sigilo fiscal)
+**Arquivo:** `PY/services/analise_buffer.py::AnaliseBuffer.recuperar()` + `PY/main.py::obter_analise_sessao()`
+**Descoberto em:** Derivação do ERR-018 durante a implementação da Fase 4 Segurança/LGPD
+
+**Descrição:**
+O endpoint `GET /analise/sessao/{analise_id}` devolve o envelope
+`{diagnostico, pii}` de uma análise ativa. Sem ownership server-side, qualquer
+usuário autenticado que obtivesse um `analise_id` (por reuso do mesmo browser,
+log compartilhado, vazamento via referer, etc.) leria o diagnóstico +
+`pii.cnpj` + `pii.razao_social` de análise de **outro operador**. Vetor IDOR
+horizontal equivalente ao ERR-018 original, porém no pipeline de análise
+(não nas integrações externas).
+
+**Evidência:** antes da Fase 4, o buffer só validava existência/TTL do id;
+não comparava `user_id` do JWT com `user_id` dono do envelope.
+
+**Solução aplicada (Fase 4 — 22/04/2026, commit `67fcb01`):**
+1. `AnaliseBuffer` reescrito com `user_id` obrigatório em `armazenar()` e
+   `recuperar()`; envelope gravado em `_EntradaBuffer` junto do dono.
+2. `recuperar()` devolve `None` silenciosamente quando `user_id != dono` —
+   mesmo comportamento de id inexistente, para não vazar a existência do
+   registro (IDOR-safe).
+3. Handler `obter_analise_sessao` extrai `user_id` via `_extrair_user_id` e
+   chama `get_buffer().recuperar(analise_id, user_id)` — resposta é `404`
+   tanto para id inexistente quanto para ownership falha.
+4. Cobertura em `test_analise_buffer.py` (unit + integração).
+
+**Status:** ✅ Corrigido na Fase 4 Segurança/LGPD.
+
+---
+
+### ERR-018.b — IDOR em `/integracoes/ecac/sync` (CNPJ do Form não cross-check)
+**Data:** 23/04/2026
+**Severidade:** 🔴 Crítico
+**Amparo legal violado:** CTN Art. 198 (sigilo fiscal) + LGPD Art. 48 (incidente reportável à ANPD)
+**Arquivo:** `PY/api/routers/integracoes.py` — `ecac_sync_a1()` + demais endpoints com CNPJ em `Form/Query` (sieg_sincronizar, integra_sincronizar, dossiê de prova)
+**Descoberto em:** Review do Viciado + Parecer Luiz Moreira na Fase 1 do plano Front/Backend
+
+**Descrição:** idêntica ao cabeçalho do ERR-018 original acima. Qualquer
+usuário autenticado submete o CNPJ de outro cliente do escritório e extrai
+dados via certificado A1/Gov.br. Vetor multi-tenant.
+
+**Solução necessária (Fase 5 — Ownership Guards):**
+1. Criar relação `user_empresas` (ou reaproveitar `auditoria_documentos.uploaded_by_user_id`).
+2. Helper `tem_acesso_cnpj(user_id, cnpj) -> bool`.
+3. No handler de cada endpoint: `if not tem_acesso_cnpj(...): raise HTTPException(403)`.
+4. Persistir tentativa em `AuditoriaTentativaAcessoDB` (infraestrutura já
+   criada na Fase 4.1, ver helper `registrar_tentativa_acesso`) — só falta
+   o wiring no handler quando o guard de CNPJ for implementado.
+5. Aplicar o mesmo padrão em `sieg_sincronizar`, `integra_sincronizar`,
+   `/auditoria/prova/cnpj/{...}` (já exige CNPJ mas valida só autenticação).
+
+**PRAZO:** antes de qualquer deploy multi-tenant. Não pode entrar em produção
+compartilhada sem isso.
+
+**Status:** ⏳ Pendente — Fase 5. A tabela de auditoria da tentativa já está
+disponível (Fase 4.1), resta o guard de ownership propriamente dito.
 
 ---
 
@@ -1152,6 +1223,142 @@ A constante FROZEN `FORMAS_PAGAMENTO_COM_PSP = frozenset({"PIX_VIA_PSP", "BOLETO
 **Evidência:** Grep `alert\s*\(` encontrou `UI/resultado.html:1166,1179,1198,1214,1730`.
 **Solução implementada:** Migração pra `mcToast(msg, type)` com copy amigável.
 **Status:** ✅ Corrigido — zero `alert()` em `UI/**`.
+
+---
+
+### ERR-045 — `_fracao_iva_no_das` usa phase-in 10%/ano enquanto `CRONOGRAMA_IVA` usa 20%/ano
+**Data:** 23/04/2026
+**Severidade:** 🔴 Critico
+**Arquivo:** `PY/core/motor_tributario.py` — `_fracao_iva_no_das()` linha 627 | `PY/core/tabelas_simples.py` — `CRONOGRAMA_IVA` linhas 297-300
+**Descoberto em:** Auditoria matematica Luiz Moreira pos-refatoracao
+
+**Descricao:**
+Dois blocos do motor modelam o mesmo fenomeno — crescimento do IBS no periodo 2029-2032 — com cronogramas inconsistentes:
+
+- `_fracao_iva_no_das(ano)` (linha 627): `Decimal(ano - 2028) * Decimal("0.10")`
+  - 2029 = 10%, 2030 = 20%, 2031 = 30%, 2032 = 40% da fracao ICMS+ISS no DAS
+
+- `CRONOGRAMA_IVA` (tabelas_simples.py):
+  - 2029: IBS 0.035 (~20% de 0.177)
+  - 2030: IBS 0.071 (~40%)
+  - 2031: IBS 0.106 (~60%)
+  - 2032: IBS 0.142 (~80%)
+
+**Impacto:**
+`_fracao_iva_no_das` e consequentemente `credito_b2b_simples` usam 10/20/30/40%.
+`split_payment_impacto` e `cenario_opt_out` usam CBS+IBS do `CRONOGRAMA_IVA` com phase-in de 20/40/60/80%.
+Em 2029, o credito B2B calculado sera metade do que o motor calcula para o custo de Split Payment — inconsistencia interna detectavel por comparacao direta dos dois cenarios.
+
+**Evidencia:**
+```
+Empresa Anexo I Faixa 1, DAS R$ 1.000, 2029:
+- credito_b2b_simples = 1.000 * (ICMS+ISS no DAS) * 10% = credito X
+- taxa_retencao split_payment = (CBS 0.088 + IBS 0.035) * fator = taxa Y
+O percentual ICMS+ISS extinto em 2029 nao e 10% — e 20% conforme CRONOGRAMA_IVA
+```
+
+**Nota legal:** LC 214/2025 Art. 360 remete o cronograma exato para regulamentacao posterior (Resolucao do Senado). Nenhum dos dois percentuais e definitivamente correto — mas o motor precisa ser internamente consistente. A decisao de qual usar deve ser unica e documentada.
+
+**Solucao necessaria:**
+1. Definir qual e o percentual de referencia: 20%/ano (alinhado ao CRONOGRAMA_IVA) ou 10%/ano (posicao conservadora)
+2. Ajustar `_fracao_iva_no_das` para usar o mesmo step do CRONOGRAMA_IVA (2029=20%, 2030=40%, 2031=60%, 2032=80%): `fator_fase_in = Decimal(ano - 2028) * Decimal("0.20")`
+3. Ou ajustar CRONOGRAMA_IVA para step de 10% se essa for a posicao conservadora adotada
+4. Decisao deve ser documentada na propria constante com citacao da fonte legal
+
+**Status:** ⏳ Pendente — aguarda decisao de Luiz Moreira sobre qual step adotar
+
+---
+
+### ERR-046 — `cenario_opt_out` subtrai IBS/CBS em bases diferentes (DAS mensal vs operacao)
+**Data:** 23/04/2026
+**Severidade:** 🟡 Atencao
+**Arquivo:** `PY/core/motor_tributario.py` — `cenario_opt_out()` linhas 734-737
+**Descoberto em:** Auditoria matematica Luiz Moreira pos-refatoracao
+
+**Descricao:**
+A subtracao para evitar dupla contagem de IBS/CBS no cenario Opt-Out mistura duas bases de calculo diferentes:
+
+```python
+fracao_iva_no_das = (ibs_no_das + cbs_no_das)           # R$ absolutos do DAS MENSAL
+custo_das_por_operacao_completo = valor_operacao * AE   # R$ da OPERACAO especifica
+custo_das_sem_iva = custo_das_por_operacao_completo - fracao_iva_no_das  # BASES DIFERENTES
+```
+
+`ibs_no_das` e `cbs_no_das` sao calculados via `_calcular_fracao_componente()` que usa `das_mensal` como base (RBT12/12 ou rpa_mensal). `custo_das_por_operacao_completo` usa `valor_operacao` como base — que pode ser diferente do RPA mensal.
+
+**Exemplo concreto:**
+- RBT12 R$ 600.000, DAS mensal R$ 4.750, operacao R$ 20.000
+- `custo_das_por_operacao_completo` = 20.000 x AE (base: operacao)
+- `ibs_no_das` = R$ X (base: DAS mensal de R$ 4.750)
+- Subtracao: custo_operacao - fracao_do_das_mensal — grandezas incompativeis
+
+**Impacto:** a diferenca e pequena em valor absoluto (ambas sao fracao pequena dos respectivos totais), mas a base matematica e conceitualmente incorreta. O correto seria:
+
+```python
+fracao_iva_percentual = (fracao_ibs_pct + fracao_cbs_pct)  # % do DAS
+custo_das_sem_iva = valor_operacao * (AE - AE * fracao_iva_percentual)
+```
+
+**Status:** ⏳ Pendente
+
+---
+
+### ERR-047 — Thresholds de recomendacao Opt-Out (70%/5%, 50%/10%, <30%) sem amparo legal
+**Data:** 23/04/2026
+**Severidade:** 🟡 Atencao
+**Arquivo:** `PY/core/recomendacoes_optout.py` — linhas 41, 68, 83 | campo `amparo_legal` linha 112-115
+**Descoberto em:** Auditoria matematica Luiz Moreira pos-refatoracao
+
+**Descricao:**
+Os thresholds de conveniencia economica para recomendacao de Opt-Out (B2B >= 70% + custo <= 5% = OPT_OUT_FORTE; B2B >= 50% + custo <= 10% = OPT_OUT_VANTAJOSO; B2B < 30% = MANTER_SIMPLES) nao tem base em lei, instrucao normativa ou resolucao do CGSN.
+
+O campo `amparo_legal` do retorno (linha 112) cita "LC 214/2025, Arts. 41-44 | Resolucao CGSN 183/2025" — esses dispositivos definem o mecanismo de opt-out e as janelas semestrais, nao os criterios de conveniencia economica.
+
+**Risco:** o parecer entregue ao contribuinte cita base legal que nao embase os percentuais usados na tomada de decisao. Se o contribuinte contestar a recomendacao invocando a lei citada, nao encontrara os thresholds nela.
+
+**Solucao necessaria:**
+Separar no campo `amparo_legal` dois blocos:
+1. Base legal do dispositivo de opt-out: LC 214/2025 Arts. 41-44 + Res. CGSN 183/2025
+2. Criterio de conveniencia: "Criterio de conveniencia economica — escritorio Conect (heuristica profissional, sem amparo legal especifico)"
+
+**Status:** ⏳ Pendente — baixa prioridade (nao afeta calculo, apenas documentacao)
+
+---
+
+### ERR-048 — Alerta admin de IDOR cruzado (3×24h) sem dashboard ops
+**Data:** 23/04/2026
+**Severidade:** 🟡 Atenção — observabilidade de incidentes
+**Amparo legal:** LGPD Art. 48 (dever de comunicar incidente à ANPD em 72h)
+**Arquivo:** TBD — precisa decisão sobre canal (e-mail, painel admin, webhook).
+**Descoberto em:** Ressalva Luiz Fase 4.1 #3 — escopo aperto do Chefe
+
+**Descrição:**
+A Fase 4.1 persiste toda tentativa de IDOR horizontal em
+`auditoria_tentativas_acesso` (helper `registrar_tentativa_acesso` +
+wiring em `/analise/sessao`). Entretanto, **ninguém é avisado em tempo
+real** quando um mesmo `user_id_tentando` dispara 3 ou mais tentativas
+em 24h — padrão clássico de operador malicioso ou credencial
+comprometida tentando varrer ids.
+
+A regra de threshold (3×24h) é a mais adequada ao perfil multi-tenant de
+escritório contábil: dedos gordos geram 1 tentativa; atacante consistente
+gera 3+. A contagem vai feita com uma janela deslizante por
+`user_id_tentando` olhando para `tentado_em`.
+
+**Escopo cortado da Fase 4.1** (decisão do Chefe): apenas a persistência
+das tentativas foi entregue. O alerta em tempo real fica como item de
+backlog do dashboard ops.
+
+**Solução necessária (backlog — sem deadline):**
+1. Job ou trigger ao inserir linha em `auditoria_tentativas_acesso`.
+2. `COUNT(user_id_tentando)` na janela `tentado_em >= now() - 24h`.
+3. Se ≥ 3, notificar admins via canal escolhido (slack/email/webhook/
+   painel ops). Idempotente — não spamar no 4º, 5º... dentro da mesma
+   janela.
+4. Tela no dashboard ops com lista de tentativas por dia + destaque
+   para os que cruzaram o threshold.
+
+**Status:** ⏳ Pendente (backlog do dashboard ops, sem deadline).
 
 ---
 

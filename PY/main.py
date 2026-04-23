@@ -797,6 +797,7 @@ def analise_manual(
 @app.get("/analise/sessao/{analise_id}", tags=["analise"])
 def obter_analise_sessao(
     analise_id: str,
+    request: Request,
     current_user: dict = Depends(get_current_user),
 ):
     """
@@ -818,10 +819,54 @@ def obter_analise_sessao(
         # Sem user_id válido, ownership não faz sentido — responde 404.
         raise HTTPException(status_code=404, detail="Sessão de análise não encontrada.")
 
+    # ── IP da requisição — sem PII, usado só para correlação em log/auditoria.
+    # Amparo: LGPD Art. 7º VI (legítimo interesse — segurança) + Art. 37
+    # (registro de operações de tratamento). NUNCA logar CNPJ ou razão social.
+    ip_origem = request.client.host if request and request.client else None
+
     from services.analise_buffer import get_buffer
-    envelope = get_buffer().recuperar(analise_id, user_id)
+    buffer = get_buffer()
+    envelope = buffer.recuperar(analise_id, user_id)
+
     if envelope is None:
+        # Detecta se é IDOR (dono existe, é outro) ou 404 legítimo
+        # (id inexistente / expirado). Só registra tentativa em auditoria
+        # no caso IDOR — 404 legítimo não é incidente.
+        dono = buffer.get_dono(analise_id)
+        if dono is not None and dono != user_id:
+            # Tentativa de acesso cruzado — LGPD Art. 46 §1º + 48 (evidência 72h ANPD)
+            try:
+                from database.repositories.auditoria_tentativa_repo import (
+                    registrar_tentativa_acesso,
+                )
+                registrar_tentativa_acesso(
+                    analise_id_prefix=analise_id[:8],
+                    user_id_tentando=user_id,
+                    user_id_dono=dono,
+                    ip=ip_origem or "unknown",
+                    endpoint="/analise/sessao",
+                )
+            except Exception:
+                # Falha ao persistir a tentativa não pode quebrar o 404.
+                # O warning em analise_buffer.recuperar() já deixou rastro.
+                logger.exception(
+                    "Falha ao registrar tentativa de acesso | analise_id=%s... | user_id=%s",
+                    analise_id[:8], user_id,
+                )
         raise HTTPException(status_code=404, detail="Sessão de análise não encontrada.")
+
+    # ── Log estruturado de hidratação bem-sucedida (ressalva Luiz Fase 4.1 #2).
+    # LGPD Art. 5º X + Art. 37 — acesso/reprodução de PII é operação de
+    # tratamento registrável. Campos: prefixo do id (não-reversível), user_id,
+    # ip, evento. SEM CNPJ, SEM razão social — o envelope foi acessado, mas
+    # o log não repassa PII.
+    logger.info(
+        "HIDRATACAO_SESSAO | analise_id=%s | user_id=%s | ip=%s | evento=%s",
+        analise_id[:8],
+        user_id,
+        ip_origem,
+        "HIDRATACAO_SESSAO",
+    )
     return JSONResponse(content=envelope)
 
 

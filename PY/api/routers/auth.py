@@ -72,7 +72,9 @@ class RefreshResponse(BaseModel):
     renewed: bool
 
 @router.post("/refresh", response_model=RefreshResponse)
+@limiter.limit("10/minute")
 def refresh_token(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     """
@@ -84,6 +86,11 @@ def refresh_token(
 
     Nunca retorna 304. 304 em POST quebra o contrato HTTP e faz o frontend
     interpretar como "sessão morta" sem necessidade.
+
+    Rate limit: 10 chamadas/minuto por IP remoto (ressalva Luiz 4.1 #1).
+    Sem limite, o endpoint pode ser usado como backdoor de refresh contínuo
+    para manter sessão viva além do TTL natural ou para fuzzing de tokens.
+    Amparo: LGPD Art. 46 (medidas de segurança proporcionais ao risco).
     """
     novo = renovar_token_jwt(credentials.credentials)
     if novo is None:
