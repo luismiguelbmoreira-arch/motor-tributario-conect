@@ -120,6 +120,7 @@
     </div>
   </div>
 
+  <script src="components.js"></script>
   <script>
     // Inicializar ícones Lucide
     lucide.createIcons();
@@ -158,21 +159,25 @@
       btnText.innerHTML = '<div class="spinner"></div> Autenticando...';
 
       try {
-        const res = await fetch(`${window.location.origin}/auth/login`, {
+        // skipAuthRedirect: login é a única rota que pode receber 401 sem redirect
+        const res = await mcFetch(`${window.location.origin}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password }),
+          skipAuthRedirect: true,
         });
 
         if (res.ok) {
           const data = await res.json();
           sessionStorage.setItem('token', data.access_token);
+          sessionStorage.setItem('username', data.username || '');
+          sessionStorage.setItem('role', data.role || '');
           window.location.href = 'dashboard.html';
         } else {
           generalError.classList.remove('step-hidden');
         }
       } catch (err) {
-        generalError.innerText = 'Erro de conexão com o servidor.';
+        generalError.innerText = err && err.message ? err.message : 'Erro de conexão com o servidor.';
         generalError.classList.remove('step-hidden');
       } finally {
         submitBtn.disabled = false;

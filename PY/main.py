@@ -68,7 +68,7 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import JSONResponse, Response, StreamingResponse  # noqa: E402
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
-from pydantic import BaseModel, ConfigDict, Field, field_validator  # noqa: E402
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator  # noqa: E402
 from pydantic import ValidationError as PydanticValidationError  # noqa: E402
 from slowapi import Limiter, _rate_limit_exceeded_handler  # noqa: E402
 from slowapi.errors import RateLimitExceeded  # noqa: E402
@@ -98,6 +98,7 @@ from core.motor_tributario import (  # noqa: E402
 )
 from schemas.catalogo_documentos import montar_cards  # noqa: E402
 from schemas.documentos_requeridos import CardsResponse  # noqa: E402
+from schemas.responses import DiagnosticoResponse  # noqa: E402
 from utils.periodo_base import ANO_MAX, ANO_MIN  # noqa: E402
 import database  # noqa: E402
 from validadores import validar_cnpj, validar_uf, validar_cnae  # noqa: E402
@@ -170,6 +171,8 @@ from api.dependencies import get_current_user, require_admin, security, limiter
 # ─────────────────────────────────────────────────────────────────────────────
 
 class AuditarRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     pasta_empresa: str = Field(
         ...,
         description="Caminho para pasta com PDFs da empresa",
@@ -178,6 +181,8 @@ class AuditarRequest(BaseModel):
 
 
 class AuditarBatchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     pasta_base: str = Field(
         ...,
         description="Pasta base contendo subpastas de empresas",
@@ -197,7 +202,7 @@ class AnaliseManualRequest(BaseModel):
     Todos os campos espelham EmpresaFornecedora + EmpresaCompradora + OperacaoFiscal.
     Decimal serializado como string para zero perda de precisão.
     """
-    model_config = ConfigDict(json_encoders={Decimal: str})
+    model_config = ConfigDict(extra="forbid", json_encoders={Decimal: str})
 
     # ── EmpresaFornecedora ────────────────────────────────────────────────────
     cnpj: str = Field(..., description="CNPJ com ou sem pontuação")
@@ -313,6 +318,61 @@ class AnaliseManualRequest(BaseModel):
         )
     )
 
+    # ── Guards de consistência fiscal (ERR-024) ────────────────────────────────
+    @model_validator(mode="after")
+    def validar_consistencia_fiscal(self):
+        """
+        Guards de entrada — MAX_FISCAL_02 (toda regra tem amparo).
+
+        Bloqueia cenários em que o cálculo downstream daria resultado
+        semanticamente errado sem que o operador perceba. Cada bloqueio
+        tem citação legal obrigatória — nada de `or`-fallback silencioso.
+
+        Cenários bloqueados:
+          1. MEI com faturamento_12m > teto anual (LC 123/2006 Art. 18-A §1º).
+             §§5º-7º obrigam desenquadramento automático — rodar cálculo MEI
+             com receita acima do teto é erro conceitual, a empresa já é Simples.
+          2. MEI sem categoria_mei explícita (LC 123/2006 Art. 18-A §§3º I-III).
+             Categoria define DAS fixo distinto (COMERCIO/INDUSTRIA/SERVICOS/
+             COMERCIO_SERVICOS). Fallback silencioso viola MAX_FISCAL_02.
+          3. percentual_b2b != 100 com tipo_comprador ≠ MISTO
+             (LC 214/2025 Art. 47 II + Art. 48). Crédito IBS/CBS só em B2B
+             contribuinte — misto exige tipo=MISTO explícito para não
+             contaminar a recomendação Opt-Out.
+        """
+        # Import local para evitar ciclo e aproveitar a constante FROZEN do motor.
+        # Fonte única: core.regimes.mei.TETO_ANUAL_MEI (LC 123/2006 Art. 18-A §1º).
+        from core.regimes.mei import TETO_ANUAL_MEI
+
+        # 1. MEI acima do teto
+        if self.regime == "MEI" and self.faturamento_12m > TETO_ANUAL_MEI:
+            raise ValueError(
+                f"MEI com faturamento_12m={self.faturamento_12m} > teto "
+                f"R$ {TETO_ANUAL_MEI} (LC 123/2006 Art. 18-A §1º). "
+                "Empresa desenquadrada para Simples Nacional (§§5º-7º). "
+                "Use regime='SIMPLES'."
+            )
+
+        # 2. MEI sem categoria — bloqueia fallback silencioso
+        if self.regime == "MEI" and self.categoria_mei is None:
+            raise ValueError(
+                "MEI exige categoria_mei explícita "
+                "(COMERCIO|INDUSTRIA|SERVICOS|COMERCIO_SERVICOS). "
+                "LC 123/2006 Art. 18-A §§3º I a III — cada categoria tem "
+                "DAS fixo distinto (INSS 5% SM + ICMS R$1 ou ISS R$5)."
+            )
+
+        # 3. percentual_b2b fora de MISTO — incoerência semântica
+        if self.tipo_comprador != "MISTO" and self.percentual_b2b != Decimal("100"):
+            raise ValueError(
+                f"percentual_b2b={self.percentual_b2b} só é válido com "
+                f"tipo_comprador='MISTO'. Para tipo='{self.tipo_comprador}' "
+                "use percentual_b2b=100 (LC 214/2025 Art. 47 II + Art. 48 — "
+                "crédito IBS/CBS só existe em operação B2B contribuinte)."
+            )
+
+        return self
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MODELOS DE RESPONSE — Auditoria (existentes)
@@ -370,6 +430,35 @@ def _serializar_decimal(obj: Any) -> Any:
     if isinstance(obj, list):
         return [_serializar_decimal(i) for i in obj]
     return obj
+
+
+def _registrar_erro_parser(origem: str, exc: Exception, diagnostico: dict) -> None:
+    """
+    Registra falha não-fatal de parser em logger + diagnostico._erros.
+
+    Padrão unificado ERR-021/025 — o rastro da falha chega ao dossiê jurídico
+    e ao response do frontend. Substitui o antigo `except Exception: logger.warning(...)`
+    silencioso que descartava exceptions sem deixar prova de que o parser falhou.
+
+    Amparo legal:
+      - CTN Art. 142 (motivação do lançamento — rastro deve refletir falhas)
+      - LGPD Art. 37 (registro de operações de tratamento)
+      - LC 214/2025 Art. 45 §3º (integridade da trilha de apuração IBS/CBS)
+      - Lei 8.137/1990 Art. 1º II (evita dolo eventual por omissão de rastro)
+
+    Args:
+        origem: rótulo curto do parser (ex.: "parser_xml_nfe", "parser_csv_folha").
+        exc: exception capturada no try/except do chamador.
+        diagnostico: dict mutável — recebe append em `_erros` (cria a lista se ausente).
+    """
+    logger.warning(
+        "Falha parser %s: %s — %s", origem, type(exc).__name__, exc, exc_info=True,
+    )
+    diagnostico.setdefault("_erros", []).append({
+        "origem": origem,
+        "tipo": type(exc).__name__,
+        "mensagem": str(exc),
+    })
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -501,7 +590,7 @@ def dashboard_summary(_current_user: dict = Depends(get_current_user)):
 # ENDPOINTS — Análise manual (autenticado)
 # ─────────────────────────────────────────────────────────────────────────────
 
-@app.post("/analise/manual", tags=["analise"])
+@app.post("/analise/manual", response_model=DiagnosticoResponse, tags=["analise"])
 def analise_manual(
     req: AnaliseManualRequest,
     _current_user: dict = Depends(get_current_user),
@@ -536,7 +625,10 @@ def analise_manual(
             faturamento_12m=req.faturamento_12m,
             folha_salarios_12m=req.folha_salarios_12m,
             anexo_simples=req.anexo_simples,
-            categoria_mei=req.categoria_mei or ("SERVICOS" if req.regime == "MEI" else None),
+            # ERR-024: fallback silencioso removido — o @model_validator acima
+            # garante que categoria_mei nunca é None quando regime=MEI.
+            # Para os demais regimes o próprio EmpresaFornecedora ignora o campo.
+            categoria_mei=req.categoria_mei,
             data_inicio_atividade=(
                 date_type.fromisoformat(req.data_inicio_atividade)
                 if req.data_inicio_atividade else None
@@ -866,6 +958,7 @@ async def documentos_requeridos(
 
 @app.post(
     "/analise/pdf",
+    response_model=DiagnosticoResponse,
     summary="Extrai dados de documentos fiscais e gera diagnóstico",
     tags=["Análise"],
 )
@@ -1014,14 +1107,14 @@ async def analise_pdf(
                 from parsers.xml_nfe import parsear_lote_nfe
                 nfe_data = parsear_lote_nfe(conteudos_xml_nfe)
             except Exception as exc_nfe:
-                logger.warning("Falha ao parsear XML NFe: %s", exc_nfe)
+                _registrar_erro_parser("parser_xml_nfe", exc_nfe, diagnostico)
 
         if conteudos_xml_nfce:
             try:
                 from parsers.xml_nfce import parsear_lote_nfce
                 nfce_data = parsear_lote_nfce(conteudos_xml_nfce)
             except Exception as exc_nfce:
-                logger.warning("Falha ao parsear XML NFCe: %s", exc_nfce)
+                _registrar_erro_parser("parser_xml_nfce", exc_nfce, diagnostico)
 
         if conteudos_csv:
             try:
@@ -1030,7 +1123,7 @@ async def analise_pdf(
                 csv_bytes = b"\n".join(conteudos_csv)
                 folha_data = parsear_csv_folha(csv_bytes)
             except Exception as exc_csv:
-                logger.warning("Falha ao parsear CSV folha: %s", exc_csv)
+                _registrar_erro_parser("parser_csv_folha", exc_csv, diagnostico)
 
         # SPED Domínio Contábil — ECD (lançamentos) e EFD-Contribuições (PIS/COFINS)
         ecd_data = None
@@ -1042,14 +1135,14 @@ async def analise_pdf(
                 # Parse só o primeiro — múltiplos ECDs em um request é improvável
                 ecd_data = parsear_sped_ecd(conteudos_sped_ecd[0])
             except Exception as exc_ecd:
-                logger.warning("Falha ao parsear SPED ECD: %s", exc_ecd)
+                _registrar_erro_parser("parser_sped_ecd", exc_ecd, diagnostico)
 
         if conteudos_sped_efd_contrib:
             try:
                 from parsers.sped_efd_contrib import parsear_sped_efd_contrib
                 efd_contrib_data = parsear_sped_efd_contrib(conteudos_sped_efd_contrib[0])
             except Exception as exc_efd:
-                logger.warning("Falha ao parsear SPED EFD-Contrib: %s", exc_efd)
+                _registrar_erro_parser("parser_sped_efd_contrib", exc_efd, diagnostico)
 
         # Auditoria: persistir XMLs, CSVs e SPEDs também (cifrar + registrar)
         for conteudo_extra, nome_extra, mime_extra in (
@@ -1083,7 +1176,10 @@ async def analise_pdf(
                             aceito_ip=ip_origem,
                         )
             except Exception as exc_audit:
-                logger.warning("Falha ao auditar arquivo extra %s: %s", nome_extra, exc_audit)
+                # Passa o nome do arquivo como parte da origem para rastreabilidade.
+                _registrar_erro_parser(
+                    f"auditoria_doc_extra:{nome_extra}", exc_audit, diagnostico,
+                )
 
         # Registra termo de aceite para PDFs persistidos (LGPD Art. 37)
         ip_origem = request.client.host if request.client else None
@@ -1102,7 +1198,7 @@ async def analise_pdf(
                             aceito_ip=ip_origem,
                         )
             except Exception as exc_aceite:
-                logger.warning("Falha ao registrar termo de aceite: %s", exc_aceite)
+                _registrar_erro_parser("termo_aceite_lgpd", exc_aceite, diagnostico)
 
         # Adicionar metadados de fontes extra ao diagnóstico
         diagnostico.setdefault("_extracao", {})["fontes_extra"] = {
@@ -1168,7 +1264,17 @@ async def analise_pdf(
             # HMAC removido daqui — assinatura apenas na persistência definitiva
             diagnostico["trilha_auditoria"] = trilha
         except Exception as exc_obs:
-            logger.warning("Falha nas validacoes: %s", exc_obs)
+            # Antes: swallow silencioso. Agora: loga com stack + expõe _erros
+            # ao frontend para diagnóstico transparente (filosofia Zero Trust).
+            logger.warning(
+                "Falha nas validacoes/anomalias em /analise/pdf: %s — %s",
+                type(exc_obs).__name__, exc_obs, exc_info=True,
+            )
+            diagnostico.setdefault("_erros", []).append({
+                "origem": "validacoes_anomalias",
+                "tipo": type(exc_obs).__name__,
+                "mensagem": str(exc_obs),
+            })
 
         return JSONResponse(content=_serializar_decimal(payload))
 

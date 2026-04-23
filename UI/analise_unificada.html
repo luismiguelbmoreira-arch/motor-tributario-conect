@@ -361,7 +361,14 @@
         // Mostra UI de loading (animação de logs fake) em paralelo ao fetch real
         processAnalysis();
         try {
-          const resp = await mcFetch('/analise/pdf', { method: 'POST', body: formData });
+          // ERR-020 — timeout 3min: upload (até 1GB) + Claude Vision (10-40s/doc) +
+          // parsers XML/CSV/SPED + cifragem AES-256-GCM. 30s (default) abortava
+          // cliente com backend ainda gravando auditoria_documentos → registros órfãos.
+          const resp = await mcFetch('/analise/pdf', {
+            method: 'POST',
+            body: formData,
+            timeout: 180000,
+          });
           if (!resp.ok) {
             const detalhe = await resp.text();
             throw new Error('HTTP ' + resp.status + ': ' + detalhe.slice(0, 200));

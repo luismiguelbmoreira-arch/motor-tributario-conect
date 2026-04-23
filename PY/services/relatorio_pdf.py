@@ -351,6 +351,8 @@ def _gerar_html(diagnostico: dict, pii: dict | None = None) -> str:
 
 {_secao_decisao_opt_out(diagnostico)}
 
+{_secao_eventos_pipeline(diagnostico)}
+
 
 <!-- Rodapé -->
 <div class="footer">
@@ -361,6 +363,112 @@ def _gerar_html(diagnostico: dict, pii: dict | None = None) -> str:
 
 </body>
 </html>"""
+
+
+def _secao_eventos_pipeline(diagnostico: dict) -> str:
+    """
+    Gera a seção 'Eventos de Pipeline (Integridade da Trilha)' — ERR-023.
+
+    Renderiza os eventos não-fatais capturados durante o processamento:
+      - `_anomalias`: alertas do módulo `validacoes.detectar_anomalias`
+      - `_erros`: falhas de parser registradas por `_registrar_erro_parser`
+        (origem + tipo da exception + mensagem)
+
+    Por que essa seção existe:
+      O contador que entrega o PDF ao fisco precisa que "ausência de erro"
+      também seja prova. Se o pipeline rodou sem ressalvas, a seção imprime
+      linha explícita "Nenhum evento registrado". Se houve erro, ele aparece
+      com amparo legal para que o auditor externo possa rastrear.
+
+    Amparo legal:
+      - CTN Art. 142 — motivação do lançamento tributário
+      - LGPD Art. 37 — registro de operações de tratamento
+      - LC 214/2025 Art. 45 §3º — integridade da trilha de apuração IBS/CBS
+    """
+    anomalias = diagnostico.get("_anomalias") or []
+    erros = diagnostico.get("_erros") or []
+
+    # Render cards de anomalia (nivel + titulo + detalhe + amparo)
+    anomalias_html = ""
+    for alerta in anomalias:
+        if not isinstance(alerta, dict):
+            continue
+        tipo_a = _esc(alerta.get("tipo") or alerta.get("id") or "ANOMALIA")
+        titulo_a = _esc(alerta.get("titulo") or alerta.get("id") or "Anomalia")
+        detalhe_a = _esc(alerta.get("detalhe") or alerta.get("mensagem") or "")
+        amparo_a = _esc(alerta.get("amparo_legal") or "")
+        anomalias_html += f"""
+        <div style="background:#fffbeb;border-left:3px solid #f59e0b;padding:8px 12px;margin-bottom:6px;border-radius:0 4px 4px 0;">
+          <div style="font-weight:700;font-size:10px;color:#92400e;text-transform:uppercase;letter-spacing:.03em;margin-bottom:3px;">{tipo_a} — {titulo_a}</div>
+          {f'<div style="font-size:10px;color:#78350f;line-height:1.5;">{detalhe_a}</div>' if detalhe_a else ''}
+          {f'<div style="font-size:9px;color:#a16207;margin-top:3px;">⚖ {amparo_a}</div>' if amparo_a else ''}
+        </div>"""
+
+    # Render cards de erro de parser (origem + tipo + mensagem)
+    erros_html = ""
+    for erro in erros:
+        if not isinstance(erro, dict):
+            continue
+        origem_e = _esc(erro.get("origem") or "desconhecido")
+        tipo_e = _esc(erro.get("tipo") or "Exception")
+        msg_e = _esc(erro.get("mensagem") or "")
+        erros_html += f"""
+        <div style="background:#fef2f2;border-left:3px solid #dc2626;padding:8px 12px;margin-bottom:6px;border-radius:0 4px 4px 0;">
+          <div style="font-weight:700;font-size:10px;color:#991b1b;text-transform:uppercase;letter-spacing:.03em;margin-bottom:3px;">{origem_e} — {tipo_e}</div>
+          {f'<div style="font-size:10px;color:#7f1d1d;line-height:1.5;font-family:monospace;">{msg_e}</div>' if msg_e else ''}
+        </div>"""
+
+    # Caso "pipeline limpo" — prova positiva de ausência de falhas (CTN Art. 142).
+    if not anomalias_html and not erros_html:
+        corpo = (
+            '<div style="background:#f0fdf4;border-left:3px solid #10b981;'
+            'padding:10px 14px;border-radius:0 4px 4px 0;">'
+            '<div style="font-weight:700;font-size:11px;color:#065f46;margin-bottom:2px;">'
+            '✓ Pipeline executado sem ressalvas</div>'
+            '<div style="font-size:10px;color:#047857;line-height:1.5;">'
+            'Nenhuma anomalia detectada em <code>_anomalias</code> nem falha registrada '
+            'em <code>_erros</code>. Registro de ausência também é prova — CTN Art. 142, '
+            'LGPD Art. 37, LC 214/2025 Art. 45 §3º.'
+            '</div></div>'
+        )
+    else:
+        partes = []
+        if anomalias_html:
+            partes.append(
+                '<h3 style="margin-top:10px;">Anomalias detectadas '
+                f'<span style="font-weight:400;color:#6b7280;font-size:10px;">({len(anomalias)})</span></h3>'
+                + anomalias_html
+            )
+        else:
+            partes.append(
+                '<h3 style="margin-top:10px;">Anomalias detectadas</h3>'
+                '<p style="font-size:10px;color:#6b7280;margin-bottom:8px;">'
+                'Nenhuma anomalia registrada.</p>'
+            )
+
+        if erros_html:
+            partes.append(
+                '<h3 style="margin-top:10px;">Erros não-fatais no processamento '
+                f'<span style="font-weight:400;color:#6b7280;font-size:10px;">({len(erros)})</span></h3>'
+                + erros_html
+            )
+        else:
+            partes.append(
+                '<h3 style="margin-top:10px;">Erros não-fatais no processamento</h3>'
+                '<p style="font-size:10px;color:#6b7280;margin-bottom:8px;">'
+                'Nenhum erro registrado.</p>'
+            )
+        corpo = "\n".join(partes)
+
+    return f"""
+<!-- Eventos de Pipeline (Integridade da Trilha) — ERR-023 -->
+<h2>Eventos de Pipeline — Integridade da Trilha</h2>
+<p style="font-size:10px;color:#6b7280;margin-bottom:8px;">
+  Registro auditável de anomalias e falhas não-fatais capturadas durante o
+  processamento. Ausência de eventos também é prova (CTN Art. 142 + LGPD Art. 37).
+</p>
+{corpo}
+"""
 
 
 def _secao_decisao_opt_out(diagnostico: dict) -> str:

@@ -1,7 +1,7 @@
 import logging
 from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from auth import (
     criar_usuario,
@@ -16,8 +16,10 @@ logger = logging.getLogger("motor_conect.api")
 router = APIRouter(prefix="/admin/usuarios", tags=["admin"])
 
 class CriarUsuarioRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     username: str
-    email: str
+    email: EmailStr
     password: str
     role: Literal["admin", "usuario"] = "usuario"
 
@@ -31,6 +33,8 @@ class UsuarioResponse(BaseModel):
     ultimo_acesso: Optional[str]
 
 class ResetSenhaRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     nova_senha: str = Field(..., min_length=8, description="Nova senha (mínimo 8 caracteres)")
 
 @router.post("", response_model=UsuarioResponse)

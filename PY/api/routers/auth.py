@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from auth import (
     autenticar_usuario,
@@ -16,6 +16,8 @@ logger = logging.getLogger("motor_conect.api")
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 class LoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     username: str
     password: str
 
@@ -27,6 +29,8 @@ class LoginResponse(BaseModel):
     must_change_password: bool = False
 
 class TrocarSenhaRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     senha_atual: str = Field(..., min_length=1)
     nova_senha: str = Field(..., min_length=8)
 

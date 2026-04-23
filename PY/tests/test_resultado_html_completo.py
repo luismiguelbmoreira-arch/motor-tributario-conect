@@ -197,11 +197,16 @@ class TestBotaoDossie:
         assert "Nenhum documento de auditoria" in html
 
     def test_tratamento_401_limpa_sessao(self, html):
-        # Busca especificamente na DEFINIÇÃO da função (async function)
+        # Fase 2 — Contratos Blindados: 401 é tratado GLOBALMENTE em mcFetch
+        # (UI/components.js). A função só precisa usar mcFetch — a limpeza
+        # de sessionStorage + redirect pro login ficam no helper.
         idx = html.find("async function baixarDossieProva")
         bloco = html[idx:idx + 3000]
-        assert "status === 401" in bloco
-        assert "sessionStorage.clear" in bloco
+        assert "mcFetch(" in bloco, (
+            "Função deve chamar mcFetch (helper que trata 401 globalmente), não fetch() direto."
+        )
+        # components.js é a fonte única de limpeza de sessão em 401
+        assert 'src="components.js"' in html
 
     def test_funcao_mostrar_botao_dossie(self, html):
         assert "function mostrarBotaoDossie" in html

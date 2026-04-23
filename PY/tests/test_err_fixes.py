@@ -97,7 +97,6 @@ def empresa_simples():
 @pytest.fixture
 def compradora():
     return EmpresaCompradora(
-        razao_social="COMPRADORA TESTE",
         tipo="B2B_CONTRIBUINTE",
         uf_destino="SP",
     )
@@ -303,7 +302,6 @@ class TestERR016ReducaoCBSIBS:
             anexo_simples="I",
         )
         compradora = EmpresaCompradora(
-            razao_social="COMPRADORA",
             tipo="B2B_CONTRIBUINTE",
             uf_destino="SP",
         )

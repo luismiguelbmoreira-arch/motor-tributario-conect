@@ -9,7 +9,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any, List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from validadores import validar_cnpj, validar_cnae, validar_ncm, validar_uf
 import re
 
@@ -20,6 +20,8 @@ class Atividade(BaseModel):
     Atividade individual do PGDAS-D para empresas multi-atividade.
     LC 123/2006, Art. 18, §§ 1º e 3º — cada atividade tributada no Anexo correto.
     """
+    model_config = ConfigDict(extra="forbid")
+
     receita: Decimal = Field(..., gt=Decimal("0"), description="Receita desta atividade no mês (RPA parcial)")
     anexo: Literal["I", "II", "III", "IV", "V"] = Field(..., description="Anexo Simples desta atividade")
     icms_st: bool = Field(default=False, description="ICMS retido por ST — zerado no DAS desta parcela")
@@ -37,6 +39,8 @@ class EmpresaFornecedora(BaseModel):
     """
     Dados do emitente (cliente do escritório — fornecedor na cadeia B2B).
     """
+    model_config = ConfigDict(extra="forbid")
+
     cnpj: str = Field(..., description="CNPJ com ou sem pontuação")
     razao_social: str = Field(..., min_length=2, description="Razão social completa")
     regime: Literal["SIMPLES", "PRESUMIDO", "REAL", "MEI"] = Field(..., description="Regime tributário")
@@ -102,6 +106,8 @@ class EmpresaCompradora(BaseModel):
     """
     Dados do destinatário (comprador).
     """
+    model_config = ConfigDict(extra="forbid")
+
     tipo: Literal["B2B_CONTRIBUINTE", "B2C_CONSUMIDOR_FINAL", "MISTO"] = Field(
         ..., description="Tipo do comprador"
     )
@@ -124,6 +130,8 @@ class OperacaoFiscal(BaseModel):
     """
     Dados da operação tributária transicional.
     """
+    model_config = ConfigDict(extra="forbid")
+
     data_emissao: date = Field(...)
     valor_operacao: Decimal = Field(..., gt=Decimal("0"))
     ncm_nbs: str = Field(..., description="NCM/NBS (8 dígitos)")

@@ -125,9 +125,9 @@
     if (!btn) return;
     btn.addEventListener('click', function (e) {
       e.preventDefault();
-      sessionStorage.removeItem('token');
-      sessionStorage.removeItem('username');
-      sessionStorage.removeItem('role');
+      // ERR-019 — LGPD Art. 46: limpa TUDO (inclui analise_empresa, analise_cnpj,
+      // diagnostico). removeItem campo a campo deixava PII do cliente anterior.
+      sessionStorage.clear();
       window.location.href = 'login.html';
     });
   }
@@ -167,15 +167,78 @@
     setTimeout(function () { toast.remove(); }, 4000);
   };
 
-  // ─── API helper (token automático) ────────────────────────────────
-  window.mcFetch = function (url, options) {
+  // ─── API helper único — JWT + 401 global + timeout + erro de rede ────
+  //
+  // Todo fetch da UI passa por aqui. Garante:
+  //   1. Authorization: Bearer <JWT> injetado de sessionStorage.token.
+  //   2. 401 → limpa sessão e redireciona para login.html (sem laço de refresh).
+  //   3. Timeout default 30s via AbortController (override em options.timeout).
+  //   4. Erro de rede (offline, DNS, CORS) → rejeita com mensagem amigável,
+  //      sem derrubar a página com TypeError cru.
+  //
+  // Uso:
+  //   const res = await mcFetch('/auth/me');
+  //   if (!res.ok) { ... }
+  //   const data = await res.json();
+  //
+  //   // override de timeout:
+  //   await mcFetch('/analise/pdf', { method: 'POST', body: fd, timeout: 120000 });
+  //
+  //   // opt-out do redirect global (ex.: tela de login):
+  //   await mcFetch('/auth/login', { method: 'POST', body: ..., skipAuthRedirect: true });
+  window.mcFetch = async function (url, options) {
     options = options || {};
     options.headers = options.headers || {};
+
     const token = sessionStorage.getItem('token');
-    if (token) {
+    if (token && !options.headers['Authorization']) {
       options.headers['Authorization'] = 'Bearer ' + token;
     }
-    return fetch(url, options);
+
+    const timeoutMs = typeof options.timeout === 'number' ? options.timeout : 30000;
+    const skipAuthRedirect = options.skipAuthRedirect === true;
+    // Remove chaves custom antes de repassar ao fetch nativo
+    delete options.timeout;
+    delete options.skipAuthRedirect;
+
+    const controller = new AbortController();
+    const externalSignal = options.signal;
+    options.signal = controller.signal;
+    const timer = setTimeout(function () { controller.abort(); }, timeoutMs);
+    // Se o chamador passou um signal próprio, encadeia abort
+    if (externalSignal) {
+      if (externalSignal.aborted) controller.abort();
+      else externalSignal.addEventListener('abort', function () { controller.abort(); });
+    }
+
+    let response;
+    try {
+      response = await fetch(url, options);
+    } catch (err) {
+      clearTimeout(timer);
+      if (err && err.name === 'AbortError') {
+        const timeoutErr = new Error('Tempo esgotado ao contatar o servidor (' + Math.round(timeoutMs / 1000) + 's).');
+        timeoutErr.code = 'TIMEOUT';
+        throw timeoutErr;
+      }
+      const netErr = new Error('Falha de rede ao contatar o servidor. Verifique sua conexão.');
+      netErr.code = 'NETWORK';
+      netErr.cause = err;
+      throw netErr;
+    }
+    clearTimeout(timer);
+
+    // 401 global → sessão morta. Limpa TUDO e manda pro login.
+    // ERR-019 — LGPD Art. 46: removeItem campo a campo deixava analise_empresa,
+    // analise_cnpj e diagnostico vivos → vazamento de PII entre contas no
+    // mesmo browser. sessionStorage.clear() é atômico e não esquece chave.
+    if (response.status === 401 && !skipAuthRedirect) {
+      sessionStorage.clear();
+      if (currentPage() !== 'login.html') {
+        window.location.href = 'login.html';
+      }
+    }
+    return response;
   };
 
   // ─── Submit lock (anti duplo-clique + spinner seguro) ─────────────

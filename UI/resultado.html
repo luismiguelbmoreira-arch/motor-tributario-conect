@@ -6,6 +6,7 @@
   <title>Parecer de Conformidade Tributária — Motor Tributário Conect</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="components.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
@@ -1191,15 +1192,8 @@
 
       try {
         const url = `/auditoria/prova/cnpj/${cnpjDigitos}?motivo=${encodeURIComponent(motivo.trim())}`;
-        const resp = await fetch(window.location.origin + url, {
-          headers: { 'Authorization': 'Bearer ' + token },
-        });
-        if (resp.status === 401) {
-          alert('Sessão expirada. Faça login novamente.');
-          sessionStorage.clear();
-          window.location.href = 'login.html';
-          return;
-        }
+        // mcFetch injeta JWT e trata 401 globalmente (redireciona pro login)
+        const resp = await mcFetch(window.location.origin + url, { timeout: 60000 });
         if (resp.status === 404) {
           alert('Nenhum documento de auditoria encontrado para este CNPJ. O dossiê só é gerado para diagnósticos feitos via upload de PDFs.');
           return;
@@ -1710,21 +1704,13 @@
       };
 
       try {
-        const response = await fetch(window.location.origin + '/relatorio/pdf', {
+        // mcFetch: JWT automático + 401 global + timeout 60s para renderização WeasyPrint
+        const response = await mcFetch(window.location.origin + '/relatorio/pdf', {
           method: 'POST',
-          headers: {
-            'Authorization': 'Bearer ' + token,
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ diagnostico, pii }),
+          timeout: 60000,
         });
-
-        if (response.status === 401) {
-          alert('Sua sessão expirou. Faça login novamente para continuar.');
-          sessionStorage.clear();
-          window.location.href = 'login.html';
-          return;
-        }
 
         if (!response.ok) {
           throw new Error('Falha ao gerar PDF');
