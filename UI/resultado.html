@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Diagnóstico Fiscal — Motor Tributário Conect</title>
+  <title>Parecer de Conformidade Tributária — Motor Tributário Conect</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
@@ -77,9 +77,9 @@
       <div class="flex items-center gap-2 flex-wrap">
         <button id="btn-nova-analise"
                 onclick="confirmarNovaAnalise()"
-                title="Iniciar uma nova análise (a atual será descartada)"
+                title="Iniciar nova auditoria (análise atual será encerrada)"
                 class="focus-ring inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition-colors">
-          Nova Análise
+          Nova Auditoria
         </button>
         <button id="btn-baixar-pdf"
                 onclick="downloadPDF()"
@@ -109,7 +109,7 @@
     <div class="fade-in">
       <div class="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Diagnóstico Fiscal</p>
+          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Parecer de Conformidade Tributária</p>
           <h1 class="text-3xl font-semibold text-slate-900" id="header-empresa">--</h1>
           <p class="text-sm text-slate-500 mt-1" id="header-data-calculo">--</p>
         </div>
@@ -122,13 +122,13 @@
 
     <!-- ANOMALIAS (Akita Rails) — só aparece se houver alertas -->
     <div id="anomalias-panel" class="hidden border-l-4 border-amber-500 bg-amber-50 p-4 rounded-r">
-      <h3 class="font-bold text-amber-900">⚠ Anomalias detectadas — revisar antes de usar</h3>
+      <h3 class="font-bold text-amber-900">⚠ Inconsistências Identificadas — Validação Recomendada</h3>
       <ul id="anomalias-lista" class="mt-2 space-y-2 text-sm"></ul>
     </div>
 
     <!-- SEMÁFORO DAS (calc vs pago) -->
     <div id="semaforo-das-panel" class="hidden border-l-4 p-4 rounded-r">
-      <h3 id="semaforo-das-titulo" class="font-bold">Semáforo DAS</h3>
+      <h3 id="semaforo-das-titulo" class="font-bold">Status de Conformidade DAS</h3>
       <p id="semaforo-das-interpretacao" class="text-sm mt-1"></p>
       <p id="semaforo-das-amparo" class="text-xs mt-1 opacity-70"></p>
     </div>
@@ -763,7 +763,7 @@
       };
       panel.className = 'border-l-4 p-4 rounded-r ' + (cores[sem.semaforo] || cores.amarelo);
       document.getElementById('semaforo-das-titulo').textContent =
-        '🚦 Semáforo DAS: ' + sem.semaforo.toUpperCase();
+        'Status DAS: ' + sem.semaforo.toUpperCase();
       document.getElementById('semaforo-das-interpretacao').textContent =
         sem.interpretacao || sem.detalhe || '';
       document.getElementById('semaforo-das-amparo').textContent = sem.amparo_legal || '';
@@ -779,7 +779,7 @@
 
       const agora = new Date();
       document.getElementById('header-data-calculo').textContent =
-        'Diagnóstico gerado em ' + agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        'Parecer emitido em ' + agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
       const regime = d.regime || d.empresa?.regime || '--';
       document.getElementById('header-regime-badge').textContent = regime;
@@ -1063,7 +1063,7 @@
       card.className = `border-2 ${cor.border} ${cor.bg} rounded-xl p-5 mb-4`;
       const tituloEl = document.getElementById('optout-diagnostico-titulo');
       tituloEl.className = `text-sm font-bold mb-2 uppercase tracking-wider ${cor.text}`;
-      tituloEl.innerHTML = '📋 Diagnóstico personalizado: ' + tituloRec;
+      tituloEl.innerHTML = 'Parecer Técnico: ' + tituloRec;
       document.getElementById('optout-diagnostico-justificativa').innerHTML = justificativa;
 
       if (amparoRec) {
@@ -1511,8 +1511,8 @@
       if (tiposAlerta.some(function (t) { return t.includes('B2B') || t.includes('IVA'); })) {
         servicos.push({
           icone: '🔍',
-          titulo: 'Diagnóstico de Impacto Tributário 2026',
-          descricao: 'Análise detalhada do CBS/IBS nas operações B2B da empresa',
+          titulo: 'Análise de Impacto Tributário — Transição IVA 2026-2033',
+          descricao: 'Memória de cálculo CBS/IBS nas operações B2B — LC 214/2025, Art. 47',
         });
       }
 
@@ -1669,9 +1669,9 @@
     // ─────────────────────────────────────────────
     function confirmarNovaAnalise() {
       const ok = window.confirm(
-        'Iniciar uma nova análise?\n\n' +
-        'A análise atual será descartada. ' +
-        'Se precisar consultá-la, baixe o PDF antes de continuar.'
+        'Iniciar nova auditoria?\n\n' +
+        'O parecer atual será encerrado. ' +
+        'Se necessário para registro, exporte o PDF antes de prosseguir.'
       );
       if (ok) {
         sessionStorage.removeItem('diagnostico');

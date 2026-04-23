@@ -138,8 +138,8 @@
         <!-- FASE 1: ESCOLHA DO MODO -->
         <section id="phase-1" class="phase active">
           <div class="mb-8">
-            <h2 class="text-h1">Como deseja iniciar?</h2>
-            <p class="text-body text-muted">Selecione o método de entrada de dados para a auditoria.</p>
+            <h2 class="text-h1">Método de Entrada</h2>
+            <p class="text-body text-muted">Selecione o método de entrada de dados para auditoria fiscal.</p>
           </div>
 
           <div class="flex-row gap-6 mb-12">
@@ -147,16 +147,16 @@
               <div style="background: rgba(10, 132, 255, 0.1); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem;">
                 <i data-lucide="sparkles" style="color: var(--color-blue-500);"></i>
               </div>
-              <h3 class="text-h2" style="font-size: 1.1rem; margin-bottom: 0.5rem;">Análise Inteligente</h3>
-              <p class="text-body text-muted" style="font-size: 0.85rem;">Extraia dados automaticamente de PDFs do e-CAC e XMLs de faturamento via IA.</p>
+              <h3 class="text-h2" style="font-size: 1.1rem; margin-bottom: 0.5rem;">Extração Automática</h3>
+              <p class="text-body text-muted" style="font-size: 0.85rem;">Extração de PGDAS-D, DAS e XMLs de faturamento. Motor aplica LC 123/2006 e LC 214/2025.</p>
             </div>
 
             <div class="mode-card" onclick="selectMode('manual')" id="mode-manual">
               <div style="background: rgba(255, 255, 255, 0.05); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem;">
                 <i data-lucide="keyboard" style="color: var(--text-secondary);"></i>
               </div>
-              <h3 class="text-h2" style="font-size: 1.1rem; margin-bottom: 0.5rem;">Entrada Manual</h3>
-              <p class="text-body text-muted" style="font-size: 0.85rem;">Deseja apenas simular um cenário rápido? Informe os valores manualmente.</p>
+              <h3 class="text-h2" style="font-size: 1.1rem; margin-bottom: 0.5rem;">Simulação Manual</h3>
+              <p class="text-body text-muted" style="font-size: 0.85rem;">Informe os parâmetros fiscais manualmente para simulação de diagnóstico tributário.</p>
             </div>
           </div>
 
@@ -170,7 +170,7 @@
           <div id="input-content"></div>
           <div class="flex-row justify-between mt-12 pt-6 border-t" style="border-color: var(--border-subtle);">
             <button class="btn btn-ghost" onclick="goToPhase(1)">Voltar</button>
-            <button class="btn btn-primary" id="btn-processar" onclick="processAnalysis()">Iniciar Diagnóstico</button>
+            <button class="btn btn-primary" id="btn-processar" onclick="processAnalysis()">Processar Documentação Fiscal</button>
           </div>
         </section>
 
@@ -178,8 +178,8 @@
         <section id="phase-loading" class="phase">
           <div class="flex-col items-center justify-center py-20 text-center">
             <div class="spinner" style="width: 64px; height: 64px; border-width: 4px; margin-bottom: 2rem;"></div>
-            <h2 class="text-h1">Processando Auditoria...</h2>
-            <p class="text-body text-muted mb-8">O Motor Universal está aplicando as regras da LC 123/2006 e LC 214/2025.</p>
+            <h2 class="text-h1">Processando — Motor Tributário Conect</h2>
+            <p class="text-body text-muted mb-8">Aplicando LC 123/2006, LC 214/2025 e tabelas de transição IVA 2026-2033.</p>
             
             <div class="glass-card mx-auto" style="max-width: 400px; width: 100%; padding: 1rem; text-align: left;">
               <div id="engine-logs" class="text-body" style="font-family: monospace; font-size: 0.75rem; color: var(--color-green-500);">
@@ -240,6 +240,18 @@
             <input type="file" id="file-input" multiple style="display: none;">
           </div>
           <div id="file-list" class="mt-6 flex-col gap-2"></div>
+
+          <div id="termo-aceite-section" class="mt-6 p-4 rounded-xl" style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-subtle);">
+            <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer;">
+              <input type="checkbox" id="termo-aceite-checkbox" onchange="updateSubmitButton()" style="margin-top: 3px; flex-shrink: 0;">
+              <span class="text-body" style="font-size: 0.875rem; line-height: 1.5;">
+                Declaro que sou responsável pelos documentos enviados e autorizo seu processamento para fins de análise tributária.<br>
+                <strong>CTN Art. 142</strong> — constituição do crédito tributário exige prova documental.
+                <strong>LGPD Art. 37</strong> — manutenção de registro de operações de tratamento.
+              </span>
+            </label>
+          </div>
+          <div id="submit-hint" class="mt-2" style="font-size: 0.8rem; color: var(--text-secondary);"></div>
         `;
       } else {
         container.innerHTML = `
@@ -275,11 +287,11 @@
       document.querySelectorAll('.phase').forEach(p => p.classList.remove('active'));
       document.getElementById('phase-loading').classList.add('active');
       const logs = [
-        "> Extraindo metadados fiscais...",
-        "> Identificando divergências RBT12 vs DAS...",
-        "> Simulando transição CBS (8.8%) e IBS (17.7%)...",
-        "> Calculando Delta de Opt-Out...",
-        "> Diagnóstico Concluído. Gerando insights."
+        "> Extraindo parâmetros fiscais — RBT12, CNAE, Anexo...",
+        "> Identificando divergências entre DAS calculado e DAS pago...",
+        "> Aplicando cronograma CBS/IBS 2026-2033 — LC 214/2025 Art. 348...",
+        "> Calculando diferencial tributário — cenário Opt-Out (Arts. 41-44 LC 214/2025)...",
+        "> Parecer Técnico Finalizado — bases LC 123/2006 e LC 214/2025 aplicadas."
       ];
       let i = 0;
       const logContainer = document.getElementById('engine-logs');
@@ -294,14 +306,69 @@
       }, 1000);
     }
 
+    function updateSubmitButton() {
+      const termoCheckbox = document.getElementById('termo-aceite-checkbox');
+      const fileInput = document.getElementById('file-input');
+      const btn = document.getElementById('btn-processar');
+      const hint = document.getElementById('submit-hint');
+      const temArquivos = fileInput && fileInput.files && fileInput.files.length > 0;
+      const termoOk = termoCheckbox && termoCheckbox.checked;
+
+      if (!temArquivos) {
+        if (hint) hint.textContent = 'Selecione ao menos um documento para continuar.';
+        if (btn) btn.disabled = true;
+      } else if (!termoOk) {
+        if (hint) hint.textContent = 'Aceite o termo de uso para prosseguir.';
+        if (btn) btn.disabled = true;
+      } else {
+        if (hint) hint.textContent = 'Tudo pronto! Clique em Iniciar Diagnóstico.';
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function submitFiles() {
+      const termoCheckbox = document.getElementById('termo-aceite-checkbox');
+      if (!termoCheckbox || !termoCheckbox.checked) {
+        alert('Aceite o termo de uso antes de enviar.');
+        return;
+      }
+      const fileInput = document.getElementById('file-input');
+      if (!fileInput || !fileInput.files.length) return;
+
+      const formData = new FormData();
+      for (const file of fileInput.files) formData.append('files', file);
+      formData.append('termo_aceite', 'true');
+
+      try {
+        processAnalysis();
+        const resp = await fetch('/analise/pdf', { method: 'POST', body: formData,
+          headers: { 'Authorization': 'Bearer ' + (sessionStorage.getItem('token') || '') } });
+        const payload = await resp.json();
+
+        // Extrai PII do envelope separado (payload.pii.cnpj / pii.razao_social)
+        const pii = payload.pii || {};
+        const analise_empresa = pii.razao_social || '—';
+        const analise_cnpj = pii.cnpj || '—';
+
+        if (payload.pii) {
+          sessionStorage.setItem('analise_empresa', analise_empresa);
+          sessionStorage.setItem('analise_cnpj', analise_cnpj);
+        }
+
+        finishAnalysis(payload.diagnostico || payload);
+      } catch (err) {
+        console.error('Erro ao processar arquivos:', err);
+      }
+    }
+
     function finishAnalysis() {
       goToPhase(3);
       const content = document.getElementById('result-content');
       content.innerHTML = `
         <div class="flex-row justify-between items-start mb-10">
           <div>
-            <h2 class="text-h1">Diagnóstico Concluído</h2>
-            <p class="text-success" style="font-weight: 600;">Economia Estimada: R$ 42.900/ano no cenário Opt-Out</p>
+            <h2 class="text-h1">Análise Concluída — Parecer de Conformidade Fiscal</h2>
+            <p class="text-success" style="font-weight: 600;">Diferencial Fiscal Anualizado (Cenário Opt-Out IVA): R$ 42.900 — LC 214/2025, Arts. 41-44</p>
           </div>
           <button class="btn btn-primary"><i data-lucide="download"></i> Exportar PDF</button>
         </div>
@@ -316,8 +383,8 @@
            </div>
         </div>
         <div class="glass-card mt-8">
-          <h3 class="text-h2 mb-4">Parecer do Auditor</h3>
-          <p class="text-body">A empresa apresenta um volume expressivo de vendas B2B (85%). Neste cenário, a manutenção no Simples Nacional Puro após 2027 acarretará perda de competitividade, visto que seus clientes não poderão creditar o IVA integralmente. <strong>Recomendamos migração para o Opt-Out IVA.</strong></p>
+          <h3 class="text-h2 mb-4">Parecer Técnico</h3>
+          <p class="text-body">A composição de receitas B2B (85%) configura cenário de creditamento integral de IVA não aproveitável pelo adquirente no Simples Nacional Puro — LC 214/2025, Art. 47. A partir de 2027, com extinção do PIS/COFINS (CBS plena 8,8%) e início da transição IBS, a permanência no regime atual acarreta vedação ao crédito pelo adquirente contribuinte. <strong>Recomenda-se avaliação de Opt-Out IVA conforme Arts. 41-44 LC 214/2025, com janela até 30/04/2026.</strong></p>
         </div>
       `;
       lucide.createIcons();

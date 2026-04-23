@@ -129,6 +129,9 @@ async def gerar_dossie_prova(
             "  - LGPD Art. 37: registro de operacoes de tratamento",
             "  - CTN Art. 173: prazo decadencial de 5 anos",
             "  - CTN Art. 142: constituicao do credito exige prova documental",
+            "",
+            "Verificacao de integridade:",
+            "  sha256sum originais/*.pdf  # deve bater com as linhas em HASHES.txt",
         ]
         zf.writestr("README.txt", "\n".join(readme).encode("utf-8"))
 

@@ -26,6 +26,7 @@ os.environ.setdefault("MOTOR_CONECT_MASTER_KEY", "0" * 64)
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 import database  # noqa: E402
+import database.connection as db_connection  # noqa: E402
 import services.storage_cifrado as storage_cifrado  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
@@ -48,6 +49,7 @@ def iso(tmp_path, monkeypatch):
     )
     SQLModel.metadata.create_all(engine)
     monkeypatch.setattr(database, "engine", engine)
+    monkeypatch.setattr(db_connection, "engine", engine)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-fake")
     yield
 
@@ -265,7 +267,7 @@ class TestHtmlTermoAceite:
     @pytest.fixture
     def html(self):
         from pathlib import Path
-        path = Path(__file__).resolve().parent.parent.parent / "UI" / "analise_pdf.html"
+        path = Path(__file__).resolve().parent.parent.parent / "UI" / "analise_unificada.html"
         return path.read_text(encoding="utf-8")
 
     def test_secao_termo_existe(self, html):

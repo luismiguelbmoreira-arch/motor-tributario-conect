@@ -474,12 +474,6 @@ def perfil_cnae(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ENDPOINTS — Otimização de Planejamento Documental (Novo Core)
-# ─────────────────────────────────────────────────────────────────────────────
-
-# Futuramente, as rotas que consomem o planejamento_tributario.py serão injetadas aqui.
-
-# ─────────────────────────────────────────────────────────────────────────────
 # ENDPOINTS — Dashboard Summary (preparação para o novo frontend)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -499,13 +493,7 @@ def dashboard_summary(_current_user: dict = Depends(get_current_user)):
             "recent_audits": []
         }
 
-    # Dados de integração externa (Nibo/Sieg) ainda mockados (fase futura)
-    metrics["nibo_sync"] = [
-        {"nome": "Organização Moreira (Matriz)", "percentual": 100},
-        {"nome": "Cliente ABC Ltda", "percentual": 75},
-        {"nome": "Varejo Central", "percentual": 32}
-    ]
-    
+    # TODO: nibo_sync — aguarda parceria Nibo
     return metrics
 
 
@@ -1082,8 +1070,8 @@ async def analise_pdf(
                         hash_sha256=hash_doc,
                         empresa_cnpj=cnpj_empresa,
                         nome_original=nome_extra,
-                        mime=mime_extra,
-                        tamanho=len(conteudo_extra),
+                        mime_type=mime_extra,
+                        tamanho_bytes=len(conteudo_extra),
                         storage_path=str(path_cifrado),
                         uploaded_by_user_id=user_id,
                     )

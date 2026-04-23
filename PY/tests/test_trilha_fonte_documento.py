@@ -21,6 +21,7 @@ os.environ.setdefault("MOTOR_CONECT_MASTER_KEY", "0" * 64)
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 import database  # noqa: E402
+import database.connection as db_connection  # noqa: E402
 import services.storage_cifrado as storage_cifrado  # noqa: E402
 from services.extrator_pdfs import _inferir_campo_origem  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
@@ -42,6 +43,7 @@ def iso(tmp_path, monkeypatch):
     )
     SQLModel.metadata.create_all(engine)
     monkeypatch.setattr(database, "engine", engine)
+    monkeypatch.setattr(db_connection, "engine", engine)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-fake")
     yield
 

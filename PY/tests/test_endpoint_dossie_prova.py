@@ -24,6 +24,7 @@ os.environ.setdefault("MOTOR_CONECT_MASTER_KEY", "0" * 64)
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 import database  # noqa: E402
+import database.connection as db_connection  # noqa: E402
 import services.storage_cifrado as storage_cifrado  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
@@ -47,6 +48,7 @@ def client(tmp_path, monkeypatch):
     )
     SQLModel.metadata.create_all(engine)
     monkeypatch.setattr(database, "engine", engine)
+    monkeypatch.setattr(db_connection, "engine", engine)
 
     # Mock do get_current_user para pular JWT real nos testes
     from main import app, get_current_user

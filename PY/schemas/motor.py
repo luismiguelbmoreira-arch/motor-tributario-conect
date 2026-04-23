@@ -134,13 +134,29 @@ class OperacaoFiscal(BaseModel):
     forma_recebimento: Literal["DINHEIRO", "PIX_BOLETO", "CARTAO"] = Field(default="PIX_BOLETO")
     rpa_mensal: Optional[Decimal] = Field(default=None, ge=Decimal("0"))
     lucro_real_mensal: Optional[Decimal] = Field(default=None, ge=Decimal("0"))
+    produto_importado: bool = Field(default=False)
     creditos_pis_cofins: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
+    qtd_itens: int = Field(default=1, ge=1, description="Quantidade de itens na NF-e")
+    estorno_realizado: bool = Field(default=False, description="Flag de estorno após Split Payment")
+    data_liquidacao: Optional[date] = Field(
+        default=None,
+        description="Data de liquidação financeira (Split Payment). Deve ser >= data_emissao."
+    )
 
     @model_validator(mode="after")
     def validar_transicao(self):
-        # Validação temporal simples
+        # Período transicional obrigatório — LC 214/2025, Art. 348
         if not (2026 <= self.data_emissao.year <= 2033):
-            logger.warning("Data %s fora do periodo transicional (2026-2033)", self.data_emissao)
+            raise ValueError(
+                f"Data {self.data_emissao} fora do período transicional válido (2026-2033). "
+                "LC 214/2025 vigora apenas nesse intervalo."
+            )
+        # Liquidação não pode ser anterior à emissão
+        if self.data_liquidacao is not None and self.data_liquidacao < self.data_emissao:
+            raise ValueError(
+                f"data_liquidacao ({self.data_liquidacao}) não pode ser anterior à emissão "
+                f"({self.data_emissao}). Verifique a data de liquidação."
+            )
         return self
 
     @field_validator("ncm_nbs")

@@ -34,19 +34,21 @@ class MasterKeyAusente(StorageCifradoError): """Master key não encontrada."""
 class IntegridadeViolada(StorageCifradoError): """Falha na integridade (AES-GCM tag)."""
 
 def _master_key() -> bytes:
-    """Lê master key da env var MOTOR_CONECT_MASTER_KEY."""
+    """Lê master key da env var MOTOR_CONECT_MASTER_KEY. Zero fallback — falha ruidosa."""
     key_hex = os.environ.get("MOTOR_CONECT_MASTER_KEY")
     if not key_hex:
-        # Fallback para JWT_SECRET_KEY se master key não definida explicitamente
-        key_hex = os.environ.get("JWT_SECRET_KEY", "motor-conect-fallback-secret-key-32chars!!")
-    
+        raise MasterKeyAusente(
+            "MOTOR_CONECT_MASTER_KEY não definida. "
+            "Defina a variável de ambiente antes de usar o storage cifrado."
+        )
     try:
         key = bytes.fromhex(key_hex)
     except ValueError:
         key = key_hex.encode("utf-8")
-        
     if len(key) < 32:
-        return (key * (32 // len(key) + 1))[:32]
+        raise MasterKeyAusente(
+            f"MOTOR_CONECT_MASTER_KEY muito curta ({len(key)} bytes). Mínimo: 32 bytes (64 hex chars)."
+        )
     return key[:32]
 
 def _derivar_chave_cnpj(cnpj: str) -> bytes:
@@ -70,6 +72,11 @@ def _path_para(cnpj: str, hash_completo: str) -> Path:
     return STORAGE_ROOT / anonimizar_cnpj(cnpj) / f"{hash_completo[:HASH_TRUNCATE]}.bin"
 
 def cifrar_e_persistir(plaintext: bytes, cnpj: str) -> tuple[str, Path]:
+    if not plaintext:
+        raise StorageCifradoError("plaintext não pode ser vazio.")
+    cnpj_digits = "".join(c for c in cnpj if c.isdigit())
+    if len(cnpj_digits) != 14:
+        raise StorageCifradoError(f"CNPJ inválido: '{cnpj}' — esperado 14 dígitos.")
     hash_completo = hash_documento(plaintext)
     destino = _path_para(cnpj, hash_completo)
 
@@ -95,6 +102,8 @@ def decifrar(path: Path, cnpj: str, hash_esperado: str) -> bytes:
     ciphertext = blob[NONCE_BYTES:]
     chave = _derivar_chave_cnpj(cnpj)
     aesgcm = AESGCM(chave)
+    if not hash_esperado:
+        raise StorageCifradoError("hash_esperado é obrigatório para decifrar.")
     aad = hash_esperado.encode("ascii")
 
     try:
