@@ -178,6 +178,42 @@
     return fetch(url, options);
   };
 
+  // ─── Submit lock (anti duplo-clique + spinner seguro) ─────────────
+  //
+  // Envolve operação async e garante:
+  //   1. Botão desabilitado durante execução (flag reentrante em dataset.locked).
+  //   2. Cliques adicionais ignorados até a promise resolver/rejeitar.
+  //   3. Reabilitação SEMPRE via finally — nenhum erro deixa UI travada.
+  //   4. onStart/onEnd opcionais para spinner, visibility, classes CSS.
+  //
+  // Uso:
+  //   await mcWithSubmitLock('btn-processar', async () => {
+  //     await mcFetch('/analise/pdf', { method: 'POST', body: fd });
+  //   }, { onStart: showSpinner, onEnd: hideSpinner });
+  window.mcWithSubmitLock = async function (btnId, fn, hooks) {
+    hooks = hooks || {};
+    const btn = (typeof btnId === 'string') ? document.getElementById(btnId) : btnId;
+    if (!btn) {
+      // Sem botão: ainda assim roda a função, mas sem lock.
+      return await fn();
+    }
+    if (btn.dataset.mcLocked === '1') {
+      // Já em execução — ignora re-entry. Retorna undefined.
+      return undefined;
+    }
+    btn.dataset.mcLocked = '1';
+    const originalDisabled = btn.disabled;
+    btn.disabled = true;
+    try {
+      if (typeof hooks.onStart === 'function') hooks.onStart();
+      return await fn();
+    } finally {
+      btn.dataset.mcLocked = '0';
+      btn.disabled = originalDisabled;
+      if (typeof hooks.onEnd === 'function') hooks.onEnd();
+    }
+  };
+
   // ─── Boot ─────────────────────────────────────────────────────────
   // Roda assim que o DOM estiver pronto
   if (document.readyState === 'loading') {

@@ -170,7 +170,7 @@
           <div id="input-content"></div>
           <div class="flex-row justify-between mt-12 pt-6 border-t" style="border-color: var(--border-subtle);">
             <button class="btn btn-ghost" onclick="goToPhase(1)">Voltar</button>
-            <button class="btn btn-primary" id="btn-processar" onclick="processAnalysis()">Processar Documentação Fiscal</button>
+            <button class="btn btn-primary" id="btn-processar" onclick="submitFiles()" disabled>Processar Documentação Fiscal</button>
           </div>
         </section>
 
@@ -240,6 +240,18 @@
             <input type="file" id="file-input" multiple style="display: none;">
           </div>
           <div id="file-list" class="mt-6 flex-col gap-2"></div>
+
+          <div class="mt-6 input-group">
+            <label class="input-label" for="tipo-comprador">Perfil do Comprador</label>
+            <select id="tipo-comprador" class="input-field" title="Perfil tributário do cliente final">
+              <option value="B2B_CONTRIBUINTE" selected>B2B — Contribuinte de IVA (empresa)</option>
+              <option value="B2C_CONSUMIDOR_FINAL">B2C — Consumidor final (pessoa física)</option>
+              <option value="MISTO">Misto — B2B e B2C no mesmo período</option>
+            </select>
+            <p class="text-muted" style="font-size: 0.8rem; margin-top: 0.25rem;">
+              Determina direito a crédito de IVA do comprador — LC 214/2025 Arts. 47 e 56; opt-out Arts. 41-44.
+            </p>
+          </div>
 
           <div id="termo-aceite-section" class="mt-6 p-4 rounded-xl" style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-subtle);">
             <label style="display: flex; align-items: flex-start; gap: 0.75rem; cursor: pointer;">
@@ -329,36 +341,45 @@
     async function submitFiles() {
       const termoCheckbox = document.getElementById('termo-aceite-checkbox');
       if (!termoCheckbox || !termoCheckbox.checked) {
-        alert('Aceite o termo de uso antes de enviar.');
+        mcToast('Aceite o termo de uso antes de enviar.', 'error');
         return;
       }
       const fileInput = document.getElementById('file-input');
-      if (!fileInput || !fileInput.files.length) return;
+      if (!fileInput || !fileInput.files.length) {
+        mcToast('Selecione ao menos um documento.', 'error');
+        return;
+      }
+
+      const tipoComprador = (document.getElementById('tipo-comprador') || {}).value || 'B2B_CONTRIBUINTE';
 
       const formData = new FormData();
       for (const file of fileInput.files) formData.append('files', file);
       formData.append('termo_aceite', 'true');
+      formData.append('tipo_comprador', tipoComprador);
 
-      try {
+      await mcWithSubmitLock('btn-processar', async () => {
+        // Mostra UI de loading (animação de logs fake) em paralelo ao fetch real
         processAnalysis();
-        const resp = await fetch('/analise/pdf', { method: 'POST', body: formData,
-          headers: { 'Authorization': 'Bearer ' + (sessionStorage.getItem('token') || '') } });
-        const payload = await resp.json();
+        try {
+          const resp = await mcFetch('/analise/pdf', { method: 'POST', body: formData });
+          if (!resp.ok) {
+            const detalhe = await resp.text();
+            throw new Error('HTTP ' + resp.status + ': ' + detalhe.slice(0, 200));
+          }
+          const payload = await resp.json();
 
-        // Extrai PII do envelope separado (payload.pii.cnpj / pii.razao_social)
-        const pii = payload.pii || {};
-        const analise_empresa = pii.razao_social || '—';
-        const analise_cnpj = pii.cnpj || '—';
+          const pii = payload.pii || {};
+          if (pii.razao_social) sessionStorage.setItem('analise_empresa', pii.razao_social);
+          if (pii.cnpj) sessionStorage.setItem('analise_cnpj', pii.cnpj);
 
-        if (payload.pii) {
-          sessionStorage.setItem('analise_empresa', analise_empresa);
-          sessionStorage.setItem('analise_cnpj', analise_cnpj);
+          finishAnalysis(payload.diagnostico || payload);
+        } catch (err) {
+          // Loga neutro (sem vazar stack/PII) e volta o usuário pra fase de input
+          console.error('motor-conect: falha ao processar documentos');
+          mcToast('Não foi possível processar os documentos. Tente novamente.', 'error');
+          goToPhase(2);
         }
-
-        finishAnalysis(payload.diagnostico || payload);
-      } catch (err) {
-        console.error('Erro ao processar arquivos:', err);
-      }
+      });
     }
 
     function finishAnalysis() {

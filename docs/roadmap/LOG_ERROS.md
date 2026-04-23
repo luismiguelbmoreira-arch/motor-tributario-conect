@@ -351,6 +351,45 @@ Implementação da classe `Atividade` e suporte a loop em `calcular_das_mensal()
 
 ---
 
+### ERR-013 — /integracoes/ecac/sync não valida ownership de CNPJ (IDOR horizontal)
+**Data:** 23/04/2026
+**Severidade:** 🔴 Crítico
+**Amparo legal violado:** CTN Art. 198 (sigilo fiscal) + LGPD Art. 48 (incidente reportável à ANPD)
+**Arquivo:** `PY/api/routers/integracoes.py` — `ecac_sync_a1()`
+**Descoberto em:** Review do Viciado + Parecer Luiz Moreira na Fase 1 do plano Front/Backend
+
+**Descrição:**
+Após a Fase 1 aplicar auth no router inteiro de `/integracoes/*`, o endpoint
+`ecac_sync_a1` agora exige JWT — o que resolve o vetor **anônimo**. **Porém**,
+o CNPJ vem do `Form(...)` e não é validado contra o `current_user`. Qualquer
+usuário autenticado consegue mandar o CNPJ de OUTRO cliente do escritório e
+extrair dados via certificado A1. **Autorização horizontal (IDOR)** em aberto
+em endpoint que mexe com dado fiscal de terceiro via certificado Gov.br.
+
+**Parecer Luiz Moreira:** o fato de exigir JWT mitiga apenas o vetor anônimo.
+O dano possível — vazamento de PGDAS-D de cliente de outro escritório em
+cenário multi-tenant — é material e configura:
+- **CTN Art. 198** — violação direta do sigilo fiscal
+- **LGPD Art. 48** — incidente de segurança reportável à ANPD
+
+**Evidência:** handler aceita `cnpj: str = Form(...)` sem cross-check com
+relação User↔Empresa no DB.
+
+**Solução necessária (Fase 2.5 — Ownership Guards, fase própria):**
+1. Criar relação `user_empresas` (ou usar `auditoria_documentos.uploaded_by_user_id`)
+2. Helper `tem_acesso_cnpj(user_id, cnpj) -> bool`
+3. No handler: `if not tem_acesso_cnpj(current_user["id"], cnpj): raise HTTPException(403)`
+4. Aplicar mesmo guard em todo endpoint que aceita CNPJ como parâmetro
+   (sieg_sincronizar, integra_sincronizar, dossiê de prova, etc.)
+
+**PRAZO:** antes de qualquer deploy multi-tenant. Não pode entrar em produção
+compartilhada sem isso.
+
+**Status:** ⏳ Pendente — não bloqueia Fase 1 (vetor anônimo fechado), mas
+bloqueia qualquer liberação multi-tenant.
+
+---
+
 ## HISTÓRICO DE AUDITORIAS REAIS
 
 | Data | Empresa | CNPJ | Período | DAS e-CAC | DAS Motor | Delta | Status |

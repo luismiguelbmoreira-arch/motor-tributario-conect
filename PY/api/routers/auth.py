@@ -1,6 +1,5 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
 
@@ -63,17 +62,37 @@ def me(current_user: dict = Depends(get_current_user)):
         "role": current_user.get("role"),
     }
 
-@router.post("/refresh")
+class RefreshResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    renewed: bool
+
+@router.post("/refresh", response_model=RefreshResponse)
 def refresh_token(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
+    """
+    Renovação de JWT — sempre 200 com token válido, ou 401 se inválido.
+
+    - Se token tem < 2h para expirar: emite novo token (renewed=true).
+    - Se token ainda tem > 2h: devolve o mesmo token (renewed=false).
+    - Se token inválido/expirado: 401 (via renovar_token_jwt).
+
+    Nunca retorna 304. 304 em POST quebra o contrato HTTP e faz o frontend
+    interpretar como "sessão morta" sem necessidade.
+    """
     novo = renovar_token_jwt(credentials.credentials)
     if novo is None:
-        return JSONResponse(
-            status_code=304,
-            content={"detail": "Token ainda válido, renovação não necessária."},
+        return RefreshResponse(
+            access_token=credentials.credentials,
+            token_type="bearer",
+            renewed=False,
         )
-    return {"access_token": novo, "token_type": "bearer"}
+    return RefreshResponse(
+        access_token=novo,
+        token_type="bearer",
+        renewed=True,
+    )
 
 @router.post("/change-password")
 def change_password(

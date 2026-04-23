@@ -8,7 +8,18 @@ from api.dependencies import get_current_user
 
 logger = logging.getLogger("motor_conect.api")
 
-router = APIRouter(tags=["Integrações"])
+# Auth aplicada no router inteiro — todo endpoint herda get_current_user.
+# Adicionar novo endpoint aqui fica AUTOMATICAMENTE protegido.
+# Para expor algo público, criar outro APIRouter sem essa dependency.
+#
+# Endpoints que precisam do dict do usuário (sieg/integra pra user_id) declaram
+# `current_user: dict = Depends(get_current_user)` no próprio handler — FastAPI
+# cacheia a dependência por request (use_cache=True default), então
+# get_current_user roda UMA vez mesmo com duplicação. Zero overhead.
+router = APIRouter(
+    tags=["Integrações"],
+    dependencies=[Depends(get_current_user)],
+)
 
 # --- SIEG ---
 
@@ -135,18 +146,44 @@ async def ecac_sync_a1(
     senha_cert: str = Form(...),
     certificado_pfx: UploadFile = File(...)
 ):
+    # ⚠️ TODO CRÍTICO (ver LOG_ERROS.md ERR-013):
+    # Validar ownership do CNPJ contra current_user antes de processar.
+    # Hoje qualquer user autenticado consegue extrair dados de qualquer CNPJ.
+    # PRAZO: antes de qualquer deploy multi-tenant — é IDOR horizontal que
+    # viola CTN Art. 198 (sigilo fiscal) e é incidente reportável à ANPD
+    # (LGPD Art. 48). Não pode virar dívida eterna.
     if not _ECAC_AVAILABLE:
-        raise HTTPException(status_code=501, detail="O módulo 'ecac_scraper' não está acessível no backend.")
+        raise HTTPException(status_code=501, detail="Integração e-CAC indisponível neste ambiente.")
     try:
         pfx_bytes = await certificado_pfx.read()
         cert_data = load_pfx_to_pem(pfx_bytes, senha_cert)
         scraper = EcacScraper(cert_data)
         pdf_bytes = await scraper.get_pgdas_pdf(cnpj, "2026-01")
         return {
-            "status": "success", 
+            "status": "success",
             "message": "Extração A1 do Gov.br concluída.",
-            "diagnostics": {"cnpj": cnpj, "pdf_bytes_length": len(pdf_bytes) if pdf_bytes else 0}
+            "diagnostics": {"pdf_bytes_length": len(pdf_bytes) if pdf_bytes else 0},
         }
-    except Exception as e:
-        logger.error(f"Falha na extração A1 e-CAC: {e}")
-        raise HTTPException(status_code=503, detail=f"Integração Governamental: {str(e)}")
+    except (ValueError, OSError) as exc:
+        # ValueError: senha do .pfx inválida, pfx corrompido, parâmetros.
+        # OSError: falha de rede/arquivo.
+        # Log com contexto técnico mas SEM PII (sem CNPJ completo, sem str(exc) bruto).
+        logger.exception(
+            "Falha previsível na extração e-CAC | tipo=%s",
+            type(exc).__name__,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Não foi possível concluir a extração e-CAC. Verifique certificado e tente novamente.",
+        )
+    except Exception as exc:
+        # Erro inesperado: loga completo internamente, devolve mensagem neutra.
+        # str(exc) NUNCA vai pro cliente — pode conter path do .pfx, stack da lib, etc.
+        logger.exception(
+            "Erro não previsto em e-CAC | tipo=%s",
+            type(exc).__name__,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Integração Governamental indisponível. Contate o suporte.",
+        )
