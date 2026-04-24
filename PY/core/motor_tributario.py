@@ -31,6 +31,7 @@ from core.tabelas_simples import (
 )
 from schemas.motor import (
     FORMAS_PAGAMENTO_COM_PSP,
+    Atividade,  # noqa: F401 — re-exported: tests + extrator_pdfs import from here
     EmpresaCompradora,
     EmpresaFornecedora,
     OperacaoFiscal,
