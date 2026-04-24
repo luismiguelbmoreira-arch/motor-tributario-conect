@@ -13,65 +13,135 @@
 
     <main class="main-content">
       <header class="mb-8 border-b pb-4" style="border-color: var(--border-subtle);">
-        <h2 class="text-h1">Configurações Base</h2>
-        <p class="text-body mt-2">Parâmetros operacionais do Motor Tributário e configurações de perfil de usuário.</p>
+        <h2 class="text-h1">Configurações</h2>
+        <p class="text-body mt-2">Preferências do seu perfil de usuário. Alterações ficam associadas à sua conta.</p>
       </header>
 
       <div class="glass-card" style="max-width: 600px;">
         <div class="flex-col gap-6">
           <div class="flex-col gap-2">
-            <label class="input-label" style="font-weight: 600;">Tema do Design System</label>
-            <select class="input-field" title="Tema visual do painel">
-              <option>Escuro (Padrão)</option>
-              <option>Claro</option>
-              <option>Automático</option>
-            </select>
-          </div>
-          
-          <div class="flex-col gap-2">
-            <label class="input-label" style="font-weight: 600;">Notificações de Falha (Extração e-CAC)</label>
-            <select class="input-field" title="Recebimento de alertas de erro de IA">
-              <option>Alertar apenas no Painel</option>
-              <option>Enviar e-mail para Administradores</option>
-              <option>Desativado</option>
+            <label class="input-label" for="settings-tema" style="font-weight: 600;">Tema do Painel</label>
+            <select id="settings-tema" class="input-field" title="Tema visual do painel">
+              <option value="auto">Automático (segue o sistema)</option>
+              <option value="escuro">Escuro (padrão)</option>
+              <option value="claro">Claro</option>
             </select>
           </div>
 
           <div class="flex-col gap-2">
-            <label class="input-label" style="font-weight: 600;">Retenção de Documentos (Soft Delete)</label>
-            <select class="input-field" title="Política de limpeza de PDFs e XMLs processados">
-              <option>Manter em disco rígido indefinidamente</option>
-              <option>Mover para .lixeira após 30 dias</option>
-              <option>Mover para .lixeira após 7 dias</option>
+            <label class="input-label" for="settings-notificacoes" style="font-weight: 600;">Notificações por E-mail</label>
+            <select id="settings-notificacoes" class="input-field" title="Receber notificações por e-mail">
+              <option value="true">Ativadas</option>
+              <option value="false">Desativadas</option>
             </select>
-            <p class="text-muted" style="font-size: 0.7rem;">Conformidade com LGPD Art. 16 (eliminação após finalidade) e CTN Art. 173 (retenção mínima 5 anos).</p>
-          </div>
-
-          <div class="flex-col gap-2">
-            <label class="input-label" style="font-weight: 600;">Layout de Laudo Padrão</label>
-            <select class="input-field" title="Exportação de relatórios">
-              <option>Layout Executivo (Diferencial Fiscal e Resumo de Tributação)</option>
-              <option>Layout Contador (Matriz Analítica e Trilha de Auditoria)</option>
-              <option>Layout Fiscal (Conformidade Estrita — Padrão RFB)</option>
-            </select>
-          </div>
-
-          <div class="flex-col gap-2">
-            <label class="input-label" style="font-weight: 600;">Fuso Horário dos Logs</label>
-            <select class="input-field" title="Fuso horário dos relatórios">
-              <option>America/Sao_Paulo (UTC -03:00)</option>
-              <option>America/Manaus (UTC -04:00)</option>
-              <option>UTC (GTS)</option>
-            </select>
+            <p class="text-muted" style="font-size: 0.7rem;">Fase 5 persiste a preferência — o disparo real de e-mail depende de configuração do provedor (fase futura).</p>
           </div>
 
           <div class="flex-row justify-end mt-4">
-            <button class="btn btn-primary"><i data-lucide="save" style="width: 18px; margin-right: 0.5rem;"></i> Salvar Modificações</button>
+            <button id="btn-salvar-settings" class="btn btn-primary">
+              <i data-lucide="save" style="width: 18px; margin-right: 0.5rem;"></i>
+              Salvar Modificações
+            </button>
           </div>
         </div>
       </div>
     </main>
   </div>
   <script src="components.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      const TEMAS_VALIDOS = ['claro', 'escuro', 'auto'];
+
+      // ─── Aplicar tema imediatamente ao <html> via classes CSS ────────
+      // CSS vars estão em :root; adicionamos classes .theme-light / .theme-dark
+      // pra permitir override futuro sem redesenhar o design_system.
+      function aplicarTema(tema) {
+        const html = document.documentElement;
+        html.classList.remove('theme-light', 'theme-dark', 'theme-auto');
+        if (tema === 'claro') {
+          html.classList.add('theme-light');
+        } else if (tema === 'escuro') {
+          html.classList.add('theme-dark');
+        } else {
+          html.classList.add('theme-auto');
+        }
+      }
+
+      // ─── Carregar settings atuais do backend ─────────────────────────
+      async function carregarSettings() {
+        try {
+          const resp = await window.mcFetch('/settings');
+          if (!resp.ok) return;
+          const data = await resp.json();
+
+          const selTema = document.getElementById('settings-tema');
+          const selNotif = document.getElementById('settings-notificacoes');
+
+          if (selTema && TEMAS_VALIDOS.indexOf(data.tema) >= 0) {
+            selTema.value = data.tema;
+          }
+          if (selNotif) {
+            selNotif.value = data.notificacoes_email ? 'true' : 'false';
+          }
+          aplicarTema(data.tema);
+        } catch (_) {
+          // Silencioso: se falhar, GET /settings defaults vão ser usados no próximo submit.
+        }
+      }
+
+      // ─── Salvar settings (POST /settings/tema + /settings/notificacoes) ──
+      async function salvarSettings() {
+        const selTema = document.getElementById('settings-tema');
+        const selNotif = document.getElementById('settings-notificacoes');
+
+        const tema = selTema ? selTema.value : 'auto';
+        const notif = selNotif ? (selNotif.value === 'true') : true;
+
+        if (TEMAS_VALIDOS.indexOf(tema) < 0) {
+          window.mcToast('Tema inválido.', 'error');
+          return;
+        }
+
+        try {
+          // Em paralelo — os endpoints são independentes.
+          const [rTema, rNotif] = await Promise.all([
+            window.mcFetch('/settings/tema', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tema: tema }),
+            }),
+            window.mcFetch('/settings/notificacoes', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ notificacoes_email: notif }),
+            }),
+          ]);
+
+          if (rTema.ok && rNotif.ok) {
+            aplicarTema(tema);
+            window.mcToast('Configurações salvas.', 'success');
+          } else {
+            window.mcToast('Falha ao salvar. Tente novamente.', 'error');
+          }
+        } catch (err) {
+          const msg = (err && err.message) || 'Falha de rede ao salvar.';
+          window.mcToast(msg, 'error');
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', function () {
+        const btn = document.getElementById('btn-salvar-settings');
+        if (btn) {
+          btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            window.mcWithSubmitLock(btn, salvarSettings);
+          });
+        }
+        carregarSettings();
+      });
+    })();
+  </script>
 </body>
 </html>

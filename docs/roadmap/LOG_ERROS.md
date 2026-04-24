@@ -1392,6 +1392,138 @@ backlog do dashboard ops.
 
 ---
 
+### ERR-049 — `current_user.get("id")` sempre None em produção (JWT usa claim "sub")
+**Data:** 23/04/2026
+**Severidade:** 🔴 Crítico — ownership latente em 4 endpoints
+**Amparo legal:** LGPD Art. 46 §1º (segurança) + LGPD Art. 6º V (minimização) + RFC 7519 (claim "sub" padrão JWT)
+**Arquivo:**
+  - `PY/api/routers/integracoes.py:70,126` — `uploaded_by_user_id=current_user.get("id")`
+  - `PY/api/routers/auditoria.py:59` — dossiê de prova sem rastro do solicitante
+  - `PY/main.py:1244` — handler `/analise/pdf` sem user_id na auditoria documental
+**Descoberto em:** Exploração arquitetural Fase 5 (antes de adicionar o router `/auditorias`).
+
+**Descrição:**
+O JWT real emitido por `auth.gerar_token_jwt()` põe o `user_id` na claim
+`"sub"` (padrão RFC 7519). Porém 4 endpoints faziam `current_user.get("id")`
+diretamente — que sempre retornava `None` em produção porque `"id"` não é
+claim do JWT.
+
+A fixture histórica de testes usava `{"id": 1, "username": "admin", "role": "admin"}`
+(sem `"sub"`), mascarando o bug — todos os testes verdes e em produção
+`uploaded_by_user_id` virava `None`.
+
+Conseqüências concretas:
+  - SIEG e Integra registravam documentos anônimos (sem dono no banco).
+  - Dossiê de prova e-CAC gerava `AuditoriaAcessoDB` com `user_id=None`
+    — cadeia de prova quebrada para fiscalização.
+  - `/analise/pdf` cifrava PDFs e marcava `uploaded_by_user_id=None` em
+    `AuditoriaDocumentoDB` → o endpoint `GET /auditoria/prova/cnpj/...`
+    nunca teria como filtrar por dono.
+
+**Evidência:**
+```python
+# Antes (PY/api/routers/integracoes.py:70)
+uploaded_by_user_id=current_user.get("id"),  # → None sempre
+
+# Depois (Fase 5)
+uploaded_by_user_id=extrair_user_id(current_user),  # → lê "sub" OU "id"
+```
+
+**Solução aplicada (Fase 5):**
+1. Criado helper universal `api.dependencies.extrair_user_id(current_user)`
+   que aceita `"sub"` (JWT real) OU `"id"` (fixture legada), retornando
+   `int > 0` ou `None`. `_extrair_user_id` em `main.py` virou alias.
+2. Trocados todos os `current_user.get("id")` dos 4 arquivos pelo helper.
+3. Teste de regressão `tests/test_err049_extrair_user_id.py` (11 testes):
+   unitários do helper + integração com fixture que passa SOMENTE `"sub"`
+   (formato JWT real) para `/auditorias` e `/settings`.
+4. Fixture de conftest (`client_autenticado`) já tinha `"sub"` + `"id"` —
+   mantida para cobertura retroativa de testes antigos.
+
+**Status:** ✅ Corrigido na Fase 5 (commit pós d06e999).
+
+---
+
+### ERR-050 — `DiagnosticoDB` sem `uploaded_by_user_id` impedia `/auditorias`
+**Data:** 23/04/2026
+**Severidade:** 🔴 Crítico — sem essa coluna o endpoint do histórico seria IDOR horizontal
+**Amparo legal:** LGPD Art. 6º V (minimização) + Art. 46 §1º (segurança)
+**Arquivo:**
+  - `PY/database/models.py::DiagnosticoDB` — faltava coluna
+  - `PY/alembic/versions/49832cc28f45_fase5_paginas_fantasmas_ownership_e_settings.py` — migração nova
+**Descoberto em:** Exploração arquitetural Fase 5 (desenho do router `/auditorias`).
+
+**Descrição:**
+`DiagnosticoDB` tinha apenas `empresa_id` como chave relacional — nenhum
+campo identificava o usuário que disparou a análise. Consequência: se o
+endpoint `GET /auditorias` fosse criado sem essa coluna, a única opção
+seria retornar **todos os diagnósticos do sistema** para qualquer
+autenticado. IDOR horizontal com CNPJs de clientes de outros contadores
+sendo listados publicamente.
+
+**Evidência:**
+Schema antigo:
+```python
+class DiagnosticoDB(SQLModel, table=True):
+    empresa_id: int = Field(foreign_key="empresas.id", index=True)
+    # ... sem uploaded_by_user_id
+```
+
+**Solução aplicada (Fase 5):**
+1. Migração Alembic `49832cc28f45`:
+   - Coluna `diagnosticos.uploaded_by_user_id` (INTEGER, nullable, FK
+     `users.id`, indexed). Nullable para preservar registros pré-Fase 5
+     que não têm dono conhecido — esses ficam fora da listagem.
+   - Ciclo `upgrade → downgrade → upgrade` validado manualmente no DB
+     físico `motor_tributario.db`.
+2. `DiagnosticoDB` Pydantic/SQLModel atualizado com a coluna.
+3. `salvar_diagnostico` ganhou parâmetro `uploaded_by_user_id: Optional[int]`.
+4. Novo método `listar_por_user(user_id, skip, limit)` em
+   `diagnostico_repo.py` — filtra SEMPRE por dono. Nunca devolve registros
+   de terceiros.
+5. Router `/auditorias` (`PY/api/routers/historico.py`) usa o método com
+   o `user_id` extraído via `extrair_user_id(current_user)` (ERR-049).
+6. Testes em `tests/test_historico_endpoint.py` (7 testes) incluindo:
+   - Regressão de ownership: user A nunca vê diagnóstico de user B.
+   - Regressão LGPD: response não contém `cnpj`, `razao_social`,
+     `resultado_json` (minimização).
+
+**Status:** ✅ Corrigido na Fase 5.
+
+---
+
+### ERR-051 — `salvar_diagnostico` nunca era chamado nos handlers de análise
+**Data:** 23/04/2026
+**Severidade:** 🟡 Atenção — não era bug de segurança, era funcionalidade ausente
+**Amparo legal:** MAX_FISCAL_05 (rastreabilidade) + LGPD Art. 37 (registro operacional) + CTN Art. 173 (retenção 5 anos)
+**Arquivo:**
+  - `PY/main.py` handlers `/analise/manual` e `/analise/pdf` (pré-Fase 5)
+**Descoberto em:** Exploração arquitetural Fase 5 — rastrear por que o histórico estava sempre vazio.
+
+**Descrição:**
+A função `salvar_diagnostico` em `PY/database/repositories/diagnostico_repo.py`
+existia, tinha testes próprios, mas **nunca era chamada por nenhum handler
+de produção**. Em 948 testes verdes, o fluxo end-to-end `/analise/manual`
+→ DB → `/auditorias` teria retornado lista vazia em produção **para sempre**.
+
+Impacto isolado (histórico do cliente), mas combinado com ERR-050
+transformaria o endpoint `/auditorias` novo em feature natimorta.
+
+**Solução aplicada (Fase 5):**
+1. Helper privado `_persistir_diagnostico_best_effort(fornecedora, diagnostico, user_id, periodo)`
+   em `PY/main.py`. Best-effort (`try/except Exception` absorve falhas
+   de DB, FK, etc — não derruba o endpoint).
+2. Wire em `/analise/manual`: após gerar diagnóstico, chama o helper.
+3. Wire em `/analise/pdf`: reconstrói `EmpresaFornecedora` a partir da
+   extração (CNPJ + campos do `_extracao`) e chama o helper.
+4. Falha na persistência só loga `logger.warning` — o cliente vê a
+   análise normalmente. Essa escolha é intencional: o endpoint fiscal
+   NÃO pode ser refém da disponibilidade do DB.
+
+**Status:** ✅ Corrigido na Fase 5.
+
+---
+
 ### PENDÊNCIA — Fase Fiscal posterior: Hardening Luiz #7 (guarda rpa_mensal vs faturamento_12m/12)
 **Registrada em:** 23/04/2026
 **Origem:** Luiz classificou como "blocker Fase 4" antes do Luis Miguel redefinir Fase 4 como Segurança/LGPD.

@@ -78,18 +78,29 @@ class DiagnosticoDB(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     empresa_id: int = Field(foreign_key="empresas.id", index=True)
     competencia: str = Field(max_length=7)  # YYYY-MM
-    
+
     resultado_json: str = Field(sa_column=Column(TEXT, nullable=False))
-    
+
     das_mensal: str = Field(sa_column=Column(TEXT, nullable=False))
     aliquota_efetiva: str = Field(sa_column=Column(TEXT, nullable=False))
     rbt12_usado: str = Field(sa_column=Column(TEXT, nullable=False))
-    
+
     regime_no_calculo: str = Field(max_length=20)
     das_ecac_referencia: Optional[str] = Field(default=None, sa_column=Column(TEXT, nullable=True))
     delta: Optional[str] = Field(default=None, sa_column=Column(TEXT, nullable=True))
     status_auditoria: Optional[str] = Field(default=None, max_length=20)
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+    # ERR-050 (Fase 5): ownership para o endpoint GET /auditorias do histórico.
+    # Nullable — registros pré-Fase 5 não têm dono conhecido e ficarão fora
+    # da listagem filtrada por user_id. Novos inserts sempre populam.
+    # LGPD Art. 6º V (minimização) + Art. 46 (segurança) — user A jamais vê
+    # diagnósticos de user B pelo endpoint público.
+    uploaded_by_user_id: Optional[int] = Field(
+        default=None,
+        foreign_key="users.id",
+        index=True,
+    )
 
     def get_resultado(self) -> Dict[str, Any]:
         return json.loads(self.resultado_json)

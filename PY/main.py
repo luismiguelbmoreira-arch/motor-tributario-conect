@@ -451,27 +451,10 @@ def _serializar_decimal(obj: Any) -> Any:
     return obj
 
 
-def _extrair_user_id(current_user: Optional[dict]) -> Optional[int]:
-    """
-    Extrai user_id (int > 0) do dict de autenticação.
-
-    Aceita tanto o formato nativo do verificar_token ({"sub": "1", ...})
-    quanto fixtures de teste que usam {"id": 1, ...}. Retorna None se
-    nenhum deles estiver presente ou for inválido — nunca lança.
-
-    Esta tolerância é necessária porque get_current_user pode ser
-    sobrescrito em testes via dependency_overrides com payload próprio.
-    """
-    if not current_user:
-        return None
-    candidato = current_user.get("sub") or current_user.get("id")
-    if candidato is None:
-        return None
-    try:
-        user_id = int(candidato)
-    except (TypeError, ValueError):
-        return None
-    return user_id if user_id > 0 else None
+# _extrair_user_id: helper universal movido para api/dependencies.extrair_user_id
+# como parte do fix ERR-049 (ownership latentemente quebrado). Mantém alias local
+# por compatibilidade com referências internas deste módulo.
+from api.dependencies import extrair_user_id as _extrair_user_id  # noqa: E402
 
 
 def _registrar_erro_parser(origem: str, exc: Exception, diagnostico: dict) -> None:
@@ -501,6 +484,86 @@ def _registrar_erro_parser(origem: str, exc: Exception, diagnostico: dict) -> No
         "tipo": type(exc).__name__,
         "mensagem": str(exc),
     })
+
+
+def _persistir_diagnostico_best_effort(
+    fornecedora: Any,
+    diagnostico: dict,
+    user_id: Optional[int],
+    periodo: Optional[str] = None,
+) -> None:
+    """
+    Persiste EmpresaDB + DiagnosticoDB após análise bem-sucedida.
+
+    ERR-051 (Fase 5): salvar_diagnostico nunca era chamado nos handlers
+    de análise → DB ficava permanentemente vazio, /auditorias sempre []
+    em produção. Fix: chamar aqui em bloco best-effort.
+
+    CONTRATO:
+      - Falha NÃO quebra a análise — só loga warning.
+      - user_id None → não persiste (não dá pra popular ownership).
+      - Qualquer exception é absorvida (Zero-Trust: DB offline,
+        FK inválida, race no create_all de teste, etc).
+
+    Amparo:
+      - MAX_FISCAL_05 — rastreabilidade documental.
+      - LGPD Art. 37 — registro operacional.
+      - CTN Art. 173 — retenção 5 anos começa aqui.
+    """
+    if user_id is None:
+        # Sem dono identificável: não adianta persistir — a listagem do
+        # histórico filtra por user_id e registros órfãos viram lixo.
+        return
+
+    try:
+        from database import salvar_empresa, salvar_diagnostico as _sd
+
+        empresa_db = salvar_empresa(fornecedora)
+
+        # Extrai valores do diagnóstico. Todos vêm como str (serializados)
+        # ou Decimal dependendo de qual lugar do fluxo chama. Convertemos
+        # pra Decimal defensivamente — zero float.
+        das_raw = diagnostico.get("das_mensal") or diagnostico.get("valor_das") or "0"
+        aliq_raw = diagnostico.get("aliquota_efetiva") or "0"
+        rbt12_raw = (
+            diagnostico.get("rbt12")
+            or (diagnostico.get("_extracao") or {}).get("rbt12")
+            or "0"
+        )
+        regime = diagnostico.get("regime") or getattr(fornecedora, "regime", "SIMPLES")
+
+        # Período: prioriza override (do handler), depois campo do diagnóstico,
+        # depois extração de data_emissao se houver.
+        competencia = periodo or diagnostico.get("competencia")
+        if not competencia:
+            data_emissao = diagnostico.get("data_emissao")
+            if isinstance(data_emissao, str) and len(data_emissao) >= 7:
+                competencia = data_emissao[:7]
+        if not competencia:
+            # Fallback: primeiro mês do ano base do diagnóstico; se tudo
+            # falhar, usa ano corrente. Nunca deve explodir por isso.
+            from datetime import date as _date
+            competencia = _date.today().strftime("%Y-%m")
+
+        _sd(
+            empresa_id=empresa_db.id,
+            competencia=competencia,
+            resultado=diagnostico,
+            das_mensal=Decimal(str(das_raw)),
+            aliquota_efetiva=Decimal(str(aliq_raw)),
+            rbt12=Decimal(str(rbt12_raw)),
+            regime=str(regime),
+            uploaded_by_user_id=user_id,
+        )
+    except Exception as exc:
+        # Persistência é best-effort — falha NÃO derruba o endpoint.
+        # Logamos o tipo sem exc_info=True pra não poluir em dev com
+        # tracebacks de DB em memória durante testes.
+        logger.warning(
+            "Persistencia de diagnostico falhou | tipo=%s | motivo=%s",
+            type(exc).__name__,
+            str(exc)[:200],
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -537,6 +600,10 @@ app.include_router(usuarios.router)
 from api.routers import integracoes, auditoria
 app.include_router(integracoes.router)
 app.include_router(auditoria.router)
+# Fase 5 — páginas fantasmas vivas: histórico + configurações
+from api.routers import historico, configuracoes
+app.include_router(historico.router)
+app.include_router(configuracoes.router)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -746,9 +813,9 @@ def analise_manual(
         # analise_id opaco. Frontend guarda só o id em sessionStorage (não-PII)
         # e hidrata PII em memória via GET /analise/sessao/{id}.
         # LGPD Art. 6º V (minimização) — PII fora do storage do browser.
+        user_id = _extrair_user_id(current_user)
         try:
             from services.analise_buffer import get_buffer
-            user_id = _extrair_user_id(current_user)
             if user_id is not None:
                 analise_id = get_buffer().armazenar(
                     envelope=_serializar_decimal(payload),
@@ -762,6 +829,19 @@ def analise_manual(
                 "Falha ao armazenar analise em buffer | tipo=%s",
                 type(exc_buf).__name__,
             )
+
+        # ERR-051 (Fase 5): wire de persistência pro histórico do user.
+        # Best-effort — falha não derruba o endpoint.
+        competencia_req = (
+            req.data_emissao[:7] if isinstance(req.data_emissao, str)
+            and len(req.data_emissao) >= 7 else None
+        )
+        _persistir_diagnostico_best_effort(
+            fornecedora=fornecedora,
+            diagnostico=diagnostico,
+            user_id=user_id,
+            periodo=competencia_req,
+        )
 
         return JSONResponse(content=_serializar_decimal(payload))
 
@@ -1238,12 +1318,10 @@ async def analise_pdf(
             },
         )
 
-    # Operador autenticado
-    user_id = None
-    try:
-        user_id = int(current_user.get("id")) if current_user else None
-    except (TypeError, ValueError):
-        user_id = None
+    # Operador autenticado — ERR-049: extrair_user_id aceita "sub" (JWT real)
+    # e "id" (fixture de teste). Antes só aceitava "id", user_id sempre None
+    # em produção, quebrando auditoria documental.
+    user_id = _extrair_user_id(current_user)
 
     # Pipeline de extração + auditoria documental
     try:
@@ -1452,6 +1530,47 @@ async def analise_pdf(
             logger.warning(
                 "Falha ao armazenar analise PDF em buffer | tipo=%s",
                 type(exc_buf).__name__,
+            )
+
+        # ERR-051 (Fase 5): persistência do histórico no /analise/pdf.
+        # Diferente do /manual, aqui a "fornecedora" sai da extração. Tentamos
+        # reconstruí-la com os campos mínimos; se faltar algo crítico (CNPJ
+        # inválido, CNAE ausente), o helper absorve a exception. Best-effort.
+        try:
+            pii_block = payload.get("pii") or {}
+            cnpj_ext = pii_block.get("cnpj") or diagnostico.get("cnpj")
+            if cnpj_ext and user_id is not None:
+                from core.motor_tributario import EmpresaFornecedora as _EF
+                fornecedora_pdf = _EF(
+                    cnpj=cnpj_ext,
+                    razao_social=(pii_block.get("razao_social") or "Cliente e-CAC"),
+                    regime=diagnostico.get("regime", "SIMPLES"),
+                    cnae_principal=(
+                        diagnostico.get("cnae_principal")
+                        or (diagnostico.get("_extracao") or {}).get("cnae")
+                        or "4711301"
+                    ),
+                    uf_origem=(
+                        diagnostico.get("uf_origem")
+                        or (diagnostico.get("_extracao") or {}).get("uf")
+                        or "SP"
+                    ),
+                    faturamento_12m=Decimal(str(
+                        diagnostico.get("rbt12")
+                        or (diagnostico.get("_extracao") or {}).get("rbt12")
+                        or "0"
+                    )),
+                    anexo_simples=diagnostico.get("anexo_simples"),
+                )
+                _persistir_diagnostico_best_effort(
+                    fornecedora=fornecedora_pdf,
+                    diagnostico=diagnostico,
+                    user_id=user_id,
+                )
+        except Exception as exc_persist:
+            logger.warning(
+                "Persistencia /analise/pdf falhou | tipo=%s",
+                type(exc_persist).__name__,
             )
 
         return JSONResponse(content=_serializar_decimal(payload))

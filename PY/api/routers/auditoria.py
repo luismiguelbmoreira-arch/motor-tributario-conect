@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
-from api.dependencies import get_current_user
+from api.dependencies import get_current_user, extrair_user_id
 from database import (
     buscar_documentos_por_cnpj,
     registrar_acesso_documento,
@@ -55,10 +55,9 @@ async def gerar_dossie_prova(
     cnpj = cnpj_formatado
 
     # Extrai user_id + IP para auditoria
-    try:
-        user_id = int(current_user.get("id")) if current_user else None
-    except (TypeError, ValueError):
-        user_id = None
+    # ERR-049 (Fase 5): JWT real usa claim "sub". current_user.get("id")
+    # sempre devolvia None em produção — dossiê ficava sem rastro do solicitante.
+    user_id = extrair_user_id(current_user)
     
     ip = None
     if request is not None:

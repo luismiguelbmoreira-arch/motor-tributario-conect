@@ -9,32 +9,62 @@
   --color-gray-600: #323238;
   --color-gray-300: #c4c4cc;
   --color-white: #ffffff;
-  
+
   --color-green-500: #00b37e;
   --color-green-300: #00875f;
   --color-red-500: #e25858;
   --color-blue-500: #0a84ff;
-  
+
   /* TIER 2: Semantics */
   --bg-app: var(--color-gray-900);
   --bg-surface: rgba(18, 18, 20, 0.6); /* Glass effect */
   --bg-surface-solid: var(--color-gray-800);
   --border-subtle: rgba(255, 255, 255, 0.08);
   --border-focus: var(--color-green-500);
-  
+
   --text-primary: var(--color-white);
   --text-secondary: var(--color-gray-300);
-  
+
   --action-primary: var(--color-green-500);
   --action-primary-hover: var(--color-green-300);
   --action-danger: var(--color-red-500);
-  
+
   /* Typography */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  
+
   /* Spring Physics / Motion */
   --transition-spring: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
   --transition-fast: all 0.15s ease-in-out;
+}
+
+/* ───────────────────────────────────────────────────────────────────
+ * TEMA CLARO — Fase 5 (override mínimo dos CSS vars)
+ *
+ * Aplicado via <html class="theme-light"> pelo configuracoes.html.
+ * Não redesenha componentes — apenas troca as variáveis semânticas.
+ * Ajuste visual deliberadamente conservador; refino estético fica para
+ * fase de polimento UI dedicada.
+ * ─────────────────────────────────────────────────────────────────── */
+html.theme-light {
+  --bg-app: #f5f5f7;
+  --bg-surface: rgba(255, 255, 255, 0.7);
+  --bg-surface-solid: #ffffff;
+  --border-subtle: rgba(0, 0, 0, 0.08);
+
+  --text-primary: #0a0a0c;
+  --text-secondary: #323238;
+}
+
+html.theme-light body {
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+}
+
+/* theme-dark == defaults. Classe existe apenas para permitir toggle
+   explícito no futuro (ex. pressionar "Escuro" quando preferência do
+   OS é "Claro" via theme-auto). Não requer overrides. */
+html.theme-dark {
+  /* no-op — usa as defaults de :root */
 }
 
 /* Reset & Box Model */

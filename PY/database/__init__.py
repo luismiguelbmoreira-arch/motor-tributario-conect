@@ -44,6 +44,7 @@ from .repositories.empresa_repo import (
 from .repositories.diagnostico_repo import (
     salvar_diagnostico,
     buscar_diagnosticos_por_empresa,
+    listar_por_user as listar_diagnosticos_por_user,
     validar_competencia
 )
 
@@ -77,7 +78,8 @@ __all__ = [
     "AuditoriaTentativaAcessoDB",
     "salvar_empresa", "buscar_empresa_por_cnpj", "listar_empresas",
     "registrar_historico_empresa", "buscar_historico_empresa", "purge_empresa",
-    "salvar_diagnostico", "buscar_diagnosticos_por_empresa", "validar_competencia",
+    "salvar_diagnostico", "buscar_diagnosticos_por_empresa",
+    "listar_diagnosticos_por_user", "validar_competencia",
     "salvar_alertas", "buscar_alertas_por_nivel", "buscar_alertas_por_empresa", "resolver_alerta",
     "registrar_documento_auditoria", "buscar_documentos_por_cnpj",
     "buscar_documento_por_hash", "aceitar_documento", "marcar_documento_purgado",

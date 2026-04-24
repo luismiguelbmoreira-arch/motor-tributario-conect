@@ -4,7 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException, Form, UploadFile, File
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from api.dependencies import get_current_user
+from api.dependencies import get_current_user, extrair_user_id
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Constantes de motivo público (mensagens neutras, sem vazar caminho/senha)
+# ─────────────────────────────────────────────────────────────────────────────
+_MOTIVO_INATIVA = "Integração inativa — configure credenciais."
+_MOTIVO_INDISPONIVEL = "Integração indisponível neste ambiente."
+_MOTIVO_OK = None  # Status OK → motivo_erro_publico = null
 
 logger = logging.getLogger("motor_conect.api")
 
@@ -67,7 +74,9 @@ async def sieg_sincronizar(
             data_inicio=data_inicio,
             data_fim=data_fim,
             xml_type=payload.xml_type,
-            uploaded_by_user_id=current_user.get("id"),
+            # ERR-049 (Fase 5): extrair_user_id lê "sub" (JWT real) OU "id"
+            # (fixture). current_user.get("id") sempre devolvia None em prod.
+            uploaded_by_user_id=extrair_user_id(current_user),
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -123,7 +132,8 @@ async def integra_sincronizar(
             cnpj=payload.cnpj,
             periodos=periodos,
             tipos=tuple(payload.tipos),
-            uploaded_by_user_id=current_user.get("id"),
+            # ERR-049 (Fase 5): idem sieg_sincronizar.
+            uploaded_by_user_id=extrair_user_id(current_user),
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
@@ -187,3 +197,113 @@ async def ecac_sync_a1(
             status_code=503,
             detail="Integração Governamental indisponível. Contate o suporte.",
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GET /integracoes/status (Fase 5)
+#
+# Reporta estado das 3 integrações (SIEG, Integra Contador, e-CAC).
+# SEM vazamento de credenciais/paths:
+#   - ok: bool
+#   - ultimo_sync: ISO timestamp OU null
+#   - motivo_erro_publico: mensagem neutra OU null
+#
+# Ownership: status é GLOBAL — qualquer autenticado vê o mesmo retorno.
+# Não vazamos telemetria por usuário aqui (fase futura).
+#
+# Detecção de estado:
+#   - SIEG: chama get_api_key(). Se levanta SiegCredentialError → offline.
+#   - Integra: chama get_integra_credenciais(). Idem.
+#   - e-CAC: verifica se módulo ecac_scraper importa (dependências opcionais).
+#
+# NUNCA captura str(exc) no motivo público — exc pode carregar path do arquivo
+# de chave / conteúdo de env var / etc. Usamos constantes neutras.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class StatusIntegracao(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    ok: bool
+    ultimo_sync: Optional[str] = Field(None, description="ISO 8601 ou null")
+    motivo_erro_publico: Optional[str] = Field(
+        None,
+        description="Mensagem neutra sem vazar credencial/path",
+    )
+
+
+class IntegracoesStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    sieg: StatusIntegracao
+    integra: StatusIntegracao
+    ecac: StatusIntegracao
+
+
+def _check_sieg() -> StatusIntegracao:
+    """
+    Sonda SIEG — apenas presença de credencial. Não faz ping real (fora
+    do escopo da Fase 5 — endpoint seria lento e cobrar custo externo).
+    """
+    try:
+        from integrations.sieg_service import get_api_key
+        _ = get_api_key()
+        return StatusIntegracao(ok=True, ultimo_sync=None, motivo_erro_publico=_MOTIVO_OK)
+    except Exception as exc:
+        # Qualquer exceção → offline. Nunca vazamos str(exc) no retorno.
+        logger.debug("SIEG status offline | tipo=%s", type(exc).__name__)
+        return StatusIntegracao(
+            ok=False,
+            ultimo_sync=None,
+            motivo_erro_publico=_MOTIVO_INATIVA,
+        )
+
+
+def _check_integra() -> StatusIntegracao:
+    """Sonda Integra Contador — presença de certificado/credencial."""
+    try:
+        from integrations.integra_credentials import get_integra_credenciais
+        _ = get_integra_credenciais()
+        return StatusIntegracao(ok=True, ultimo_sync=None, motivo_erro_publico=_MOTIVO_OK)
+    except Exception as exc:
+        logger.debug("Integra status offline | tipo=%s", type(exc).__name__)
+        return StatusIntegracao(
+            ok=False,
+            ultimo_sync=None,
+            motivo_erro_publico=_MOTIVO_INATIVA,
+        )
+
+
+def _check_ecac() -> StatusIntegracao:
+    """
+    Sonda e-CAC — verifica se o módulo nativo (cryptography/cert) importou.
+    O import é feito no topo do arquivo via try/except — se falhou,
+    `_ECAC_AVAILABLE` fica False.
+    """
+    if _ECAC_AVAILABLE:
+        return StatusIntegracao(ok=True, ultimo_sync=None, motivo_erro_publico=_MOTIVO_OK)
+    return StatusIntegracao(
+        ok=False,
+        ultimo_sync=None,
+        motivo_erro_publico=_MOTIVO_INDISPONIVEL,
+    )
+
+
+@router.get(
+    "/integracoes/status",
+    response_model=IntegracoesStatusResponse,
+    summary="Status das integrações externas (SIEG / Integra / e-CAC)",
+)
+def integracoes_status() -> IntegracoesStatusResponse:
+    """
+    Retorna snapshot do estado das integrações.
+
+    Contrato de segurança:
+      - Nenhum campo devolve path de arquivo, env var, conteúdo de secret
+        ou stack trace. Usamos constantes neutras pré-definidas.
+      - `ultimo_sync` é null na Fase 5 — telemetria por integração
+        ficou fora do escopo (fase posterior plugará).
+    """
+    return IntegracoesStatusResponse(
+        sieg=_check_sieg(),
+        integra=_check_integra(),
+        ecac=_check_ecac(),
+    )

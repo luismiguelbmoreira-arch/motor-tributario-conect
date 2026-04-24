@@ -40,6 +40,32 @@ def _make_engine_memoria():
     return engine
 
 
+def _unificar_engines_e_criar_tabelas(monkeypatch, engine):
+    """
+    Patcha `auth._auth_engine` pro MESMO engine que `database.engine` e
+    cria todas as tabelas nele.
+
+    Motivo: em produção `_auth_engine` e `database.engine` são engines
+    distintos apontando pro mesmo banco físico. Em testes com
+    `sqlite:///:memory:` + StaticPool, cada engine seria um banco
+    independente — UserDB ficaria em um, DiagnosticoDB em outro, e as
+    FKs quebram. Unificando os dois engines no teste, ambas vivem no
+    mesmo schema e a FK `diagnosticos.uploaded_by_user_id → users.id` funciona.
+    """
+    import auth
+    monkeypatch.setattr(auth, "_auth_engine", engine)
+    # Agora também monkeypatch do módulo configuracoes — ele faz
+    # `from auth import _auth_engine` no topo, portanto captura o valor ORIGINAL
+    # no momento do import. Fazemos patch direto no ref cacheado do módulo.
+    try:
+        from api.routers import configuracoes as _conf_mod
+        monkeypatch.setattr(_conf_mod, "_auth_engine", engine)
+    except ImportError:
+        # Módulo pode não estar importado ainda em testes antigos.
+        pass
+    SQLModel.metadata.create_all(engine)
+
+
 @pytest.fixture(name="client_autenticado", scope="function")
 def client_autenticado_fixture(monkeypatch):
     """TestClient com usuário admin mockado em get_current_user."""
@@ -49,6 +75,7 @@ def client_autenticado_fixture(monkeypatch):
     engine = _make_engine_memoria()
     monkeypatch.setattr(database, "engine", engine)
     monkeypatch.setattr(database.connection, "engine", engine)
+    _unificar_engines_e_criar_tabelas(monkeypatch, engine)
 
     from main import app, get_current_user
 
@@ -72,6 +99,7 @@ def client_sem_auth_fixture(monkeypatch):
     engine = _make_engine_memoria()
     monkeypatch.setattr(database, "engine", engine)
     monkeypatch.setattr(database.connection, "engine", engine)
+    _unificar_engines_e_criar_tabelas(monkeypatch, engine)
 
     from main import app
 

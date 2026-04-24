@@ -4,10 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Motor Conect — Histórico</title>
-  
+
   <!-- CSS Centralizado -->
   <link rel="stylesheet" href="design_system.css">
-  
+
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
@@ -32,6 +32,30 @@
       font-size: 0.7rem;
       letter-spacing: 0.05em;
     }
+
+    .empty-state {
+      padding: 3rem 1rem;
+      text-align: center;
+      color: var(--text-secondary);
+    }
+
+    .empty-state i {
+      margin-bottom: 1rem;
+      opacity: 0.4;
+    }
+
+    #historico-loading {
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    #historico-loadmore {
+      margin-top: 1.5rem;
+      display: flex;
+      justify-content: center;
+    }
   </style>
 </head>
 
@@ -42,41 +66,220 @@
     <main class="main-content">
       <header class="mb-8">
         <h2 class="text-h1">Histórico de Auditorias</h2>
-        <p class="text-body mt-2">Log auditável reduzido em conformidade com as regras bancárias (sem vazamento de dados sensíveis).</p>
+        <p class="text-body mt-2">Log reduzido em conformidade com LGPD Art. 6º V (minimização) e Art. 46 (segurança) — apenas as auditorias do usuário autenticado.</p>
       </header>
 
       <div class="glass-card">
-        <table>
-          <thead>
-            <tr>
-              <th>Data/Hora</th>
-              <th>CNPJ (Ofuscado)</th>
-              <th>Regime Avaliado</th>
-              <th>Decisão Final</th>
-              <th style="text-align: right;">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>13 Abr 2026 14:32</td>
-              <td>00.000.***/0001-**</td>
-              <td>Simples Nacional c/ Opt-Out</td>
-              <td><span class="text-success">Recomendado</span></td>
-              <td style="text-align: right;"><button class="btn btn-ghost" style="padding: 0.2rem 0.5rem;" title="Ver Detalhes"><i data-lucide="eye" style="width: 16px;"></i></button></td>
-            </tr>
-            <tr>
-              <td>12 Abr 2026 09:15</td>
-              <td>12.345.***/0001-**</td>
-              <td>Lucro Presumido</td>
-              <td><span class="text-danger">Alerta de Risco</span></td>
-              <td style="text-align: right;"><button class="btn btn-ghost" style="padding: 0.2rem 0.5rem;" title="Ver Detalhes"><i data-lucide="eye" style="width: 16px;"></i></button></td>
-            </tr>
-          </tbody>
-        </table>
+        <div id="historico-loading">Carregando histórico…</div>
+        <div id="historico-root" style="display: none;"></div>
+      </div>
+
+      <div id="historico-loadmore" style="display: none;">
+        <button class="btn btn-ghost" id="btn-loadmore">Carregar mais</button>
       </div>
     </main>
   </div>
 
   <script src="components.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      const PAGE_SIZE = 20;
+      let skip = 0;
+      let carregando = false;
+
+      // ─── Formatação de data ISO → pt-BR ────────────────────────────
+      function formatarData(iso) {
+        if (!iso) return '—';
+        try {
+          const d = new Date(iso);
+          if (isNaN(d.getTime())) return iso;
+          return d.toLocaleDateString('pt-BR', {
+            day: '2-digit', month: 'short', year: 'numeric',
+            hour: '2-digit', minute: '2-digit',
+          });
+        } catch (_) {
+          return iso;
+        }
+      }
+
+      // ─── Formatação DAS (string Decimal → R$ X.XXX,XX) ────────────
+      function formatarMoeda(valorStr) {
+        if (!valorStr) return '—';
+        const n = parseFloat(valorStr);
+        if (isNaN(n)) return valorStr;
+        return n.toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+      }
+
+      // ─── Status auditoria (null → "—", APROVADO → verde, etc) ──────
+      function statusBadge(status) {
+        const span = document.createElement('span');
+        if (!status) {
+          span.className = 'text-muted';
+          span.textContent = '—';
+          return span;
+        }
+        if (status === 'APROVADO') {
+          span.className = 'text-success';
+          span.textContent = 'Aprovado';
+        } else if (status === 'PENDENTE') {
+          span.className = 'text-warning';
+          span.textContent = 'Pendente';
+        } else {
+          span.textContent = status;
+        }
+        return span;
+      }
+
+      // ─── Render de 1 linha via DOM builder (ERR-033 — sem innerHTML) ──
+      function renderLinha(item) {
+        const tr = document.createElement('tr');
+
+        const tdData = document.createElement('td');
+        tdData.textContent = formatarData(item.created_at);
+        tr.appendChild(tdData);
+
+        const tdComp = document.createElement('td');
+        tdComp.textContent = item.competencia || '—';
+        tr.appendChild(tdComp);
+
+        const tdRegime = document.createElement('td');
+        tdRegime.textContent = item.regime_no_calculo || '—';
+        tr.appendChild(tdRegime);
+
+        const tdDas = document.createElement('td');
+        tdDas.textContent = formatarMoeda(item.das_mensal);
+        tr.appendChild(tdDas);
+
+        const tdStatus = document.createElement('td');
+        tdStatus.appendChild(statusBadge(item.status_auditoria));
+        tr.appendChild(tdStatus);
+
+        return tr;
+      }
+
+      // ─── Render da tabela completa (header + linhas) ──────────────
+      function renderTabela(items) {
+        const root = document.getElementById('historico-root');
+        root.innerHTML = '';  // Limpa antes de renderizar
+
+        const table = document.createElement('table');
+        const thead = document.createElement('thead');
+        const headRow = document.createElement('tr');
+        ['Data/Hora', 'Competência', 'Regime', 'DAS Mensal', 'Status'].forEach(function (h) {
+          const th = document.createElement('th');
+          th.textContent = h;
+          headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement('tbody');
+        items.forEach(function (item) { tbody.appendChild(renderLinha(item)); });
+        table.appendChild(tbody);
+
+        root.appendChild(table);
+        root.style.display = '';
+      }
+
+      // ─── Estado vazio amigável ────────────────────────────────────
+      function renderVazio() {
+        const root = document.getElementById('historico-root');
+        root.innerHTML = '';
+
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+
+        const icon = document.createElement('i');
+        icon.setAttribute('data-lucide', 'inbox');
+        icon.style.width = '48px';
+        icon.style.height = '48px';
+        empty.appendChild(icon);
+
+        const p1 = document.createElement('p');
+        p1.style.fontSize = '1rem';
+        p1.style.fontWeight = '600';
+        p1.style.marginBottom = '0.5rem';
+        p1.textContent = 'Nenhuma auditoria realizada ainda.';
+        empty.appendChild(p1);
+
+        const p2 = document.createElement('p');
+        p2.className = 'text-muted';
+        p2.textContent = 'Suas análises aparecerão aqui após a primeira execução.';
+        empty.appendChild(p2);
+
+        root.appendChild(empty);
+        root.style.display = '';
+
+        if (typeof lucide !== 'undefined' && lucide.createIcons) {
+          lucide.createIcons();
+        }
+      }
+
+      // ─── Fetch com paginação ──────────────────────────────────────
+      async function carregarPagina() {
+        if (carregando) return;
+        carregando = true;
+
+        const loadingEl = document.getElementById('historico-loading');
+        const loadMoreWrap = document.getElementById('historico-loadmore');
+        const btnLoadMore = document.getElementById('btn-loadmore');
+
+        try {
+          const url = '/auditorias?skip=' + skip + '&limit=' + PAGE_SIZE;
+          const resp = await window.mcFetch(url);
+          if (!resp.ok) {
+            loadingEl.textContent = 'Falha ao carregar histórico.';
+            loadingEl.style.display = '';
+            return;
+          }
+          const data = await resp.json();
+          loadingEl.style.display = 'none';
+
+          if (skip === 0 && (!data || data.length === 0)) {
+            renderVazio();
+            loadMoreWrap.style.display = 'none';
+            return;
+          }
+
+          if (skip === 0) {
+            renderTabela(data);
+          } else {
+            // Append à tabela existente
+            const tbody = document.querySelector('#historico-root table tbody');
+            if (tbody) {
+              data.forEach(function (item) { tbody.appendChild(renderLinha(item)); });
+            }
+          }
+
+          skip += data.length;
+          if (data.length === PAGE_SIZE) {
+            loadMoreWrap.style.display = '';
+          } else {
+            loadMoreWrap.style.display = 'none';
+          }
+        } catch (err) {
+          loadingEl.textContent = (err && err.message) || 'Falha de rede ao carregar histórico.';
+          loadingEl.style.display = '';
+        } finally {
+          carregando = false;
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', function () {
+        const btn = document.getElementById('btn-loadmore');
+        if (btn) {
+          btn.addEventListener('click', function () { carregarPagina(); });
+        }
+        carregarPagina();
+      });
+    })();
+  </script>
 </body>
 </html>

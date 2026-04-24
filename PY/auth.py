@@ -88,6 +88,13 @@ class UserDB(SQLModel, table=True):
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     ultimo_acesso: Optional[str] = Field(default=None)
 
+    # Fase 5 — preferências por usuário (Opção A: colunas em UserDB).
+    # Decisão arquitetural: 1:1 com user, sem JOIN por GET, lifecycle atrelado.
+    # Se settings crescer além de 5-6 campos, migra pra tabela própria.
+    # tema: "claro" | "escuro" | "auto" — valida no endpoint, não no DB.
+    tema: str = Field(default="auto", max_length=10)
+    notificacoes_email: bool = Field(default=True)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # EXCEÇÕES CUSTOMIZADAS

@@ -4,37 +4,40 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Motor Conect — Integrações</title>
-  
+
   <!-- CSS Centralizado -->
   <link rel="stylesheet" href="design_system.css">
-  
+
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <style>
-    .integration-card { 
-      padding: 1.5rem; 
-      border-radius: 12px; 
-      border: 1px solid var(--border-subtle); 
-      background: rgba(255,255,255,0.02); 
-      display: flex; 
-      align-items: center; 
-      justify-content: space-between; 
+    .integration-card {
+      padding: 1.5rem;
+      border-radius: 12px;
+      border: 1px solid var(--border-subtle);
+      background: rgba(255,255,255,0.02);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
-    .status-dot { 
-      width: 10px; 
-      height: 10px; 
-      border-radius: 50%; 
-      display: inline-block; 
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
       margin-right: 0.5rem;
     }
-    .status-online { 
-      background: var(--color-green-500); 
-      box-shadow: 0 0 10px var(--color-green-500); 
+    .status-online {
+      background: var(--color-green-500);
+      box-shadow: 0 0 10px var(--color-green-500);
     }
-    .status-offline { 
-      background: var(--color-red-500); 
-      box-shadow: 0 0 10px var(--color-red-500); 
+    .status-offline {
+      background: var(--color-red-500);
+      box-shadow: 0 0 10px var(--color-red-500);
+    }
+    .status-loading {
+      background: var(--color-gray-600);
     }
   </style>
 </head>
@@ -46,61 +49,168 @@
     <main class="main-content">
       <header class="mb-8">
         <h2 class="text-h1">Hub de Integrações</h2>
-        <p class="text-body mt-2">Conectores ativos para orquestração de dados fiscais (ETL e Webhooks).</p>
+        <p class="text-body mt-2">Status em tempo real dos conectores ativos. Estado global do sistema — não reporta credencial nem caminho de arquivo.</p>
       </header>
 
-      <div class="flex-col gap-4">
-        <div class="integration-card">
-          <div class="flex-row items-center gap-4">
-            <div style="background: rgba(10, 132, 255, 0.1); padding: 1rem; border-radius: 8px;">
-               <i data-lucide="cloud" style="color: var(--color-blue-500);"></i>
-            </div>
-            <div>
-              <h3 style="font-size: 1rem; font-weight: 600;">Claude 3 Vision (e-CAC)</h3>
-              <p class="text-muted" style="font-size: 0.75rem;">Extração de PGDAS-D e DRE via Processamento de Imagem (Vision API)</p>
-            </div>
-          </div>
-          <div class="flex-row items-center gap-4">
-            <span style="font-size: 0.8rem;"><span class="status-dot status-online"></span> Operante</span>
-            <button class="btn btn-ghost" onclick="mcToast('Teste de I/O iniciado...', 'info')">Testar I/O</button>
-          </div>
-        </div>
-
-        <div class="integration-card">
-          <div class="flex-row items-center gap-4">
-            <div style="background: rgba(0, 179, 126, 0.1); padding: 1rem; border-radius: 8px;">
-               <i data-lucide="shield" style="color: var(--color-green-500);"></i>
-            </div>
-            <div>
-              <h3 style="font-size: 1rem; font-weight: 600;">Portal e-CAC (Certificado A1)</h3>
-              <p class="text-muted" style="font-size: 0.75rem;">Acesso direto ao Portal e-CAC com Certificado Digital A1 (automação RPA)</p>
-            </div>
-          </div>
-          <div class="flex-row items-center gap-4">
-             <span style="font-size: 0.8rem;"><span class="status-dot status-online"></span> Operante</span>
-            <button class="btn btn-ghost">Renovar A1</button>
-          </div>
-        </div>
-
-        <div class="integration-card">
-          <div class="flex-row items-center gap-4">
-            <div style="background: rgba(226, 88, 88, 0.1); padding: 1rem; border-radius: 8px;">
-               <i data-lucide="database" style="color: var(--color-red-500);"></i>
-            </div>
-            <div>
-              <h3 style="font-size: 1rem; font-weight: 600;">Nibo Sync</h3>
-              <p class="text-muted" style="font-size: 0.75rem;">Exportador de Lotes Fiscais</p>
-            </div>
-          </div>
-          <div class="flex-row items-center gap-4">
-            <span style="font-size: 0.8rem; color: var(--color-red-500);"><span class="status-dot status-offline"></span> Desconectado</span>
-            <button class="btn btn-primary" style="font-size: 0.8rem;">Reconectar</button>
-          </div>
-        </div>
+      <div class="flex-col gap-4" id="integracoes-root">
+        <!-- Cards renderizados dinamicamente -->
       </div>
     </main>
   </div>
 
   <script src="components.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      // ─── Lista canônica das integrações (label + icon + chave da API) ──
+      const INTEGRACOES = [
+        {
+          chave: 'sieg',
+          titulo: 'SIEG (XMLs Fiscais)',
+          descricao: 'Provedor de XMLs de NF-e/NFC-e/CT-e via API autenticada',
+          icon: 'cloud',
+          iconBg: 'rgba(10, 132, 255, 0.1)',
+          iconColor: 'var(--color-blue-500)',
+        },
+        {
+          chave: 'integra',
+          titulo: 'Integra Contador (Serpro)',
+          descricao: 'PGDAS-D, DAS e Declarações oficiais via Serpro Integra Contador',
+          icon: 'shield',
+          iconBg: 'rgba(0, 179, 126, 0.1)',
+          iconColor: 'var(--color-green-500)',
+        },
+        {
+          chave: 'ecac',
+          titulo: 'Portal e-CAC (Certificado A1)',
+          descricao: 'Acesso direto ao e-CAC via Certificado Digital A1 (RPA)',
+          icon: 'database',
+          iconBg: 'rgba(226, 88, 88, 0.1)',
+          iconColor: 'var(--color-red-500)',
+        },
+      ];
+
+      // ─── DOM builder: 1 card de integração (sem innerHTML de dados crus) ──
+      function construirCard(cfg, estado) {
+        const card = document.createElement('div');
+        card.className = 'integration-card';
+
+        // Coluna esquerda: ícone + texto
+        const esq = document.createElement('div');
+        esq.className = 'flex-row items-center gap-4';
+
+        const iconBox = document.createElement('div');
+        iconBox.style.background = cfg.iconBg;
+        iconBox.style.padding = '1rem';
+        iconBox.style.borderRadius = '8px';
+
+        const icon = document.createElement('i');
+        icon.setAttribute('data-lucide', cfg.icon);
+        icon.style.color = cfg.iconColor;
+        iconBox.appendChild(icon);
+        esq.appendChild(iconBox);
+
+        const texto = document.createElement('div');
+        const h3 = document.createElement('h3');
+        h3.style.fontSize = '1rem';
+        h3.style.fontWeight = '600';
+        h3.textContent = cfg.titulo;
+        texto.appendChild(h3);
+        const pDesc = document.createElement('p');
+        pDesc.className = 'text-muted';
+        pDesc.style.fontSize = '0.75rem';
+        pDesc.textContent = cfg.descricao;
+        texto.appendChild(pDesc);
+        esq.appendChild(texto);
+
+        card.appendChild(esq);
+
+        // Coluna direita: status
+        const dir = document.createElement('div');
+        dir.className = 'flex-row items-center gap-4';
+
+        const statusSpan = document.createElement('span');
+        statusSpan.style.fontSize = '0.8rem';
+
+        const dot = document.createElement('span');
+        dot.className = 'status-dot';
+
+        if (estado === 'loading') {
+          dot.classList.add('status-loading');
+          statusSpan.appendChild(dot);
+          statusSpan.appendChild(document.createTextNode(' Carregando…'));
+        } else if (estado && estado.ok === true) {
+          dot.classList.add('status-online');
+          statusSpan.appendChild(dot);
+          statusSpan.appendChild(document.createTextNode(' Operante'));
+        } else {
+          dot.classList.add('status-offline');
+          statusSpan.style.color = 'var(--color-red-500)';
+          statusSpan.appendChild(dot);
+          const motivo = (estado && estado.motivo_erro_publico) || 'Indisponível';
+          statusSpan.appendChild(document.createTextNode(' ' + motivo));
+        }
+
+        dir.appendChild(statusSpan);
+        card.appendChild(dir);
+
+        return card;
+      }
+
+      // ─── Render inicial: placeholders "Carregando…" ───────────────
+      function renderPlaceholders() {
+        const root = document.getElementById('integracoes-root');
+        root.innerHTML = '';
+        INTEGRACOES.forEach(function (cfg) {
+          root.appendChild(construirCard(cfg, 'loading'));
+        });
+        if (typeof lucide !== 'undefined' && lucide.createIcons) {
+          lucide.createIcons();
+        }
+      }
+
+      // ─── Render final com estado do backend ───────────────────────
+      function renderStatus(statusResponse) {
+        const root = document.getElementById('integracoes-root');
+        root.innerHTML = '';
+        INTEGRACOES.forEach(function (cfg) {
+          const estado = statusResponse ? statusResponse[cfg.chave] : null;
+          root.appendChild(construirCard(cfg, estado));
+        });
+        if (typeof lucide !== 'undefined' && lucide.createIcons) {
+          lucide.createIcons();
+        }
+      }
+
+      // ─── Fetch do status ──────────────────────────────────────────
+      async function carregarStatus() {
+        renderPlaceholders();
+        try {
+          // Timeout curto — endpoint é síncrono e rápido.
+          const resp = await window.mcFetch('/integracoes/status', { timeout: 10000 });
+          if (!resp.ok) {
+            // Fail-closed: render offline para todos.
+            renderStatus({
+              sieg: { ok: false, motivo_erro_publico: 'Falha ao consultar' },
+              integra: { ok: false, motivo_erro_publico: 'Falha ao consultar' },
+              ecac: { ok: false, motivo_erro_publico: 'Falha ao consultar' },
+            });
+            return;
+          }
+          const data = await resp.json();
+          renderStatus(data);
+        } catch (err) {
+          renderStatus({
+            sieg: { ok: false, motivo_erro_publico: 'Sem conexão' },
+            integra: { ok: false, motivo_erro_publico: 'Sem conexão' },
+            ecac: { ok: false, motivo_erro_publico: 'Sem conexão' },
+          });
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', carregarStatus);
+    })();
+  </script>
 </body>
 </html>
