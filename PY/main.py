@@ -157,7 +157,7 @@ def _setup_logging() -> None:
 _setup_logging()
 logger = logging.getLogger("motor_conect.api")
 
-TOTAL_TESTES = 327  # Atualizado 08/04/2026: + 7 testes LGPD PII separation (fix bug latente Lucro Real)
+TOTAL_TESTES = 984  # Atualizado 24/04/2026: 57 arquivos, 984 funções de teste (inclui suite HTTP Fase 5)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1610,15 +1610,6 @@ async def analise_pdf(
             status_code=500,
             detail="Falha na extração dos documentos. Verifique os arquivos enviados.",
         )
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# GET /auditoria/prova/cnpj/{cnpj} — Dossiê de prova ZIP (Gap P0 / Etapa 5)
-#
-# Decifra todos os PDFs cifrados de um cliente e devolve um ZIP com:
-#   - originais/<nome>.pdf         (decifrados on-the-fly)
-#   - HASHES.txt                   (hash SHA-256 esperado de cada arquivo)
-
 
 
 

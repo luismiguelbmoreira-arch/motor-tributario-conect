@@ -176,7 +176,7 @@ Impacto: AE I faixa 5 = 9,97% vs AE III faixa 5 = ~18% → diferença brutal
 - `4757100` → Anexo I (CANAVEZI, comércio varejista eletroeletrônicos)
 - `2539001` → Anexo II (ITANGUA, usinagem/tornearia/solda — confirmado por IPI no DAS)
 
-**Status:** ⏳ Parcial — fallback agora levanta `ValueError` (ERR-005 Opção B implementada). Adicionar 2 CNAEs acima como próximo passo.
+**Status:** ✅ Corrigido — `data/cnae_completo.json` (1.332 entradas geradas por `scripts/gerar_mapa_cnae.py`) já contém `4757100 → I` e `2539001 → II`. `CNAE_PARA_ANEXO` carrega o JSON no boot via `tabelas_simples.py:360`. Verificado em 24/04/2026.
 
 ---
 
@@ -362,7 +362,7 @@ Implementação da classe `Atividade` e suporte a loop em `calcular_das_mensal()
 > `/analise/sessao` (hidratação do resultado a partir do buffer in-memory).
 > Para manter a rastreabilidade separada por superfície de ataque, o item
 > foi desmembrado em **ERR-018.a** (`/analise/sessao` — ✅ corrigido na Fase 4)
-> e **ERR-018.b** (`/integracoes/ecac/sync` — ⏳ pendente para Fase 5).
+> e **ERR-018.b** (`/integracoes/ecac/sync` — ✅ corrigido em 24/04/2026).
 > O cabeçalho original abaixo permanece intacto como contexto histórico.
 
 **Data:** 23/04/2026
@@ -460,8 +460,7 @@ dados via certificado A1/Gov.br. Vetor multi-tenant.
 **PRAZO:** antes de qualquer deploy multi-tenant. Não pode entrar em produção
 compartilhada sem isso.
 
-**Status:** ⏳ Pendente — Fase 5. A tabela de auditoria da tentativa já está
-disponível (Fase 4.1), resta o guard de ownership propriamente dito.
+**Status:** ✅ Corrigido em 24/04/2026. Helper `tem_acesso_cnpj(user_id, cnpj)` implementado em `database/repositories/diagnostico_repo.py`. Guard `_verificar_ownership_cnpj()` aplicado em `ecac_sync_a1`, `sieg_sincronizar` e `integra_sincronizar`. Admin bypass. Tentativas bloqueadas registradas via `registrar_tentativa_acesso()`.
 
 ---
 

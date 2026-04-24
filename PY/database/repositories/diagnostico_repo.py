@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 from sqlalchemy.exc import IntegrityError, OperationalError
 from ..connection import get_session
-from ..models import DiagnosticoDB
+from ..models import DiagnosticoDB, EmpresaDB, AuditoriaDocumentoDB
 from ..enums import RegimeTributario, StatusAuditoria
 
 logger = logging.getLogger("motor_conect.database.diagnostico")
@@ -69,6 +69,50 @@ def salvar_diagnostico(
             session.rollback()
             logger.error("Erro ao salvar diagnóstico: %s", exc)
             raise RuntimeError("Falha na persistência do diagnóstico.")
+
+def tem_acesso_cnpj(user_id: int, cnpj: str) -> bool:
+    """
+    Verifica se user_id tem ao menos um diagnóstico ou documento vinculado ao CNPJ.
+
+    Amparo: LGPD Art. 6º V (minimização) + CTN Art. 198 (sigilo fiscal).
+    Usado como guard de ownership em endpoints de integração (ERR-018.b).
+
+    Aceita CNPJ com ou sem pontuação — normaliza internamente para 14 dígitos.
+    Admin bypass deve ser feito ANTES de chamar esta função.
+    """
+    apenas_digitos = re.sub(r"\D", "", cnpj or "")
+    if len(apenas_digitos) != 14:
+        return False
+
+    with get_session() as session:
+        # 1. Checa via DiagnosticoDB → EmpresaDB (CNPJ armazenado sem pontuação)
+        tem_diag = (
+            session.query(DiagnosticoDB)
+            .join(EmpresaDB, DiagnosticoDB.empresa_id == EmpresaDB.id)
+            .filter(
+                EmpresaDB.cnpj == apenas_digitos,
+                DiagnosticoDB.uploaded_by_user_id == user_id,
+            )
+            .first()
+        )
+        if tem_diag:
+            return True
+
+        # 2. Checa via AuditoriaDocumentoDB (empresa_cnpj pode ser formatado ou raw)
+        cnpj_formatado = (
+            f"{apenas_digitos[:2]}.{apenas_digitos[2:5]}.{apenas_digitos[5:8]}"
+            f"/{apenas_digitos[8:12]}-{apenas_digitos[12:]}"
+        )
+        tem_doc = (
+            session.query(AuditoriaDocumentoDB)
+            .filter(
+                AuditoriaDocumentoDB.empresa_cnpj.in_([apenas_digitos, cnpj_formatado]),
+                AuditoriaDocumentoDB.uploaded_by_user_id == user_id,
+            )
+            .first()
+        )
+        return tem_doc is not None
+
 
 def buscar_diagnosticos_por_empresa(empresa_id: int) -> List[DiagnosticoDB]:
     with get_session() as session:
