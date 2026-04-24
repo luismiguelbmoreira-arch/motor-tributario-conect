@@ -1275,7 +1275,8 @@ Alinhado a 10%/ano em ambos os blocos. `_fracao_iva_no_das` ja estava correto (`
 
 ### ERR-046 — `cenario_opt_out` subtrai IBS/CBS em bases diferentes (DAS mensal vs operacao)
 **Data:** 23/04/2026
-**Severidade:** 🟡 Atencao
+**Severidade:** 🔴 Critico (reclassificado de 🟡 em 23/04/2026 na auditoria pos-fissura Luiz)
+**Status:** ✅ **CORRIGIDO — Protocolo Jogada Fiscal (Fases 1-4) commit pos-65b35ea (23/04/2026)**
 **Arquivo:** `PY/core/motor_tributario.py` — `cenario_opt_out()` linhas 734-737
 **Descoberto em:** Auditoria matematica Luiz Moreira pos-refatoracao
 
@@ -1303,9 +1304,31 @@ fracao_iva_percentual = (fracao_ibs_pct + fracao_cbs_pct)  # % do DAS
 custo_das_sem_iva = valor_operacao * (AE - AE * fracao_iva_percentual)
 ```
 
-**Gatilho para reclassificacao (Luiz Moreira, 23/04/2026):** se o motor comecar a emitir pareceres com `valor_operacao` materialmente diferente de `rbt12/12` (operacoes pontuais grandes, compras sazonais, NF unica acima da media mensal), ERR-046 deve ser elevado para 🔴 Critico e entrar como P0 no sprint seguinte. Enquanto o uso for simulacao mensal representativa, a diferenca permanece pequena em valor absoluto.
+**Descoberta adicional na Fase 1 do Protocolo Jogada Fiscal:**
+Os testes TDD reverso revelaram que o defeito era MAIS GRAVE do que o LOG original documentava. `fracao_ibs` e `fracao_cbs` usavam `DISTRIBUICAO_DAS[anexo][faixa]["IBS"|"CBS"]` — mas essas colunas estao **zeradas** em TODAS as faixas do motor (o sistema real usa `_fracao_iva_no_das` com composicao PIS+COFINS → CBS e ICMS+ISS × fase_in → IBS). Resultado: **o motor nao expurgava NADA do DAS no cenario Opt-Out** — dupla tributacao silenciosa em produçao. Nao era vies pequeno, era expurgo zerado.
 
-**Status:** ⏳ Pendente — adiado para sprint separada (auditoria pos-fissura 23/04/2026)
+**Solucao adotada (ATA Fase 1 + veto Luiz item 3):**
+```python
+fracao_iva_pct = self._fracao_iva_no_das(anexo, faixa, ano)     # % adimensional
+fator_reducao  = self._fator_reducao_cbs_ibs()
+ae_sem_iva     = ae_efetiva * (Decimal("1") - fracao_iva_pct * fator_reducao)
+custo_das_sem_iva = valor_operacao * ae_sem_iva
+```
+
+Principais mudancas sobre a proposta original do LOG:
+1. **Reutiliza `_fracao_iva_no_das`** em vez de criar funcao nova (DRY, fonte unica com `credito_b2b_simples`)
+2. **Simetria do `fator_reducao`** aplicada nas duas pontas (veto Luiz): sem isso, `REDUCAO_60` deixaria IVA por fora a 40% mas expurgaria 100% do DAS → vies pro-opt-out. Fundamento: LC 214/2025 Arts. 258-264 aplicam isonomicamente.
+3. **Amparo legal expandido**: antes citava apenas "LC 214/2025 (aguardar regulamentacao)". Agora cita 6 artigos (41-44 + 47 §II + 344 + 353 + 356-360 + 348 III 'c').
+4. **Trilha `OPT_OUT_CALCULO` reescrita** com base/deducoes/aliquota coerentes (MAX_FISCAL_01 restaurado).
+
+**Testes canario (`tests/test_err046_opt_out_base.py`):**
+- **Linearidade** — dobrar valor_operacao dobra custo_das_sem_iva (invariante permanente)
+- **Nao-negatividade** — operacao pequena nunca gera valor negativo
+- **Boundary 2026** — fracao IVA = 0 → custo_das_sem_iva = valor × AE (Art. 348 III 'c')
+- **Simetria fator_reducao** — REDUCAO_60 expurga 40%, nao 100%
+- **Invariante soma** — custo_total = custo_das + iva_por_fora em qualquer combinacao
+
+**Versionamento:** bump `MOTOR_VERSAO` 1.1.0 → 1.2.0 (MINOR — mudança de regra fiscal). Diagnosticos v1.1.0 com `valor_operacao ≠ rbt12/12` foram entregues sem expurgo de IVA no DAS — identificaveis via campo `versao_motor` no JSON.
 
 ---
 

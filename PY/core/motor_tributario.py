@@ -48,7 +48,7 @@ logger = logging.getLogger("motor_conect.motor")
 # Versão do motor — bump a cada mudança de regra fiscal (V-04: rastreabilidade
 # retroativa de diagnósticos persistidos). Formato SemVer. Incrementar MINOR
 # para mudança de cálculo, PATCH para ajustes de citação/formatação.
-MOTOR_VERSAO = "1.1.0"  # 1.0.0 → 1.1.0: ERR-045 phase-in IBS corrigido
+MOTOR_VERSAO = "1.2.0"  # 1.1.0 → 1.2.0: ERR-046 cenario_opt_out base única + simetria fator_reducao
 
 
 # Fator R: limiar para migração Anexo V → Anexo III (LC 123/2006, Art. 18, § 24)
@@ -722,44 +722,82 @@ class MotorReformaTributaria:
         }
 
     def cenario_opt_out(self) -> Dict[str, Any]:
-        """Cenário B: Empresa recolhe IBS/CBS separadamente (Opt-Out)."""
+        """Cenário B: Empresa recolhe IBS/CBS separadamente (Opt-Out).
+
+        ERR-046 fix (ATA Fase 1, commit pós-4caf82c):
+        Fórmula antiga subtraía R$ do DAS mensal de um custo sobre valor_operacao
+        (bases incompatíveis, viola MAX_FISCAL_01). Pior: DISTRIBUICAO_DAS tem
+        IBS/CBS zerados em todas as faixas (motor usa _fracao_iva_no_das para
+        calcular a fração real), então o motor não expurgava NADA do DAS no
+        opt-out — resultava em dupla tributação silenciosa.
+
+        Fórmula nova (base única = valor_operacao, simetria de fator_reducao):
+            custo_das_sem_iva = valor_operacao × AE × (1 − fração_IVA_% × fator_reducao)
+
+        Simetria: se IVA por fora sofre REDUCAO_60 (40% da alíquota), a fração
+        do DAS expurgada também é 40% — caso contrário há viés pró-opt-out.
+        """
         aliquotas_iva = self.get_aliquotas_iva_por_ano()
         ae_efetiva = self.aliquota_efetiva
-
-        ibs_no_das = self.fracao_ibs
-        cbs_no_das = self.fracao_cbs
-
-        # ERR-016: aplica fator de redução CBS/IBS (Arts. 258-264 LC 214/2025)
         fator_reducao = self._fator_reducao_cbs_ibs()
+
         iva_por_fora = (
             self.operacao.valor_operacao
             * (aliquotas_iva["CBS"] + aliquotas_iva["IBS"])
             * fator_reducao
         ).quantize(Decimal("0.01"), ROUND_HALF_UP)
 
-        custo_das_por_operacao_completo = (self.operacao.valor_operacao * ae_efetiva).quantize(
-            Decimal("0.01"), ROUND_HALF_UP
-        )
-        # Subtrai fração IBS/CBS do DAS — evita dupla contagem
-        fracao_iva_no_das = (ibs_no_das + cbs_no_das)
-        custo_das_sem_iva = (custo_das_por_operacao_completo - fracao_iva_no_das).quantize(
-            Decimal("0.01"), ROUND_HALF_UP
-        )
+        # Fração IVA (CBS+IBS) percentual no DAS, por anexo/faixa/ano.
+        # Reutiliza _fracao_iva_no_das (mesma fonte usada em credito_b2b_simples).
+        anexo = self.anexo_principal
+        faixa = obter_faixa_numero(self.rbt12, anexo)
+        ano = self.operacao.data_emissao.year
+        fracao_iva_pct = self._fracao_iva_no_das(anexo, faixa, ano)
+
+        # AE líquida do DAS: expurga a fração IVA simetricamente ao fator de redução.
+        ae_sem_iva = (
+            ae_efetiva * (Decimal("1") - fracao_iva_pct * fator_reducao)
+        ).quantize(Decimal("0.000001"), ROUND_HALF_UP)
+
+        custo_das_sem_iva = (
+            self.operacao.valor_operacao * ae_sem_iva
+        ).quantize(Decimal("0.01"), ROUND_HALF_UP)
+
+        custo_das_completo_ref = (
+            self.operacao.valor_operacao * ae_efetiva
+        ).quantize(Decimal("0.01"), ROUND_HALF_UP)
+
         custo_total = (custo_das_sem_iva + iva_por_fora).quantize(
             Decimal("0.01"), ROUND_HALF_UP
         )
 
         self._registrar_passo(
             id="OPT_OUT_CALCULO",
-            titulo="Cenário Opt-Out — DAS sem IVA + IVA por fora",
-            base=f"DAS completo {_fmt_brl(custo_das_por_operacao_completo)}",
-            deducoes=f"IBS/CBS no DAS {_fmt_brl(fracao_iva_no_das)}",
-            aliquota=f"IVA por fora {(aliquotas_iva['CBS']+aliquotas_iva['IBS'])*100:.2f}%",
+            titulo="Cenário Opt-Out — DAS líquido + IVA por fora (base única)",
+            base=f"Valor operação {_fmt_brl(self.operacao.valor_operacao)}",
+            deducoes=(
+                f"Fração IBS+CBS no DAS Anexo {anexo} Faixa {faixa} em {ano}: "
+                f"{(fracao_iva_pct*100):.2f}% × fator redução {fator_reducao}"
+            ),
+            aliquota=(
+                f"AE líquida {(ae_sem_iva*100):.4f}% + IVA por fora "
+                f"{((aliquotas_iva['CBS']+aliquotas_iva['IBS'])*fator_reducao*100):.2f}%"
+            ),
             valor=_fmt_brl(custo_total),
-            lei="LC 214/2025 (dispositivo de opt-out — aguardar regulamentação)",
+            lei=(
+                "LC 214/2025 Arts. 41-44 (dispositivo de opt-out) | "
+                "Art. 47 §II (creditamento proporcional) | "
+                "Arts. 258-264 (fator redução CBS/IBS — aplicação simétrica) | "
+                "Arts. 344 e 353 (CBS substitui PIS/COFINS 2027) | "
+                "Arts. 356-360 (fase-in IBS 2029-2032) | "
+                "Art. 348 III 'c' (dispensa 2026)"
+            ),
             detalhe=(
-                f"DAS sem IVA {_fmt_brl(custo_das_sem_iva)} + IVA por fora {_fmt_brl(iva_por_fora)} = "
-                f"Total {_fmt_brl(custo_total)}. Sem dupla contagem de IBS/CBS."
+                f"DAS completo seria {_fmt_brl(custo_das_completo_ref)}. "
+                f"AE líquida = AE × (1 − fração_IVA_% × fator_redução) = "
+                f"{_fmt_brl(custo_das_sem_iva)}. IVA por fora {_fmt_brl(iva_por_fora)}. "
+                f"Total {_fmt_brl(custo_total)}. Base única (valor_operacao), "
+                f"simetria de fator_reducao nas duas pontas (ERR-046 fix)."
             ),
         )
 
@@ -775,7 +813,9 @@ class MotorReformaTributaria:
             "impacto_caixa": "NEUTRO se IVA repassado no preço de venda",
             "observacao": (
                 "100% do IBS/CBS é creditável pelo comprador B2B. "
-                "Empresa mantém competitividade no polo industrial."
+                "Empresa mantém competitividade no polo industrial. "
+                "Fração IVA do DAS expurgada proporcionalmente à operação — "
+                "sem dupla tributação e sem viés direcional (ERR-046)."
             ),
         }
 
