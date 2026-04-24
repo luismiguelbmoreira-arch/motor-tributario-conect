@@ -1,12 +1,14 @@
 import json
-import re
 import logging
+import re
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
+
 from sqlalchemy.exc import IntegrityError, OperationalError
+
 from ..connection import get_session
-from ..models import DiagnosticoDB, EmpresaDB, AuditoriaDocumentoDB
-from ..enums import RegimeTributario, StatusAuditoria
+from ..enums import RegimeTributario
+from ..models import AuditoriaDocumentoDB, DiagnosticoDB, EmpresaDB
 
 logger = logging.getLogger("motor_conect.database.diagnostico")
 

@@ -2,20 +2,29 @@
 test_endpoints.py — Testes de integração HTTP do Motor Tributário Conect.
 
 Cobre o contrato público da API via FastAPI TestClient (sem rede real).
-Banco em memória isolado por sessão — nenhum dado persiste entre testes.
+Banco em arquivo temporário por sessão — isolado e sem conflitos de conexão
+que afetam SQLite :memory: com múltiplas threads.
 
 Rodar: python -m pytest tests/api/test_endpoints.py -v
 """
 import os
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
-os.environ.setdefault("JWT_SECRET_KEY", "test_secret_key_for_pytest_only")
-os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+# Chaves de teste — NUNCA usar em produção
+os.environ.setdefault("JWT_SECRET_KEY", "test_secret_key_for_pytest_only_32ch")
 os.environ.setdefault("ANTHROPIC_API_KEY", "sk-ant-test-placeholder")
-os.environ.setdefault("DEFAULT_ADMIN_PASSWORD", "TestAdmin@2026!")
+os.environ.setdefault("DEFAULT_ADMIN_PASSWORD", "Admin@Test2026")
 os.environ.setdefault("ENVIRONMENT", "test")
+os.environ.setdefault("MOTOR_CONECT_MASTER_KEY", "0" * 64)
+
+# Banco de dados temporário em arquivo (evita isolamento multi-conexão do :memory:)
+_tmp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+_tmp_db.close()
+_DB_URL = f"sqlite:///{_tmp_db.name}"
+os.environ["DATABASE_URL"] = _DB_URL
 
 import pytest
 from fastapi.testclient import TestClient
@@ -37,7 +46,7 @@ def auth_headers(client):
     """Faz login com admin padrão e devolve headers JWT."""
     resp = client.post(
         "/auth/login",
-        json={"username": "admin", "password": "TestAdmin@2026!"},
+        json={"username": "admin", "password": "Admin@Test2026"},
     )
     assert resp.status_code == 200, f"Login falhou: {resp.text}"
     token = resp.json()["access_token"]
@@ -64,7 +73,7 @@ def test_login_credenciais_corretas(client):
     """/auth/login com credenciais válidas deve retornar JWT."""
     resp = client.post(
         "/auth/login",
-        json={"username": "admin", "password": "TestAdmin@2026!"},
+        json={"username": "admin", "password": "Admin@Test2026"},
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -110,30 +119,25 @@ def test_dashboard_summary_sem_auth(client):
 
 def test_analise_manual_simples_valida(client, auth_headers):
     """Análise manual de empresa Simples Nacional retorna diagnóstico 200."""
+    # AnaliseManualRequest é um schema PLANO (não aninhado)
     payload = {
-        "fornecedora": {
-            "cnpj": "11.222.333/0001-81",
-            "razao_social": "Empresa Teste Simples Ltda",
-            "regime": "SIMPLES",
-            "cnae_principal": "4771701",
-            "uf_origem": "SP",
-            "faturamento_12m": "360000.00",
-            "anexo_simples": "I",
-        },
-        "operacao": {
-            "data_emissao": "2026-06-15",
-            "valor": "10000.00",
-            "reducao_cbs_ibs": "INTEGRAL",
-        },
-        "compradora": {
-            "tipo": "B2B_CONTRIBUINTE",
-            "uf_destino": "SP",
-        },
+        "cnpj": "11.222.333/0001-81",
+        "razao_social": "Empresa Teste Simples Ltda",
+        "regime": "SIMPLES",
+        "cnae_principal": "4771701",
+        "uf_origem": "SP",
+        "faturamento_12m": "360000.00",
+        "anexo_simples": "I",
+        "tipo_comprador": "B2B_CONTRIBUINTE",
+        "uf_destino": "SP",
+        "data_emissao": "2026-06-15",
+        "valor_operacao": "10000.00",
     }
     resp = client.post("/analise/manual", json=payload, headers=auth_headers)
     assert resp.status_code == 200
     body = resp.json()
-    assert "das_mensal" in body or "regime" in body or "trilha_auditoria" in body
+    # Resposta usa envelope {diagnostico, pii, analise_id}
+    assert "analise_id" in body or "diagnostico" in body
 
 
 def test_analise_manual_payload_invalido(client, auth_headers):
@@ -166,7 +170,7 @@ def test_cnae_perfil_valido(client, auth_headers):
     resp = client.get("/cnae/4757100/perfil", headers=auth_headers)
     assert resp.status_code == 200
     body = resp.json()
-    assert "anexo_sugerido" in body or "anexo" in body or "cnae" in body
+    assert "cnae" in body or "anexo" in body or "sugestao" in body
 
 
 # ─── GET /auditoria/prova/cnpj/{cnpj} ────────────────────────────────────

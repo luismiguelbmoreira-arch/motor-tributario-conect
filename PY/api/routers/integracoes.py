@@ -1,11 +1,12 @@
 import logging
 import re
 from typing import Literal, Optional
-from fastapi import APIRouter, Depends, HTTPException, Form, Request, UploadFile, File
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from api.dependencies import get_current_user, extrair_user_id
+from api.dependencies import extrair_user_id, get_current_user
 from database import tem_acesso_cnpj
 from database.repositories.auditoria_tentativa_repo import registrar_tentativa_acesso
 
@@ -108,7 +109,7 @@ async def sieg_sincronizar(
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=f"Data inválida: {exc}") from exc
 
-    from integrations.sieg_service import SiegCredentialError, SiegError, SiegService, XML_TYPES_VALIDOS
+    from integrations.sieg_service import XML_TYPES_VALIDOS, SiegCredentialError, SiegError, SiegService
 
     if payload.xml_type not in XML_TYPES_VALIDOS:
         raise HTTPException(status_code=422, detail=f"xml_type inválido — esperado {list(XML_TYPES_VALIDOS)}")
@@ -166,7 +167,7 @@ async def integra_sincronizar(
         raise HTTPException(status_code=422, detail=str(exc))
 
     try:
-        from integrations.integra_adapter import (IntegraAdapter, IntegraAuthError, IntegraCertError, IntegraError)
+        from integrations.integra_adapter import IntegraAdapter, IntegraAuthError, IntegraCertError, IntegraError
         from integrations.integra_credentials import IntegraCredentialError, get_integra_credenciais
         from integrations.integra_ingestor import IntegraIngestor
     except ImportError as exc:
@@ -197,7 +198,7 @@ async def integra_sincronizar(
 
 # --- E-CAC ---
 try:
-    from integrations.ecac_scraper import EcacScraper, CertificateData, load_pfx_to_pem
+    from integrations.ecac_scraper import EcacScraper, load_pfx_to_pem
     _ECAC_AVAILABLE = True
 except ImportError:
     _ECAC_AVAILABLE = False
