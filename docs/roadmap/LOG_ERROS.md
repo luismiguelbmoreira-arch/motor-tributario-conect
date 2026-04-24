@@ -1533,6 +1533,77 @@ transformaria o endpoint `/auditorias` novo em feature natimorta.
 
 ---
 
+### ERR-052 — Wire `/analise/pdf` poluía histórico com CNAE fictício "4711301" (ACHADO-L1 Luiz)
+**Data:** 23/04/2026
+**Severidade:** 🟡 Atenção (integridade fiscal do histórico)
+**Amparo legal:** LC 123/2006 Art. 18 §§1º-24 (Anexo depende do CNAE) + MAX_FISCAL_02 (toda regra cita base legal)
+**Arquivo:** `PY/main.py:1539-1569` (antes do fix)
+**Descoberto em:** Parecer Luiz Moreira pós-Fase 5
+
+**Descrição:**
+Quando a extração Claude Vision no `/analise/pdf` não trazia CNAE, o wire
+de persistência (ERR-051) caía em default `"4711301"` (Comércio varejista
+de mercadorias com predominância de produtos alimentícios — supermercados).
+Empresa real poderia ser Anexo V (serviços de TI), Anexo IV (construção),
+etc. — CNAE fictício em histórico persistido = passivo de auditoria.
+Anexo I vs Anexo V muda alíquota em faixas inteiras.
+
+**Evidência:**
+```python
+cnae_principal=(
+    diagnostico.get("cnae_principal")
+    or (diagnostico.get("_extracao") or {}).get("cnae")
+    or "4711301"  # ← default fictício — podre
+),
+```
+
+**Solução aplicada (Fase 5.1):** guard de CNAE real no handler:
+```python
+cnae_real = (
+    diagnostico.get("cnae_principal")
+    or (diagnostico.get("_extracao") or {}).get("cnae")
+)
+if not cnae_real:
+    logger.info("Persistencia /analise/pdf pulada | motivo=cnae_ausente | user_id=%s", user_id)
+    # Sem CNAE confiável, não persistimos. Não inventamos.
+elif cnpj_ext and user_id is not None:
+    # ... constrói fornecedora com CNAE REAL (sem default fictício)
+```
+
+Histórico agora é PROVA, não suposição. Sem CNAE da fonte, a linha não entra.
+
+**Status:** ✅ Corrigido na Fase 5.1
+
+---
+
+### ERR-053 — `GET /auditorias` sem log estruturado operacional (ACHADO-L2 Luiz)
+**Data:** 23/04/2026
+**Severidade:** 🟡 Atenção (consistência com padrão Fase 4)
+**Amparo legal:** LGPD Art. 5º X + Art. 37 (registro de operações de tratamento)
+**Arquivo:** `PY/api/routers/historico.py:84` (antes do fix)
+**Descoberto em:** Parecer Luiz Moreira pós-Fase 5
+
+**Descrição:**
+Fase 4 introduziu `logger.info("HIDRATACAO_SESSAO | ...")` em `/analise/sessao/{id}`
+como telemetria operacional (sem PII). `GET /auditorias` da Fase 5 não
+seguiu o mesmo padrão — sem log estruturado, correlação de incidente
+fica cega.
+
+**Solução aplicada (Fase 5.1):** log estruturado após listagem:
+```python
+logger.info(
+    "AUDITORIAS_LISTADAS | user_id=%s | count=%s | skip=%s | limit=%s",
+    user_id, len(registros), skip, limit,
+)
+```
+
+ZERO PII (sem CNPJ, sem razão social, sem resultado_json). Só telemetria
+operacional — útil em incidente/auditoria ANPD.
+
+**Status:** ✅ Corrigido na Fase 5.1
+
+---
+
 ## HISTÓRICO DE AUDITORIAS REAIS
 
 | Data | Empresa | CNPJ | Período | DAS e-CAC | DAS Motor | Delta | Status |

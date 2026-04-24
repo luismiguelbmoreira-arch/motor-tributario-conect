@@ -91,6 +91,16 @@ def listar_auditorias_usuario(
         # de DB ao atacante. Erros reais ficam no log do servidor.
         return []
 
+    # ACHADO-L2 (Fase 5.1 — Luiz Moreira): log estruturado por consistência
+    # com o padrão Fase 4 (HIDRATACAO_SESSAO em /analise/sessao). Telemetria
+    # operacional mínima — user_id, count, skip — ZERO PII (sem CNPJ, sem
+    # razão social, sem resultado_json). Útil em correlação de incidente.
+    # Amparo: LGPD Art. 5º X + 37 (registro de operações de tratamento).
+    logger.info(
+        "AUDITORIAS_LISTADAS | user_id=%s | count=%s | skip=%s | limit=%s",
+        user_id, len(registros), skip, limit,
+    )
+
     return [
         AuditoriaResumo(
             id=r.id or 0,

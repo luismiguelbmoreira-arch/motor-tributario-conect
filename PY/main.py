@@ -1536,25 +1536,40 @@ async def analise_pdf(
         # Diferente do /manual, aqui a "fornecedora" sai da extração. Tentamos
         # reconstruí-la com os campos mínimos; se faltar algo crítico (CNPJ
         # inválido, CNAE ausente), o helper absorve a exception. Best-effort.
+        #
+        # ACHADO-L1 (Fase 5.1 — Luiz Moreira): guard CNAE REAL obrigatório.
+        # Antes, a ausência de CNAE caía em default "4711301" (Comércio
+        # varejista com predominância de produtos alimentícios), mas a empresa
+        # poderia ser prestadora de serviços (Anexo V) ou construção (Anexo IV).
+        # CNAE fictício em histórico persistido = passivo de auditoria e
+        # viola MAX_FISCAL_02 ("toda regra cita base legal"). Sem CNAE da
+        # fonte, não escrevemos no histórico — histórico é PROVA, não suposição.
+        # Amparo: LC 123/2006 Art. 18 §1º-§24 (Anexo depende do CNAE).
         try:
             pii_block = payload.get("pii") or {}
             cnpj_ext = pii_block.get("cnpj") or diagnostico.get("cnpj")
-            if cnpj_ext and user_id is not None:
+            cnae_real = (
+                diagnostico.get("cnae_principal")
+                or (diagnostico.get("_extracao") or {}).get("cnae")
+            )
+            uf_real = (
+                diagnostico.get("uf_origem")
+                or (diagnostico.get("_extracao") or {}).get("uf")
+            )
+            if not cnae_real:
+                # Sem CNAE confiável, não persistimos. Não inventamos.
+                logger.info(
+                    "Persistencia /analise/pdf pulada | motivo=cnae_ausente | user_id=%s",
+                    user_id,
+                )
+            elif cnpj_ext and user_id is not None:
                 from core.motor_tributario import EmpresaFornecedora as _EF
                 fornecedora_pdf = _EF(
                     cnpj=cnpj_ext,
                     razao_social=(pii_block.get("razao_social") or "Cliente e-CAC"),
                     regime=diagnostico.get("regime", "SIMPLES"),
-                    cnae_principal=(
-                        diagnostico.get("cnae_principal")
-                        or (diagnostico.get("_extracao") or {}).get("cnae")
-                        or "4711301"
-                    ),
-                    uf_origem=(
-                        diagnostico.get("uf_origem")
-                        or (diagnostico.get("_extracao") or {}).get("uf")
-                        or "SP"
-                    ),
+                    cnae_principal=cnae_real,
+                    uf_origem=(uf_real or "SP"),
                     faturamento_12m=Decimal(str(
                         diagnostico.get("rbt12")
                         or (diagnostico.get("_extracao") or {}).get("rbt12")
