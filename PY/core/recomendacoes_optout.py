@@ -4,15 +4,9 @@ LC 214/2025 Arts. 41-44 | Res. CGSN 183/2025
 """
 
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any, Dict
+from typing import Dict
 
-
-def _fmt_brl(valor: Any) -> str:
-    try:
-        d = Decimal(str(valor or 0)).quantize(Decimal("0.01"), ROUND_HALF_UP)
-    except Exception:
-        return "R$ 0,00"
-    return f"R$ {d:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+from core.formatadores import _fmt_brl
 
 
 def gerar_recomendacao_opt_out(
@@ -25,10 +19,28 @@ def gerar_recomendacao_opt_out(
       - percentual_b2b: peso comercial (clientes que perderiam crédito)
       - disparidade_anual / rbt12: custo relativo de sair do Simples Puro
       - threshold absoluto: R$ 6.000/ano separa impacto alto de baixo
-    """
-    rbt12_val = rbt12 or Decimal("1")
 
-    razao_disparidade = (abs(disparidade_anual) / rbt12_val * Decimal("100")).quantize(
+    V-01 fix: rbt12 <= 0 → DADOS_INSUFICIENTES (não fabrica 50000%
+    como `rbt12 or Decimal("1")` fazia antes).
+    """
+    if rbt12 is None or rbt12 <= Decimal("0"):
+        return {
+            "codigo": "DADOS_INSUFICIENTES",
+            "titulo": "RBT12 ausente ou zero — recomendação não calculável",
+            "justificativa": (
+                "A Receita Bruta dos últimos 12 meses (RBT12) é zero ou não "
+                "foi informada. Sem esse dado, não é possível calcular a "
+                "razão de disparidade do Opt-Out em relação à receita. "
+                "Revise o cadastro da empresa e informe o faturamento dos "
+                "últimos 12 meses."
+            ),
+            "amparo_legal": (
+                "LC 123/2006, Art. 3º, § 1º (definição de receita bruta) | "
+                "Res. CGSN 140/2018, Art. 16 (obrigatoriedade de apuração mensal)"
+            ),
+        }
+
+    razao_disparidade = (abs(disparidade_anual) / rbt12 * Decimal("100")).quantize(
         Decimal("0.01"), ROUND_HALF_UP
     )
 
@@ -108,8 +120,11 @@ def gerar_recomendacao_opt_out(
         "titulo": titulo,
         "justificativa": justificativa,
         "amparo_legal": (
-            "LC 214/2025, Arts. 41-44 (dispositivo de Opt-Out) | "
+            "Dispositivo legal do Opt-Out: LC 214/2025, Arts. 41-44 | "
             "CF Art. 146, III, 'd' (regime diferenciado Simples Nacional) | "
-            "Resolução CGSN 183/2025 (janelas semestrais abr/set)"
+            "Resolução CGSN 183/2025 (janelas semestrais abr/set). "
+            "Critério de conveniência econômica (thresholds 70%/50%/30% de "
+            "B2B e 5%/10% de disparidade): heurística interna do Escritório "
+            "Conect — sem amparo normativo específico. Avaliar caso a caso."
         ),
     }

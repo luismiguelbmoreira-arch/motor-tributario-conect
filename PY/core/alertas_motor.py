@@ -4,23 +4,16 @@ LC 123/2006 | LC 214/2025 | EC 132/2023
 """
 
 from datetime import date
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
+from core.formatadores import _fmt_brl
 from core.tabelas_simples import (
     ALERTA_90_PERCENT_TETO,
     ANO_INICIO_SPLIT_PAYMENT,
     SUBLIMITE_ICMS_ISS,
     TETO_SIMPLES_NACIONAL,
 )
-
-
-def _fmt_brl(valor: Any) -> str:
-    try:
-        d = Decimal(str(valor or 0)).quantize(Decimal("0.01"), ROUND_HALF_UP)
-    except Exception:
-        return "R$ 0,00"
-    return f"R$ {d:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def gerar_alertas(

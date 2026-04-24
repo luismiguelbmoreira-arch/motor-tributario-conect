@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import Field, field_validator, model_validator
 
 from core.difal import calcular_difal
+from core.formatadores import _fmt_brl
 from core.regimes.base import BaseRegimeEngine
 from core.regimes.lucro_presumido import LucroPresumidoEngine
 from core.regimes.lucro_real import LucroRealEngine
@@ -33,18 +34,21 @@ from core.tabelas_simples import (
     obter_faixa_numero,
 )
 from validadores import validar_cnae, validar_cnpj, validar_ncm, validar_uf
-from schemas.motor import Atividade, EmpresaFornecedora, EmpresaCompradora, OperacaoFiscal
+from schemas.motor import (
+    Atividade,
+    EmpresaFornecedora,
+    EmpresaCompradora,
+    FORMAS_PAGAMENTO_COM_PSP,
+    OperacaoFiscal,
+)
 
 logger = logging.getLogger("motor_conect.motor")
 
 
-def _fmt_brl(valor: Any) -> str:
-    """Formata valor monetário no padrão BR: R$ X.XXX,YY."""
-    try:
-        d = Decimal(str(valor or 0)).quantize(Decimal("0.01"), ROUND_HALF_UP)
-    except Exception:
-        return "R$ 0,00"
-    return f"R$ {d:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+# Versão do motor — bump a cada mudança de regra fiscal (V-04: rastreabilidade
+# retroativa de diagnósticos persistidos). Formato SemVer. Incrementar MINOR
+# para mudança de cálculo, PATCH para ajustes de citação/formatação.
+MOTOR_VERSAO = "1.1.0"  # 1.0.0 → 1.1.0: ERR-045 phase-in IBS corrigido
 
 
 # Fator R: limiar para migração Anexo V → Anexo III (LC 123/2006, Art. 18, § 24)
@@ -77,6 +81,7 @@ class MotorReformaTributaria:
     trilha_auditoria: List[Dict[str, Any]]
     _engine_regime: Optional[BaseRegimeEngine]
     _diagnostico_gerado: bool
+    _cnae_fonte: Optional[str]
 
     def __init__(
         self,
@@ -89,6 +94,11 @@ class MotorReformaTributaria:
         self.operacao = operacao
         self._diagnostico_gerado = False
         self.trilha_auditoria: List[Dict[str, Any]] = []
+        # V-06 fix: inicializa _cnae_fonte explicitamente. Antes só era set lazy
+        # em anexo_principal/_diagnostico_lucro_real, gerando risco de AttributeError
+        # caso _gerar_alertas fosse chamado em path alternativo. getattr(...) defensivo
+        # removido em troca de contrato claro.
+        self._cnae_fonte = None
 
         logger.info(
             "Motor iniciado | regime=%s | tipo_comprador=%s | ano=%s",
@@ -775,12 +785,9 @@ class MotorReformaTributaria:
         Split Payment: IBS/CBS retido na fonte pelo PSP a partir de jan/2027. LC 214/2025, Art. 344 + Art. 353 §1º.
         ERR-038: gating por FORMAS_PAGAMENTO_COM_PSP — PIX_VIA_PSP/BOLETO/CARTAO disparam; PIX_DIRETO/DINHEIRO escapam.
         """
-        # Import local evita ciclo e mantém fonte única de verdade.
-        from schemas.motor import FORMAS_PAGAMENTO_COM_PSP
-
         ano = self.operacao.data_emissao.year
         forma = self.operacao.forma_recebimento
-        tem_psp = forma in FORMAS_PAGAMENTO_COM_PSP
+        tem_psp = forma in FORMAS_PAGAMENTO_COM_PSP  # V-07: import agora no toplevel
 
         if ano >= ANO_INICIO_SPLIT_PAYMENT and tem_psp:
             aliquotas_ano = self.get_aliquotas_iva_por_ano()
@@ -918,7 +925,7 @@ class MotorReformaTributaria:
             estorno_realizado=self.operacao.estorno_realizado,
             tinha_st_icms=self.operacao.tinha_st_icms,
             cnae_principal=self.fornecedora.cnae_principal,
-            cnae_fonte=getattr(self, "_cnae_fonte", None),
+            cnae_fonte=self._cnae_fonte,  # V-06: inicializado no __init__
         )
 
     def _diagnostico_lucro_real(self) -> Dict[str, Any]:
@@ -967,6 +974,7 @@ class MotorReformaTributaria:
 
         return {
             "versao_schema": "1.0",
+            "versao_motor": MOTOR_VERSAO,  # V-04: rastreabilidade retroativa
             "versao_lei": "RIR_2018_LC214_2025",
             "data_analise": str(date.today()),
             "ano_operacao": self.operacao.data_emissao.year,
@@ -1005,12 +1013,16 @@ class MotorReformaTributaria:
             "alertas": self._gerar_alertas(),
             "trilha_auditoria": self.trilha_auditoria,
             "meta": {
-                "elaborado_por": "Escritório Conect — Motor Tributário v1.0",
+                "elaborado_por": f"Escritório Conect — Motor Tributário v{MOTOR_VERSAO}",
                 "legislacao_base": ["RIR/2018", "Lei 7.689/1988", "Lei 10.637/2002", "Lei 10.833/2003", "LC 214/2025"],
                 "validar_com_profissional": True,
                 "aviso": (
                     "Este diagnóstico é de natureza informativa. "
-                    "Decisões tributárias devem ser validadas por contador responsável (CRC-SP)."
+                    "Decisões tributárias devem ser validadas por contador responsável (CRC-SP). "
+                    f"Motor v{MOTOR_VERSAO}: diagnósticos gerados em versões anteriores "
+                    "podem conter erros fiscais corrigidos em versões posteriores "
+                    "(ver campo `versao_motor` e CHANGELOG). Verifique antes de usar "
+                    "como prova em defesa jurídica."
                 ),
             },
         }
@@ -1040,6 +1052,7 @@ class MotorReformaTributaria:
 
         diagnostico = {
             "versao_schema": "1.0",
+            "versao_motor": MOTOR_VERSAO,  # V-04: rastreabilidade retroativa
             "versao_lei": "LC123_2006_LC214_2025",
             "data_analise": str(date.today()),
             "ano_operacao": self.operacao.data_emissao.year,
@@ -1090,12 +1103,16 @@ class MotorReformaTributaria:
             "trilha_auditoria": self.trilha_auditoria,
 
             "meta": {
-                "elaborado_por": "Escritório Conect — Motor Tributário v1.0",
+                "elaborado_por": f"Escritório Conect — Motor Tributário v{MOTOR_VERSAO}",
                 "legislacao_base": ["LC 123/2006", "LC 214/2025"],
                 "validar_com_profissional": True,
                 "aviso": (
                     "Este diagnóstico é de natureza informativa. "
-                    "Decisões tributárias devem ser validadas por contador responsável (CRC-SP)."
+                    "Decisões tributárias devem ser validadas por contador responsável (CRC-SP). "
+                    f"Motor v{MOTOR_VERSAO}: diagnósticos gerados em versões anteriores "
+                    "podem conter erros fiscais corrigidos em versões posteriores "
+                    "(ver campo `versao_motor` e CHANGELOG). Verifique antes de usar "
+                    "como prova em defesa jurídica."
                 ),
             },
         }
@@ -1106,10 +1123,19 @@ class MotorReformaTributaria:
     # ── LGPD ──────────────────────────────────────────────────────────────────
 
     def purge(self) -> None:
-        """LGPD Art. 15 — Elimina dados após finalidade cumprida. Chamado automaticamente após gerar_diagnostico()."""
+        """LGPD Art. 16 — Elimina fornecedora, compradora, operação E trilha_auditoria
+        (contém RBT12, CNAE, valor_operacao, UF). Chamar APÓS serializar/persistir o
+        diagnóstico — o chamador que guardar referência direta de `motor.trilha_auditoria`
+        após `__exit__` receberá lista vazia.
+
+        V-09 fix (auditoria Luiz pós-fissura): trilha_auditoria é dado econômico
+        identificável e estava sobrevivendo ao purge anterior. Em FastAPI keep-alive,
+        vazava para a próxima análise do mesmo worker.
+        """
         setattr(self, "fornecedora", None)
         setattr(self, "compradora", None)
         setattr(self, "operacao", None)
+        self.trilha_auditoria.clear()
         gc.collect()
         logger.info("purge() concluído. Dados da análise eliminados da memória.")
 

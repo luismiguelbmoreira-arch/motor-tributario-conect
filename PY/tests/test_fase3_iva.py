@@ -115,12 +115,26 @@ class TestCronogramaIVA:
             assert aliq["CBS"] == Decimal("0.088"), f"CBS {ano} deve ser 8,8%"
 
     def test_ibs_cresce_ano_a_ano_2029_2033(self):
-        """IBS cresce progressivamente de 2029 a 2033 — fase-in ICMS/ISS."""
-        anos = [2029, 2030, 2031, 2032, 2033]
+        """IBS cresce progressivamente de 2029 a 2033 — fase-in ICMS/ISS.
+
+        V-05 fix: ancorado em valores absolutos (phase-in 10%/ano de 0.177).
+        Monotonicidade sozinha aceitava valores errados (ex: 20%/ano antigo).
+        Agora crava cada ano contra a expectativa legal direta.
+        """
+        esperados = {
+            2029: Decimal("0.0177"),  # 10% de 0.177
+            2030: Decimal("0.0354"),  # 20%
+            2031: Decimal("0.0531"),  # 30%
+            2032: Decimal("0.0708"),  # 40%
+            2033: Decimal("0.177"),   # 100%
+        }
         ibs_anterior = Decimal("0")
-        for ano in anos:
+        for ano, esperado in esperados.items():
             motor = make_motor(ano=ano)
             aliq = motor.get_aliquotas_iva_por_ano()
+            assert aliq["IBS"] == esperado, (
+                f"IBS {ano} esperado {esperado}, obtido {aliq['IBS']}"
+            )
             assert aliq["IBS"] > ibs_anterior, f"IBS {ano} deve ser > IBS {ano-1}"
             ibs_anterior = aliq["IBS"]
 
@@ -427,12 +441,30 @@ class TestSplitPayment:
         )
 
     def test_split_cresce_ano_a_ano_2029_2033(self):
-        """Retenção deve crescer de 2029 a 2033 junto com o fase-in do IBS."""
+        """Retenção deve crescer de 2029 a 2033 junto com o fase-in do IBS.
+
+        V-05 fix: cada ano cravado no valor absoluto esperado (CBS 8.8% fixo +
+        IBS phase-in 10%/20%/30%/40%/100%). Monotonicidade era teatro — aceitava
+        qualquer curva crescente incluindo valores duas vezes maiores.
+        """
+        ibs_esperado = {
+            2029: Decimal("0.0177"),
+            2030: Decimal("0.0354"),
+            2031: Decimal("0.0531"),
+            2032: Decimal("0.0708"),
+            2033: Decimal("0.177"),
+        }
+        cbs = Decimal("0.088")
+        valor = Decimal("50000.00")
         retencao_anterior = Decimal("0")
-        for ano in [2029, 2030, 2031, 2032, 2033]:
+        for ano, ibs in ibs_esperado.items():
             motor = make_motor(ano=ano, valor="50000.00", forma="PIX_VIA_PSP")
             r = motor.split_payment_impacto
             ret = Decimal(r["retencao_imediata"])
+            esperado = (valor * (cbs + ibs)).quantize(Decimal("0.01"))
+            assert abs(ret - esperado) <= Decimal("0.01"), (
+                f"Split {ano} esperado R$ {esperado}, obtido R$ {ret}"
+            )
             assert ret > retencao_anterior, f"Split {ano} deve ser > Split {ano-1}"
             retencao_anterior = ret
 

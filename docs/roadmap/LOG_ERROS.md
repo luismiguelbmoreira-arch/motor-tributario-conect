@@ -1229,6 +1229,7 @@ A constante FROZEN `FORMAS_PAGAMENTO_COM_PSP = frozenset({"PIX_VIA_PSP", "BOLETO
 ### ERR-045 — `_fracao_iva_no_das` usa phase-in 10%/ano enquanto `CRONOGRAMA_IVA` usa 20%/ano
 **Data:** 23/04/2026
 **Severidade:** 🔴 Critico
+**Status:** ✅ **CORRIGIDO — commit 4caf82c (23/04/2026)**
 **Arquivo:** `PY/core/motor_tributario.py` — `_fracao_iva_no_das()` linha 627 | `PY/core/tabelas_simples.py` — `CRONOGRAMA_IVA` linhas 297-300
 **Descoberto em:** Auditoria matematica Luiz Moreira pos-refatoracao
 
@@ -1259,13 +1260,16 @@ O percentual ICMS+ISS extinto em 2029 nao e 10% — e 20% conforme CRONOGRAMA_IV
 
 **Nota legal:** LC 214/2025 Art. 360 remete o cronograma exato para regulamentacao posterior (Resolucao do Senado). Nenhum dos dois percentuais e definitivamente correto — mas o motor precisa ser internamente consistente. A decisao de qual usar deve ser unica e documentada.
 
-**Solucao necessaria:**
-1. Definir qual e o percentual de referencia: 20%/ano (alinhado ao CRONOGRAMA_IVA) ou 10%/ano (posicao conservadora)
-2. Ajustar `_fracao_iva_no_das` para usar o mesmo step do CRONOGRAMA_IVA (2029=20%, 2030=40%, 2031=60%, 2032=80%): `fator_fase_in = Decimal(ano - 2028) * Decimal("0.20")`
-3. Ou ajustar CRONOGRAMA_IVA para step de 10% se essa for a posicao conservadora adotada
-4. Decisao deve ser documentada na propria constante com citacao da fonte legal
+**Solucao adotada (commit 4caf82c):**
+Alinhado a 10%/ano em ambos os blocos. `_fracao_iva_no_das` ja estava correto (`Decimal(ano-2028) * Decimal("0.10")`). `CRONOGRAMA_IVA` foi corrigido:
+- 2029: IBS 0.0177 (10% de 0.177)
+- 2030: IBS 0.0354 (20%)
+- 2031: IBS 0.0531 (30%)
+- 2032: IBS 0.0708 (40%)
 
-**Status:** ⏳ Pendente — aguarda decisao de Luiz Moreira sobre qual step adotar
+**Fundamento legal:** LC 214/2025 Arts. 356-360 — ICMS/ISS reduzidos em 10% ao ano simetricamente ao crescimento do IBS. Validado via 4 fontes independentes (CRCSP, SimTax, Tax Group, Trad & Cavalcanti): *"as aliquotas de ICMS e de ISS serao reduzidas em 10% ao ano, com cobranca gradual de IBS"*.
+
+**Impacto retroativo:** diagnosticos gerados antes de 4caf82c para anos 2029-2032 usavam IBS inflado em 2x. Versionamento do motor (`MOTOR_VERSAO`) adicionado ao JSON do diagnostico (commit pos-fissura) para permitir identificar e reprocessar diagnosticos afetados.
 
 ---
 
@@ -1299,13 +1303,16 @@ fracao_iva_percentual = (fracao_ibs_pct + fracao_cbs_pct)  # % do DAS
 custo_das_sem_iva = valor_operacao * (AE - AE * fracao_iva_percentual)
 ```
 
-**Status:** ⏳ Pendente
+**Gatilho para reclassificacao (Luiz Moreira, 23/04/2026):** se o motor comecar a emitir pareceres com `valor_operacao` materialmente diferente de `rbt12/12` (operacoes pontuais grandes, compras sazonais, NF unica acima da media mensal), ERR-046 deve ser elevado para 🔴 Critico e entrar como P0 no sprint seguinte. Enquanto o uso for simulacao mensal representativa, a diferenca permanece pequena em valor absoluto.
+
+**Status:** ⏳ Pendente — adiado para sprint separada (auditoria pos-fissura 23/04/2026)
 
 ---
 
 ### ERR-047 — Thresholds de recomendacao Opt-Out (70%/5%, 50%/10%, <30%) sem amparo legal
 **Data:** 23/04/2026
 **Severidade:** 🟡 Atencao
+**Status:** ✅ **CORRIGIDO — fix V-12 auditoria pos-fissura (23/04/2026)**
 **Arquivo:** `PY/core/recomendacoes_optout.py` — linhas 41, 68, 83 | campo `amparo_legal` linha 112-115
 **Descoberto em:** Auditoria matematica Luiz Moreira pos-refatoracao
 
@@ -1316,12 +1323,12 @@ O campo `amparo_legal` do retorno (linha 112) cita "LC 214/2025, Arts. 41-44 | R
 
 **Risco:** o parecer entregue ao contribuinte cita base legal que nao embase os percentuais usados na tomada de decisao. Se o contribuinte contestar a recomendacao invocando a lei citada, nao encontrara os thresholds nela.
 
-**Solucao necessaria:**
-Separar no campo `amparo_legal` dois blocos:
-1. Base legal do dispositivo de opt-out: LC 214/2025 Arts. 41-44 + Res. CGSN 183/2025
-2. Criterio de conveniencia: "Criterio de conveniencia economica — escritorio Conect (heuristica profissional, sem amparo legal especifico)"
+**Solucao adotada (fix V-12):**
+Campo `amparo_legal` reestruturado em dois blocos explicitos:
+1. "Dispositivo legal do Opt-Out: LC 214/2025 Arts. 41-44 | CF Art. 146, III, 'd' | Resolucao CGSN 183/2025 (janelas semestrais abr/set)"
+2. "Criterio de conveniencia economica (thresholds 70%/50%/30% de B2B e 5%/10% de disparidade): heuristica interna do Escritorio Conect — sem amparo normativo especifico. Avaliar caso a caso."
 
-**Status:** ⏳ Pendente — baixa prioridade (nao afeta calculo, apenas documentacao)
+Aprovado por Luiz Moreira: cumpre MAX_FISCAL_02 integralmente. Auditor RFB lendo o parecer distingue o que foi lei do que foi juizo do escritorio.
 
 ---
 
