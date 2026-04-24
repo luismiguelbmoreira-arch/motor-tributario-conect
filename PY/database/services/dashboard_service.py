@@ -15,7 +15,7 @@ def get_dashboard_metrics() -> Dict[str, Any]:
         total_empresas = session.exec(select(func.count(EmpresaDB.id))).one()
 
         # 2. Economia Total
-        diagnosticos = session.exec(select(DiagnosticoDB.delta).where(DiagnosticoDB.delta is not None)).all()
+        diagnosticos = session.exec(select(DiagnosticoDB.delta).where(DiagnosticoDB.delta != None)).all()  # noqa: E711
         soma_delta = sum((Decimal(d) for d in diagnosticos), Decimal("0"))
 
         # 3. Alertas Críticos/Altos (ABERTOS)
