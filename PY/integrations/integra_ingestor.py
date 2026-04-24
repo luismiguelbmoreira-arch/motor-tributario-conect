@@ -20,14 +20,13 @@ import logging
 from dataclasses import dataclass, field
 from typing import Sequence
 
+import database
+import services.storage_cifrado as storage_cifrado
 from integrations.integra_adapter import (
     IntegraAdapter,
     IntegraDocumento,
     IntegraError,
 )
-
-import database
-import services.storage_cifrado as storage_cifrado
 
 logger = logging.getLogger(__name__)
 

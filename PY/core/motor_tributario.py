@@ -11,9 +11,7 @@ import logging
 from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from functools import cached_property
-from typing import Any, Dict, List, Literal, Optional
-
-from pydantic import Field, field_validator, model_validator
+from typing import Any, Dict, List, Optional
 
 from core.difal import calcular_difal
 from core.formatadores import _fmt_brl
@@ -23,22 +21,18 @@ from core.regimes.lucro_real import LucroRealEngine
 from core.regimes.mei import MEIEngine
 from core.regimes.simples_multi import SimplesMultiAtividadeEngine
 from core.tabelas_simples import (
-    ALERTA_90_PERCENT_TETO,
     ANO_INICIO_SPLIT_PAYMENT,
     CRONOGRAMA_IVA,
     DISTRIBUICAO_DAS,
-    SUBLIMITE_ICMS_ISS,
     TABELAS_ANEXOS,
     TETO_SIMPLES_NACIONAL,
     determinar_anexo_por_cnae_com_fonte,
     obter_faixa_numero,
 )
-from validadores import validar_cnae, validar_cnpj, validar_ncm, validar_uf
 from schemas.motor import (
-    Atividade,
-    EmpresaFornecedora,
-    EmpresaCompradora,
     FORMAS_PAGAMENTO_COM_PSP,
+    EmpresaCompradora,
+    EmpresaFornecedora,
     OperacaoFiscal,
 )
 

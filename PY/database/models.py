@@ -1,14 +1,13 @@
 import json
-from datetime import datetime
-from decimal import Decimal
-from typing import Any, Dict, List, Optional
 import re
+from datetime import datetime
+from typing import Any, Dict, Optional
 
-from sqlmodel import TEXT, Column, Field, SQLModel
 from pydantic import field_validator
+from sqlmodel import TEXT, Column, Field, SQLModel
 
-from validadores import validar_cnpj, validar_uf, validar_cnae
-from .enums import RegimeTributario, NivelAlerta, StatusAlerta, StatusAuditoria
+from validadores import validar_cnae, validar_cnpj, validar_uf
+
 
 class EmpresaDB(SQLModel, table=True):
     __tablename__ = "empresas"

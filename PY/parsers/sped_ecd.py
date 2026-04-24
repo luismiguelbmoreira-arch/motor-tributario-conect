@@ -30,8 +30,6 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-
-
 class SPEDEcdParserError(ValueError):
     """Erro ao parsear SPED ECD — arquivo corrompido, vazio ou sem bloco 0000."""
 

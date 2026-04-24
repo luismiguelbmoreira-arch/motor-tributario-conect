@@ -21,9 +21,9 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
-from sqlmodel import Session, select
+from sqlmodel import Session
 
-from api.dependencies import get_current_user, extrair_user_id
+from api.dependencies import extrair_user_id, get_current_user
 from auth import UserDB, _auth_engine
 
 logger = logging.getLogger("motor_conect.api")

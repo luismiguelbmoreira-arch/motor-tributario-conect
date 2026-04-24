@@ -5,13 +5,14 @@ Separados da lógica de cálculo para evitar monólitos e facilitar testes unit�
 """
 
 import logging
+import re
 from datetime import date
 from decimal import Decimal
 from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from validadores import validar_cnpj, validar_cnae, validar_ncm, validar_uf
-import re
+
+from validadores import validar_cnae, validar_cnpj, validar_ncm, validar_uf
 
 logger = logging.getLogger("motor_conect.schemas")
 
@@ -143,7 +144,8 @@ class EmpresaFornecedora(BaseModel):
     @field_validator("faturamento_12m", "folha_salarios_12m", mode="before")
     @classmethod
     def converter_para_decimal(cls, v: Any) -> Optional[Decimal]:
-        if v is None: return None
+        if v is None:
+            return None
         if isinstance(v, float):
             return Decimal(str(v))
         return Decimal(str(v)) if not isinstance(v, Decimal) else v

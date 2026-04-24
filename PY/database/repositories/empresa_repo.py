@@ -1,10 +1,11 @@
 import logging
 from datetime import datetime
-from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
+
 from sqlalchemy.exc import IntegrityError, OperationalError
+
 from ..connection import get_session
-from ..models import EmpresaDB, EmpresaHistoricoDB, AlertaDB, DiagnosticoDB, AtividadeDB
+from ..models import AlertaDB, AtividadeDB, DiagnosticoDB, EmpresaDB, EmpresaHistoricoDB
 
 logger = logging.getLogger("motor_conect.database.empresa")
 

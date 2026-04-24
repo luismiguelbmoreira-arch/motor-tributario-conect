@@ -26,7 +26,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 
-from api.dependencies import get_current_user, extrair_user_id
+from api.dependencies import extrair_user_id, get_current_user
 from database import listar_diagnosticos_por_user
 
 logger = logging.getLogger("motor_conect.api")

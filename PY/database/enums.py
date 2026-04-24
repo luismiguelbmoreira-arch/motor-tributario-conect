@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class RegimeTributario(str, Enum):
     """
     Regimes tributários suportados pelo motor.

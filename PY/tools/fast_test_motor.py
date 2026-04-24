@@ -7,8 +7,9 @@ from pathlib import Path
 # Ajustar os paths para garantir que consigamos importar do nivel acima (PY/)
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.motor_tributario import EmpresaFornecedora, EmpresaCompradora, OperacaoFiscal, MotorReformaTributaria
 from pydantic import ValidationError
+
+from core.motor_tributario import EmpresaCompradora, EmpresaFornecedora, MotorReformaTributaria, OperacaoFiscal
 
 logging.basicConfig(level=logging.ERROR) # Omitir logs pesados na std
 
@@ -24,7 +25,7 @@ def formatar_moeda(valor: Decimal) -> str:
 def executar_analise_mock(json_path: str):
     caminho = Path(json_path).resolve()
     base_dir = Path(__file__).parent.parent.parent.resolve()
-    
+
     # Prevenção de Path Traversal (LFI)
     if not str(caminho).startswith(str(base_dir)):
         print(f"❌ Erro de Segurança (Path Traversal): Tentativa de acesso fora do diretório base bloqueada [{caminho.name}].")
@@ -33,7 +34,7 @@ def executar_analise_mock(json_path: str):
     if not caminho.exists() or not caminho.is_file():
         print(f"❌ Erro: O arquivo de teste {json_path} não foi encontrado ou não é um arquivo válido.")
         sys.exit(1)
-        
+
     with open(caminho, 'r', encoding='utf-8') as f:
         try:
             payload = json.load(f)
@@ -42,7 +43,7 @@ def executar_analise_mock(json_path: str):
             sys.exit(1)
 
     print_separator()
-    print(f"⚙️  MOTOR OFF-LINE INICIADO  ⚙️")
+    print("⚙️  MOTOR OFF-LINE INICIADO  ⚙️")
     print(f"📂 Lendo Caso: {caminho.name}")
     print_separator()
 
@@ -64,25 +65,25 @@ def executar_analise_mock(json_path: str):
     # Executando o Motor Central
     print("\n>> Computando Carga Tributária Transicional...")
     print_separator('-')
-    
+
     # Motor suporta context_manager para LGPD purge() automatico, mas como é script vamos estanciar seco para debug
     motor = MotorReformaTributaria(fornecedora, compradora, operacao)
-    
+
     # Executamos FASE 5: A fase 5 vai ate onde der, para debug podemos só extrair os raw metrics
     engine = motor.obter_engine_regime()
-    
+
     print(f"📌 Regime Fornecedora: {fornecedora.regime}")
     if engine:
         print(f"📌 Engine Detectada: {engine.__class__.__name__}")
-    
+
     try:
         diagnostico = motor.gerar_diagnostico()
-        
+
         print("\n🏆 RESULTADO PRELIMINAR BÁSICO 🏆")
         print(f" Passos da Trilha Mapeados: {len(motor.trilha_auditoria)}")
         print("\n[DIAGNÓSTICO OFICIAL DA API]")
         print(json.dumps(diagnostico, indent=2, ensure_ascii=False))
-        
+
     except Exception as e:
         print(f"❌ Falha massiva no Motor: {e}")
     finally:
@@ -98,5 +99,5 @@ if __name__ == "__main__":
         print("\nExemplo:")
         print("  python PY/tools/fast_test_motor.py samples/casos_clinicos/teste1.json")
         sys.exit(0)
-        
+
     executar_analise_mock(sys.argv[1])

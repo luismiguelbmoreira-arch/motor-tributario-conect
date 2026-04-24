@@ -5,7 +5,7 @@ from typing import Any
 
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
-from sqlmodel import Session, create_engine, SQLModel
+from sqlmodel import Session, SQLModel, create_engine
 
 logger = logging.getLogger("motor_conect.database")
 
@@ -39,7 +39,7 @@ def criar_tabelas() -> None:
     if os.environ.get("DB_SKIP_INIT") == "1":
         logger.info("Pulo inicialização automática do banco (DB_SKIP_INIT=1).")
         return
-    
+
     SQLModel.metadata.create_all(engine)
     logger.info("Tabelas verificadas.")
 
