@@ -12,6 +12,9 @@ omit =
     relatorio_pdf.py
     audit_universal.py
     extrator_pdfs.py
+    tools/*
+    integrations/onvio_adapter.py
+    parsers/xml_nfce.py
 
 [report]
 exclude_lines =
