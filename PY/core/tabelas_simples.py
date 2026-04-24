@@ -293,11 +293,14 @@ CRONOGRAMA_IVA: dict = {
     # 2029-2032: ICMS/ISS reduzidos em 10% ao ano; IBS aumenta proporcionalmente
     # LC 214/2025: ICMS e ISS extintos gradualmente 2029→2033
     # IBS full rate estimada ≈ 17,7% (média ponderada nacional ICMS+ISS)
-    # Phase-in: 20%, 40%, 60%, 80% da alíquota plena
-    2029: {"CBS": Decimal("0.088"),  "IBS": Decimal("0.035")},  # ~20% da alíquota plena
-    2030: {"CBS": Decimal("0.088"),  "IBS": Decimal("0.071")},  # ~40%
-    2031: {"CBS": Decimal("0.088"),  "IBS": Decimal("0.106")},  # ~60%
-    2032: {"CBS": Decimal("0.088"),  "IBS": Decimal("0.142")},  # ~80%
+    # Phase-in: 10%, 20%, 30%, 40% da alíquota plena
+    # (ERR-045 fix: correção de 20%/40%/60%/80% → 10%/20%/30%/40% validado via
+    #  CRCSP/SimTax/Tax Group — "ICMS/ISS reduzidas em 10% ao ano" com cobrança
+    #  gradual de IBS simétrica. Alinhado com _fracao_iva_no_das do motor.)
+    2029: {"CBS": Decimal("0.088"),  "IBS": Decimal("0.0177")},  # 10% da alíquota plena
+    2030: {"CBS": Decimal("0.088"),  "IBS": Decimal("0.0354")},  # 20%
+    2031: {"CBS": Decimal("0.088"),  "IBS": Decimal("0.0531")},  # 30%
+    2032: {"CBS": Decimal("0.088"),  "IBS": Decimal("0.0708")},  # 40%
 
     # 2033: REGIME PLENO — ICMS e ISS extintos; IBS em 100% da alíquota de referência
     # CBS e IBS plenas conforme Resolução do Senado (LC 214/2025, Art. 361-366)

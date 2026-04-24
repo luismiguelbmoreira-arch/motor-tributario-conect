@@ -91,12 +91,14 @@ class TestCronogramaIVA:
         assert aliq["CBS"] == Decimal("0.088")
         assert aliq["IBS"] == Decimal("0.001")
 
-    def test_2029_ibs_fase_in_20_pct(self):
-        """2029: IBS fase-in ~20% da alíquota plena — Arts. 356-360 LC 214/2025."""
+    def test_2029_ibs_fase_in_10_pct(self):
+        """2029: IBS fase-in 10% da alíquota plena — Arts. 356-360 LC 214/2025.
+        ERR-045: correção de 20% → 10% ao ano. ICMS/ISS reduzidos em 10%/ano
+        com cobrança gradual de IBS simétrica (CRCSP, SimTax, Tax Group)."""
         motor = make_motor(ano=2029)
         aliq = motor.get_aliquotas_iva_por_ano()
         assert aliq["CBS"] == Decimal("0.088")
-        assert aliq["IBS"] == Decimal("0.035"), "IBS 2029 = ~20% de 17,7%"
+        assert aliq["IBS"] == Decimal("0.0177"), "IBS 2029 = 10% de 17,7%"
 
     def test_2033_regime_pleno(self):
         """2033: CBS 8,8% + IBS 17,7% — ICMS/ISS extintos, regime pleno."""

@@ -1,21 +1,9 @@
 """
 motor_tributario.py — Motor de Regras Tributárias Transicionais (2026-2033)
-Projeto: Motor Tributário Conect 2026-2033
-Escritório Contábil Conect — Sorocaba, SP
+LC 123/2006 | LC 214/2025 | EC 132/2023
 
-PADRÕES OBRIGATÓRIOS (Chefe veta qualquer desvio):
-  - Decimal em TODOS os valores monetários. Float = PROIBIDO.
-  - ROUND_HALF_UP em todos os quantize().
-  - purge() chamado após gerar_diagnostico() — LGPD compliance.
-  - Nenhum log com CNPJ, razão social ou dado pessoal.
-  - Toda constante tem citação do artigo de lei.
-
-Fases implementadas:
-  Fase 1: EmpresaFornecedora, EmpresaCompradora, OperacaoFiscal (Pydantic V2)
-  Fase 2: rbt12, fator_r, anexo_principal, aliquota_efetiva
-  Fase 3: fracao_ibs, fracao_cbs, get_aliquotas_iva_por_ano
-  Fase 4: cenario_simples_puro, cenario_opt_out, split_payment_impacto
-  Fase 5: gerar_diagnostico, _gerar_alertas, purge
+Decimal obrigatório (float=PROIBIDO). ROUND_HALF_UP em todos os quantize().
+Nenhum log com CNPJ, razão social ou dado pessoal.
 """
 
 import gc
@@ -51,9 +39,7 @@ logger = logging.getLogger("motor_conect.motor")
 
 
 def _fmt_brl(valor: Any) -> str:
-    """
-    Formata valor monetário no padrão BR: R$ X.XXX,YY (ponto milhar, vírgula decimal).
-    """
+    """Formata valor monetário no padrão BR: R$ X.XXX,YY."""
     try:
         d = Decimal(str(valor or 0)).quantize(Decimal("0.01"), ROUND_HALF_UP)
     except Exception:
@@ -66,7 +52,7 @@ FATOR_R_LIMIAR = Decimal("0.28")
 FATOR_R_ZONA_RISCO_MIN = Decimal("0.27")
 FATOR_R_ZONA_RISCO_MAX = Decimal("0.29")
 
-# CNAEs que aplicam o Fator R (Serviços Anexo III/V)
+# CNAEs elegíveis ao Fator R (Serviços Anexo III/V)
 CNAES_FATOR_R = frozenset({
     "6201501", "6202300", "6209100",  # TI
     "6911701", "6920601",              # Advocacia, Contabilidade
@@ -82,12 +68,7 @@ CNAES_FATOR_R = frozenset({
 class MotorReformaTributaria:
     """
     Motor Transicional de Regras Tributárias (2026-2033).
-    Realiza o embate técnico entre a Legislação Antiga e o Novo IVA Dual (LC 214/2025).
-
-    Uso:
-        motor = MotorReformaTributaria(fornecedora, compradora, operacao)
-        diagnostico = motor.gerar_diagnostico()
-        # motor.purge() é chamado automaticamente
+    Embate técnico entre a Legislação Antiga e o Novo IVA Dual (LC 214/2025).
     """
 
     fornecedora: EmpresaFornecedora
@@ -107,13 +88,8 @@ class MotorReformaTributaria:
         self.compradora = compradora
         self.operacao = operacao
         self._diagnostico_gerado = False
-
-        # ── TRILHA UNIFICADA (MAX_FISCAL_04) ─────────────────────────────────
-        # Lista compartilhada: motor principal + todos os engines de regime
-        # escrevem aqui. Um único ponto de verdade para o auditor.
         self.trilha_auditoria: List[Dict[str, Any]] = []
 
-        # Log SEM PII (regime e tipo apenas — sem CNPJ, razão social)
         logger.info(
             "Motor iniciado | regime=%s | tipo_comprador=%s | ano=%s",
             self.fornecedora.regime,
@@ -121,20 +97,9 @@ class MotorReformaTributaria:
             self.operacao.data_emissao.year,
         )
 
-        # [MAX_FISCAL_03] Validação de Cronograma de Transição (Timeline Awareness)
         self._validar_timeline()
-
-        # [ERR-037] Registro informativo do regime do comprador na trilha.
-        # O campo é capturado e persistido na auditoria — mas a ramificação
-        # de cálculo por regime do adquirente (LC 214/2025 Art. 47 §2º:
-        # Simples não apropria crédito, Lucro Real apropria integral,
-        # Presumido parcial) é entregue na Fase 4+. Até lá, o motor segue
-        # PIOR CASO (sem crédito cruzado) para não inflar recomendação.
+        # ERR-037: regime do comprador capturado na trilha (crédito cruzado LC 214/2025 Art. 47 §2º na Fase 4+)
         self._registrar_regime_comprador()
-
-        # ── DISPATCHER DE REGIME ────────────────────────────────────────────
-        # Instancia o engine correto e vincula à trilha unificada.
-        # Guard Clause (Camada 2) ocorre dentro do engine — exceção gravada na trilha.
         self._engine_regime: Optional[BaseRegimeEngine] = self._instanciar_engine()
 
     def _instanciar_engine(self) -> Optional[BaseRegimeEngine]:
@@ -152,19 +117,17 @@ class MotorReformaTributaria:
         return None
 
     def obter_engine_regime(self) -> Optional[BaseRegimeEngine]:
-        """Retorna o engine de regime instanciado (para uso externo nos audits)."""
+        """Retorna o engine de regime instanciado."""
         return self._engine_regime
 
     def __enter__(self):
-        """Suporta protocolo Context Manager: with MotorReformaTributaria(...) as motor:"""
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Garante a limpeza dos dados (LGPD) ao sair do bloco 'with'."""
         self.purge()
 
-    def _validar_timeline(self):
-        """Validação obrigatória da data base da operação (MAX_FISCAL_03)."""
+    def _validar_timeline(self) -> None:
+        """Validação da data base da operação (MAX_FISCAL_03). LC 214/2025, Art. 360."""
         ano = self.operacao.data_emissao.year
         status = "TESTE" if ano == 2026 else "EFETIVO" if ano <= 2028 else "TRANSICAO"
         self._registrar_passo(
@@ -179,17 +142,8 @@ class MotorReformaTributaria:
         )
 
     def _registrar_regime_comprador(self) -> None:
-        """
-        Registra regime do comprador capturado na entrada (ERR-037).
-
-        A trilha guarda o valor mesmo que o motor ainda não ramifique por ele.
-        A lógica de crédito cruzado por regime do adquirente (LC 214/2025
-        Art. 47 §2º) está prevista para Fase 4+ e será implementada com
-        tabela FROZEN e validação fiscal. Até lá, o cálculo segue PIOR CASO
-        (sem crédito cruzado) — registro explícito na trilha protege
-        contra alegação de que o dado foi ignorado.
-        """
-        regime_c = self.compradora.regime  # Literal — nunca None
+        """Registra regime do comprador na trilha (ERR-037). Crédito cruzado em Fase 4+."""
+        regime_c = self.compradora.regime
         conhecido = regime_c != "NAO_INFORMADO"
         detalhe = (
             f"Regime do comprador capturado: '{regime_c}'. "
@@ -213,10 +167,8 @@ class MotorReformaTributaria:
             detalhe=detalhe,
         )
 
-        # Fase 3.2.1 — Achado #3 do Luiz: MEI NÃO é contribuinte de IBS/CBS
-        # (LC 123/2006 Art. 18-A §4º V) — logo, a combinação B2B_CONTRIBUINTE
-        # + regime_comprador=MEI é semanticamente inconsistente. Emite alerta
-        # explícito na trilha para o auditor não assumir crédito B2B inexistente.
+        # MEI não é contribuinte de IBS/CBS (LC 123/2006 Art. 18-A §4º V) —
+        # combinação B2B_CONTRIBUINTE + MEI é semanticamente incoerente.
         if self.compradora.tipo == "B2B_CONTRIBUINTE" and regime_c == "MEI":
             self.trilha_auditoria.append({
                 "tipo": "ALERTA_MEI_NAO_CONTRIBUINTE",
@@ -238,7 +190,7 @@ class MotorReformaTributaria:
         aliquota: Any, valor: Any, lei: str, detalhe: str = "",
         vigente_desde: str = "",
     ) -> None:
-        """Registro obrigatório de Memória de Cálculo (MAX_FISCAL_01/02)."""
+        """Registro de Memória de Cálculo (MAX_FISCAL_01/02)."""
         passo = {
             "tipo": "CALCULO",
             "id": id,
@@ -261,11 +213,7 @@ class MotorReformaTributaria:
 
     @cached_property
     def rbt12(self) -> Decimal:
-        """
-        Receita Bruta Acumulada 12 meses.
-        Se empresa tem menos de 12 meses, proporcionaliza automaticamente.
-        LC 123/2006, Art. 3º, §2º — limites proporcionais ao nº de meses.
-        """
+        """Receita Bruta Acumulada 12 meses. Proporcionaliza para < 12 meses. LC 123/2006, Art. 3º, §2º."""
         rbt12 = self.fornecedora.faturamento_12m.quantize(Decimal("0.01"), ROUND_HALF_UP)
 
         if self.fornecedora.data_inicio_atividade is not None:
@@ -298,12 +246,7 @@ class MotorReformaTributaria:
 
     @cached_property
     def fator_r(self) -> Optional[Decimal]:
-        """
-        Fator R = Folha de Salários 12m / RBT12.
-        LC 123/2006, Art. 18, § 24.
-        Aplicável apenas para CNAEs de serviço com tributação nos Anexos III/V.
-        Retorna None se folha não informada ou CNAE não elegível.
-        """
+        """Fator R = Folha 12m / RBT12. LC 123/2006, Art. 18, § 24. None se folha ausente ou CNAE inelegível."""
         if self.fornecedora.folha_salarios_12m is None:
             return None
         if self.fornecedora.cnae_principal not in CNAES_FATOR_R:
@@ -316,15 +259,7 @@ class MotorReformaTributaria:
 
     @cached_property
     def anexo_principal(self) -> str:
-        """
-        Determina o Anexo Simples Nacional correto.
-        Precedência:
-          1. Anexo informado explicitamente (self.fornecedora.anexo_simples)
-          2. Fator R: se elegível e >= 0.28 → Anexo III (mesmo que CNAE indique V)
-          3. Mapeamento CNAE → Anexo (tabelas_simples.CNAE_PARA_ANEXO)
-          4. Fallback: Anexo III (serviço genérico)
-        LC 123/2006, Art. 18, §§ 1º e 24.
-        """
+        """Determina Anexo Simples Nacional. Precedência: explícito > Fator R ≥ 0,28 > CNAE > fallback III. LC 123/2006, Art. 18."""
         if self.fornecedora.anexo_simples:
             anexo = self.fornecedora.anexo_simples
             motivo = f"Anexo {anexo} informado explicitamente pelo operador."
@@ -386,10 +321,7 @@ class MotorReformaTributaria:
         return anexo
 
     def _buscar_faixa(self, rbt12: Decimal, anexo: str):
-        """
-        Retorna (aliquota_nominal, parcela_deduzir) para o RBT12 e Anexo informados.
-        Raises ValueError se RBT12 > teto do Simples Nacional.
-        """
+        """Alíquota nominal e parcela deduzir para RBT12 e Anexo. Raises ValueError se > teto."""
         tabela = TABELAS_ANEXOS.get(anexo)
         if not tabela:
             raise ValueError(f"Anexo '{anexo}' inválido. Use I, II, III, IV ou V.")
@@ -404,19 +336,13 @@ class MotorReformaTributaria:
         )
 
     def _obter_distribuicao_tributos(self, anexo: str) -> Dict[str, Decimal]:
-        """
-        Retorna a partilha de tributos para o RBT12 e Anexo atuais.
-        Estratégia 2: Centraliza busca para evitar loops repetitivos.
-        """
+        """Partilha de tributos para o Anexo/faixa atuais."""
         faixa_num = obter_faixa_numero(self.rbt12, anexo)
         return DISTRIBUICAO_DAS.get(anexo, {}).get(faixa_num, {})
 
     @property
     def perfil_b2b_ajustado(self) -> Decimal:
-        """
-        Normaliza o percentual B2B com base no tipo do comprador.
-        Estratégia 4: Centraliza lógica para evitar duplicidade em recomendações.
-        """
+        """Percentual B2B normalizado: 100 se B2B_CONTRIBUINTE, 0 se B2C, ou percentual_b2b."""
         if self.compradora.tipo == "B2B_CONTRIBUINTE":
             return Decimal("100")
         if self.compradora.tipo == "B2C_CONSUMIDOR_FINAL":
@@ -424,10 +350,7 @@ class MotorReformaTributaria:
         return self.compradora.percentual_b2b or Decimal("0")
 
     def calcular_ae_por_anexo(self, anexo: str) -> Decimal:
-        """
-        Calcula a alíquota efetiva para um Anexo específico, baseando-se no RBT12 total.
-        LC 123/2006, Art. 18, § 1º.
-        """
+        """Alíquota efetiva para Anexo específico com base no RBT12 total. LC 123/2006, Art. 18, § 1º."""
         rbt12_val = self.rbt12
         if rbt12_val == Decimal("0"):
             return Decimal("0.00")
@@ -440,11 +363,7 @@ class MotorReformaTributaria:
 
     @cached_property
     def aliquota_efetiva(self) -> Decimal:
-        """
-        Alíquota efetiva do DAS total (baseada no Anexo principal).
-        LC 123/2006, Art. 18, § 1º.
-        Precisão: 6 casas decimais, ROUND_HALF_UP.
-        """
+        """Alíquota efetiva do DAS total. LC 123/2006, Art. 18, § 1º. 6 casas decimais."""
         rbt12_val = self.rbt12
         if rbt12_val == Decimal("0"):
             return Decimal("0.000000")
@@ -470,10 +389,7 @@ class MotorReformaTributaria:
 
     @cached_property
     def das_mensal(self) -> Decimal:
-        """
-        DAS mensal calculado sobre o RPA (ou estimativa RBT12/12).
-        Suporta multi-atividade (ERR-008) quando self.fornecedora.atividades está presente.
-        """
+        """DAS mensal sobre o RPA (ou RBT12/12). Suporta multi-atividade (ERR-008)."""
         rbt12_val = self.rbt12
 
         # CASO A: Multi-atividade (ERR-008)
@@ -483,7 +399,6 @@ class MotorReformaTributaria:
                 ae = self.calcular_ae_por_anexo(item.anexo)
                 dist = self._obter_distribuicao_tributos(item.anexo)
 
-                # Ajuste de segregação (ST/ISS Retido)
                 pct_abatimento = Decimal("0")
                 if item.icms_st:
                     pct_abatimento += dist.get("ICMS", Decimal("0"))
@@ -498,7 +413,7 @@ class MotorReformaTributaria:
                 das_total += das_item
             return das_total
 
-        # CASO B: Comportamento Legado (Única Atividade ou RPA Global)
+        # CASO B: Legado (única atividade ou RPA global)
         if self.operacao.rpa_mensal is not None:
             base = self.operacao.rpa_mensal
             base_motivo = f"RPA mensal real {_fmt_brl(base)} (informado pelo operador)"
@@ -532,7 +447,6 @@ class MotorReformaTributaria:
         receita_sem_st = base - self.fornecedora.receita_com_st_icms
         das_sem_st = (receita_sem_st * aliquota).quantize(Decimal("0.01"), ROUND_HALF_UP)
 
-        # Para a parcela com ST: retira a fração ICMS da alíquota efetiva
         ae_sem_icms = (aliquota - aliquota * icms_pct).quantize(Decimal("0.000001"), ROUND_HALF_UP)
         das_com_st = (self.fornecedora.receita_com_st_icms * ae_sem_icms).quantize(
             Decimal("0.01"), ROUND_HALF_UP
@@ -554,10 +468,7 @@ class MotorReformaTributaria:
         return total_das
 
     def calcular_das_detalhado(self, rpa: Optional[Decimal] = None) -> Decimal:
-        """
-        DAS com arredondamento per-tributo — estrutura de componentes individuais.
-        Suporta multi-atividade (ERR-008).
-        """
+        """DAS com arredondamento per-tributo. Suporta multi-atividade (ERR-008)."""
         # CASO A: Multi-atividade
         if self.fornecedora.atividades:
             total_detalhado = Decimal("0")
@@ -572,14 +483,10 @@ class MotorReformaTributaria:
                 for tributo, p_dist in dist.items():
                     if p_dist == Decimal("0"):
                         continue
-
-                    # Zerar se for ST de ICMS ou Retenção de ISS
                     if tributo == "ICMS" and item.icms_st:
                         continue
                     if tributo == "ISS" and item.iss_retido:
                         continue
-
-                    # Arredondamento individual per-tributo per-item
                     componente = (item.receita * ae * p_dist).quantize(Decimal("0.01"), ROUND_HALF_UP)
                     total_detalhado += componente
             return total_detalhado
@@ -600,36 +507,28 @@ class MotorReformaTributaria:
         for tributo, percentual_dist in dist.items():
             if percentual_dist == Decimal("0"):
                 continue
-
-            # Especial para legado ERR-006 (ST ICMS global)
+            # ERR-006: ST ICMS global (legado)
             if tributo == "ICMS" and self.fornecedora.receita_com_st_icms is not None:
                 r_sem_st = base - self.fornecedora.receita_com_st_icms
                 comp = (r_sem_st * aliquota * percentual_dist).quantize(Decimal("0.01"), ROUND_HALF_UP)
             else:
                 comp = (base * aliquota * percentual_dist).quantize(Decimal("0.01"), ROUND_HALF_UP)
-
             das_total += comp
 
         return das_total
 
     def _distancia_proxima_faixa(self) -> Optional[Decimal]:
-        """
-        Quanto falta para entrar na próxima faixa de RBT12 (em R$).
-        Útil para alertas de planejamento.
-        """
+        """Quanto falta (R$) para a próxima faixa de RBT12."""
         rbt12_val = self.rbt12
         anexo = self.anexo_principal
         tabela = TABELAS_ANEXOS.get(anexo, [])
         for limite, _, _ in tabela:
             if rbt12_val <= limite:
                 return (limite - rbt12_val).quantize(Decimal("0.01"), ROUND_HALF_UP)
-        return None  # Já no teto
+        return None
 
     def alertar_fator_r(self) -> Optional[str]:
-        """
-        Alerta zona de risco do Fator R (0.27-0.29).
-        Nesta faixa, pequena variação na folha muda drasticamente a alíquota.
-        """
+        """Alerta zona de risco Fator R (0,27-0,29): pequena variação na folha muda o Anexo."""
         fator_r_val = self.fator_r
         if fator_r_val is not None and FATOR_R_ZONA_RISCO_MIN <= fator_r_val < FATOR_R_ZONA_RISCO_MAX:
             return (
@@ -639,17 +538,10 @@ class MotorReformaTributaria:
             )
         return None
 
-    # ── FASE 3: DISSECAÇÃO IBS/CBS ────────────────────────────────────────────
+    # ── FASE 3: IBS/CBS ───────────────────────────────────────────────────────
 
     def _fator_reducao_cbs_ibs(self) -> Decimal:
-        """
-        ERR-016: Fator multiplicador conforme nível de redução CBS/IBS.
-        LC 214/2025:
-          - INTEGRAL   → 1.00 (sem redução)
-          - REDUCAO_30 → 0.70 (Art. 262 — profissionais liberais)
-          - REDUCAO_60 → 0.40 (Art. 258 — saúde, educação, cesta básica ampliada)
-          - ISENTO     → 0.00 (Art. 264 — cesta básica nacional)
-        """
+        """Fator de redução CBS/IBS: INTEGRAL=1.00, REDUCAO_30=0.70, REDUCAO_60=0.40, ISENTO=0.00. LC 214/2025, Arts. 258-264."""
         _FATORES: Dict[str, Decimal] = {
             "INTEGRAL":    Decimal("1.00"),
             "REDUCAO_30":  Decimal("0.70"),
@@ -671,14 +563,10 @@ class MotorReformaTributaria:
         return fator
 
     def get_aliquotas_iva_por_ano(self) -> Dict[str, Decimal]:
-        """
-        Alíquotas CBS e IBS vigentes no ano da operação.
-        LC 214/2025, Art. 360 (cronograma de transição).
-        """
+        """Alíquotas CBS/IBS vigentes no ano da operação. LC 214/2025, Art. 360."""
         ano = self.operacao.data_emissao.year
         if ano in CRONOGRAMA_IVA:
             return CRONOGRAMA_IVA[ano]
-        # Ano fora do cronograma: usa pleno
         from core.tabelas_simples import ALIQUOTA_IVA_PLENA_ESTIMADA
         return {
             "CBS": ALIQUOTA_IVA_PLENA_ESTIMADA,
@@ -686,70 +574,34 @@ class MotorReformaTributaria:
         }
 
     def _calcular_fracao_componente(self, componente: str) -> Decimal:
-        """
-        Calcula quanto do DAS total corresponde ao componente informado (ex: "CBS", "IBS", "ICMS").
-        Retorna valor em R$ por mês.
-        """
+        """Valor mensal (R$) do componente no DAS (ex: 'CBS', 'IBS', 'ICMS')."""
         anexo = self.anexo_principal
         rbt12_val = self.rbt12
         faixa_num = obter_faixa_numero(rbt12_val, anexo)
         if faixa_num == 0:
             return Decimal("0")
-
         distribuicao = DISTRIBUICAO_DAS.get(anexo, {}).get(faixa_num, {})
         percentual = distribuicao.get(componente, Decimal("0"))
-        # DAS mensal pode ser calculado multiplas vezes se RPA mudar, mas aqui usamos o padrão.
         das_mensal = self.das_mensal
         return (das_mensal * percentual).quantize(Decimal("0.01"), ROUND_HALF_UP)
 
     @cached_property
     def fracao_ibs(self) -> Decimal:
-        """IBS mensal dentro do DAS (durante período transitório)."""
+        """IBS mensal dentro do DAS (período transitório)."""
         return self._calcular_fracao_componente("IBS")
 
     @cached_property
     def fracao_cbs(self) -> Decimal:
-        """CBS mensal dentro do DAS (durante período transitório)."""
+        """CBS mensal dentro do DAS (período transitório)."""
         return self._calcular_fracao_componente("CBS")
 
     def _fracao_iva_no_das(self, anexo: str, faixa: int, ano: int) -> Decimal:
         """
-        Retorna a fração (0-1) de CBS+IBS que estará embutida no DAS do Simples
-        Nacional no ano informado, conforme LC 214/2025 Art. 47 §II.
-
-        LÓGICA DA TRANSIÇÃO — por ano:
-
-          2026: 0 (Art. 348, III, "c" — optantes do Simples estão DISPENSADOS
-                de destacar CBS/IBS no período-teste; logo, cliente B2B não
-                recebe crédito).
-
-          2027-2028: fração(PIS + COFINS) do DAS — a CBS substitui INTEGRALMENTE
-                PIS e COFINS a partir de 2027 (Art. 344 + 353). ICMS e ISS
-                continuam ativos no DAS do Simples, mas não viram IBS ainda.
-
-          2029-2032: fração(PIS + COFINS) + fração(ICMS + ISS) × fase_in, onde
-                fase_in = 10% em 2029, 20% em 2030, 30% em 2031, 40% em 2032.
-                Arts. 356-360 — redução escalonada de ICMS/ISS com IBS crescendo
-                proporcionalmente.
-
-          2033+: fração(PIS + COFINS) + fração(ICMS + ISS) integral — IBS
-                substituiu completamente ICMS e ISS. Sistema IVA dual pleno.
-
-        EXEMPLO — Anexo III Faixa 5 (R$ 1,8M < RBT12 ≤ R$ 3,6M):
-          PIS = 2,96% do DAS
-          COFINS = 13,64% do DAS
-          CBS 2027 = 16,60% do DAS
-          ISS = 32,50% do DAS
-          IBS 2033 = 32,50% do DAS
-          Total 2033 (CBS + IBS) = 49,10% do DAS
-
-        NOTA: esta é a interpretação técnica do Art. 47 §II pré-regulamentação
-        definitiva do CGSN. Caso o Comitê Gestor publique resolução que altere
-        a metodologia de cálculo (ex: fator fixo ao invés de proporcional), esta
-        função deve ser revisitada. Acompanhar DOU + Receita Federal.
-
-        Returns:
-            Decimal entre 0 e ~0.60, arredondado a 4 casas.
+        Fração CBS+IBS embutida no DAS por ano. LC 214/2025, Art. 47 §II.
+        2026: 0 (dispensado — Art. 348 III "c").
+        2027-2028: PIS+COFINS → CBS (Arts. 344, 353).
+        2029-2032: CBS + IBS phase-in 10%/ano (Arts. 356-360).
+        2033+: CBS + IBS pleno.
         """
         if ano <= 2026:
             return Decimal("0.0000")
@@ -758,12 +610,10 @@ class MotorReformaTributaria:
         if not partilha:
             return Decimal("0.0000")
 
-        # CBS substitui PIS + COFINS integralmente a partir de 2027
         fracao_pis = partilha.get("PIS", Decimal("0"))
         fracao_cofins = partilha.get("COFINS", Decimal("0"))
         fracao_cbs = fracao_pis + fracao_cofins
 
-        # IBS substitui ICMS + ISS gradualmente (2029-2032), pleno em 2033
         fracao_icms = partilha.get("ICMS", Decimal("0"))
         fracao_iss = partilha.get("ISS", Decimal("0"))
         fracao_icms_iss_total = fracao_icms + fracao_iss
@@ -774,8 +624,6 @@ class MotorReformaTributaria:
             fracao_ibs = fracao_icms_iss_total
         else:
             # Fase-in 2029-2032: 10%, 20%, 30%, 40%
-            # 2029 → (2029-2028)×10% = 10%
-            # 2032 → (2032-2028)×10% = 40%
             fator_fase_in = Decimal(ano - 2028) * Decimal("0.10")
             fracao_ibs = fracao_icms_iss_total * fator_fase_in
 
@@ -785,40 +633,10 @@ class MotorReformaTributaria:
     @cached_property
     def credito_b2b_simples(self) -> Decimal:
         """
-        Crédito IBS+CBS que o comprador B2B pode apropriar quando fornecedor
-        está no Simples Nacional (SEM exercício da opção pelo regime regular).
-
-        BASE LEGAL — LC 214/2025, Art. 47, §§ I e II:
-          (I)  "Não é permitida a apropriação de créditos de IBS e CBS pelo
-               optante do Simples Nacional"
-          (II) "É permitida ao contribuinte sujeito ao regime regular de IBS
-               e CBS a apropriação de créditos de IBS e CBS correspondentes
-               aos valores destes tributos pagos nas aquisições de optantes
-               pelo Simples Nacional, EM MONTANTE EQUIVALENTE AO DEVIDO POR
-               MEIO DESTE REGIME"
-
-        REGRA DE 2026 — LC 214/2025, Art. 348, III, "c":
-          Em 2026, os optantes do Simples Nacional NÃO aplicam as alíquotas
-          de transição — não destacam CBS/IBS nas operações, logo NÃO geram
-          crédito para clientes B2B neste ano. Retorna R$ 0.
-
-        REGRA DE 2027+ (CORREÇÃO ART. 47 §II):
-          O crédito é CALCULADO como:
-            credito = DAS_mensal × fração_CBS_IBS_no_DAS(anexo, faixa, ano) × fator_reducao
-
-          A fração vem de `_fracao_iva_no_das()` que consulta a tabela
-          DISTRIBUICAO_DAS real do Simples Nacional. NÃO é `valor_operacao ×
-          alíquota cheia` — essa era a aproximação errada anterior que
-          super-estimava o crédito em 3-5×.
-
-        EXEMPLO — Moreira (Anexo III Faixa 5, RPA R$ 251.303,53, DAS R$ 43.913,87):
-          2026: R$ 0,00 (dispensado)
-          2027: R$ 43.913,87 × 16,60% (PIS+COFINS) = R$ 7.289,70
-          2029: R$ 43.913,87 × (16,60% + 32,50%×10%) = R$ 8.717,00
-          2033: R$ 43.913,87 × 49,10% (CBS+IBS pleno) = R$ 21.561,71
-
-        ERR-016: Aplica fator de redução conforme reducao_cbs_ibs
-        (LC 214/2025, Arts. 258, 262, 264 — setores reduzidos/isentos).
+        Crédito IBS+CBS apropriável pelo comprador B2B de fornecedor Simples Nacional.
+        LC 214/2025, Art. 47 §II: credito = DAS_mensal × fração_CBS_IBS_no_DAS(anexo, faixa, ano).
+        2026: R$0 (Art. 348 III "c"). 2027+: fração real do DAS por Anexo/Faixa.
+        ERR-016: fator_reducao_cbs_ibs (Arts. 258, 262, 264).
         """
         ano = self.operacao.data_emissao.year
 
@@ -841,7 +659,6 @@ class MotorReformaTributaria:
             Decimal("0.01"), ROUND_HALF_UP
         )
 
-        # Trilha de auditoria — MAX_FISCAL_02 exige citação legal em cada passo
         self._registrar_passo(
             id="CREDITO_B2B_ART_47",
             titulo=f"Crédito B2B cliente ({ano}) — LC 214/2025 Art. 47 §II",
@@ -865,12 +682,10 @@ class MotorReformaTributaria:
         )
         return credito
 
-    # ── FASE 4: SIMULAÇÃO OPT-OUT ─────────────────────────────────────────────
+    # ── FASE 4: OPT-OUT ───────────────────────────────────────────────────────
 
     def cenario_simples_puro(self) -> Dict[str, Any]:
-        """
-        Cenário A: Empresa mantém tudo no Simples Nacional.
-        """
+        """Cenário A: Empresa mantém Simples Nacional sem alteração."""
         ae_efetiva = self.aliquota_efetiva
         custo_total = (self.operacao.valor_operacao * ae_efetiva).quantize(
             Decimal("0.01"), ROUND_HALF_UP
@@ -897,17 +712,13 @@ class MotorReformaTributaria:
         }
 
     def cenario_opt_out(self) -> Dict[str, Any]:
-        """
-        Cenário B: Empresa opta por recolher IBS/CBS separadamente (Opt-Out).
-        """
+        """Cenário B: Empresa recolhe IBS/CBS separadamente (Opt-Out)."""
         aliquotas_iva = self.get_aliquotas_iva_por_ano()
         ae_efetiva = self.aliquota_efetiva
 
-        # Frações IBS/CBS que já estão dentro do DAS (serão subtraídas no Opt-Out)
         ibs_no_das = self.fracao_ibs
         cbs_no_das = self.fracao_cbs
 
-        # IVA recolhido separadamente (por operação)
         # ERR-016: aplica fator de redução CBS/IBS (Arts. 258-264 LC 214/2025)
         fator_reducao = self._fator_reducao_cbs_ibs()
         iva_por_fora = (
@@ -916,16 +727,14 @@ class MotorReformaTributaria:
             * fator_reducao
         ).quantize(Decimal("0.01"), ROUND_HALF_UP)
 
-        # Custo DAS completo (proporcional à operação) antes de tirar o IVA
         custo_das_por_operacao_completo = (self.operacao.valor_operacao * ae_efetiva).quantize(
             Decimal("0.01"), ROUND_HALF_UP
         )
-        # Subtrai a fração IBS/CBS que já estava dentro do DAS (evita dupla contagem)
+        # Subtrai fração IBS/CBS do DAS — evita dupla contagem
         fracao_iva_no_das = (ibs_no_das + cbs_no_das)
         custo_das_sem_iva = (custo_das_por_operacao_completo - fracao_iva_no_das).quantize(
             Decimal("0.01"), ROUND_HALF_UP
         )
-        # Custo total = DAS (sem IVA) + IVA por fora — sem dupla contagem
         custo_total = (custo_das_sem_iva + iva_por_fora).quantize(
             Decimal("0.01"), ROUND_HALF_UP
         )
@@ -963,16 +772,8 @@ class MotorReformaTributaria:
     @cached_property
     def split_payment_impacto(self) -> Dict[str, Any]:
         """
-        Split Payment: IBS/CBS retido na fonte pelo PSP (Prestador de Serviço
-        de Pagamento). Ativo a partir de jan/2027.
-
-        ERR-038 — gating por forma de recebimento usa FORMAS_PAGAMENTO_COM_PSP
-        (schemas.motor). Split só dispara para pagamentos intermediados por
-        PSP (LC 214/2025 Art. 353 §1º):
-          - PIX_VIA_PSP, BOLETO, CARTAO → dispara retenção
-          - PIX_DIRETO, DINHEIRO        → escapa (sem intermediário PSP)
-
-        Fonte única da lista: schemas.motor.FORMAS_PAGAMENTO_COM_PSP.
+        Split Payment: IBS/CBS retido na fonte pelo PSP a partir de jan/2027. LC 214/2025, Art. 344 + Art. 353 §1º.
+        ERR-038: gating por FORMAS_PAGAMENTO_COM_PSP — PIX_VIA_PSP/BOLETO/CARTAO disparam; PIX_DIRETO/DINHEIRO escapam.
         """
         # Import local evita ciclo e mantém fonte única de verdade.
         from schemas.motor import FORMAS_PAGAMENTO_COM_PSP
@@ -982,7 +783,6 @@ class MotorReformaTributaria:
         tem_psp = forma in FORMAS_PAGAMENTO_COM_PSP
 
         if ano >= ANO_INICIO_SPLIT_PAYMENT and tem_psp:
-            # Split Payment dinâmico: usa CBS+IBS do ano da operação (LC 214/2025, Art. 344)
             aliquotas_ano = self.get_aliquotas_iva_por_ano()
             # ERR-016: aplica fator de redução CBS/IBS (Arts. 258-264)
             fator_reducao = self._fator_reducao_cbs_ibs()
@@ -1018,7 +818,6 @@ class MotorReformaTributaria:
                 ) + " (anual)",
             }
 
-        # Motivo granular — separa (ano não ativo) de (forma sem PSP)
         if ano < ANO_INICIO_SPLIT_PAYMENT:
             motivo = (
                 f"Ano {ano} < {ANO_INICIO_SPLIT_PAYMENT} "
@@ -1049,119 +848,23 @@ class MotorReformaTributaria:
 
     @cached_property
     def disparidade_anual(self) -> Decimal:
-        """
-        Diferença financeira anualizada entre Cenário B (Opt-Out) e Cenário A (Simples Puro).
-        Positivo = Opt-Out custa mais; Negativo = Opt-Out economiza.
-        Na prática deve ser próximo de zero (IVA repassado no preço).
-        """
+        """Delta anual (Opt-Out - Simples Puro). Positivo = Opt-Out mais caro; negativo = Opt-Out economiza."""
         custo_a = Decimal(self.cenario_simples_puro().get("custo_das_por_operacao", "0"))
         custo_b_total = Decimal(self.cenario_opt_out().get("custo_total", "0"))
         disparidade_por_operacao = custo_b_total - custo_a
-        # Multiplica por 12 para projeção anual (simplificação: 1 operação/mês)
         return (disparidade_por_operacao * 12).quantize(Decimal("0.01"), ROUND_HALF_UP)
 
     def _gerar_recomendacao_opt_out(self) -> Dict[str, str]:
-        """
-        Gera recomendação inteligente de Opt-Out cruzando:
-          - percentual_b2b (peso comercial: quantos clientes perderiam crédito)
-          - disparidade_anual / RBT12 (peso financeiro: custo relativo de sair)
-          - tipo do comprador (gate: B2C puro nunca recomenda Opt-Out)
-        """
-        percentual_b2b = self.perfil_b2b_ajustado
-        disparidade = self.disparidade_anual
-        rbt12_val = self.rbt12 or Decimal("1")  # evita divisão por zero
-
-        # Razão disparidade/RBT12 em percentual (absoluto — ganhos e perdas)
-        razao_disparidade = (abs(disparidade) / rbt12_val * Decimal("100")).quantize(
-            Decimal("0.01"), ROUND_HALF_UP
+        """Recomendação inteligente de Opt-Out. LC 214/2025 Arts. 41-44 | Res. CGSN 183/2025."""
+        from core.recomendacoes_optout import gerar_recomendacao_opt_out
+        return gerar_recomendacao_opt_out(
+            self.perfil_b2b_ajustado,
+            self.disparidade_anual,
+            self.rbt12,
         )
 
-        THRESHOLD_CUSTO_ABSOLUTO_ANUAL = Decimal("6000.00")
-        custo_alto_absoluto = abs(disparidade) > THRESHOLD_CUSTO_ABSOLUTO_ANUAL
-
-        razao_pct_str = f"{razao_disparidade:.2f}".replace(".", ",")
-        b2b_str = f"{percentual_b2b:.0f}"
-
-        if percentual_b2b >= Decimal("70") and razao_disparidade <= Decimal("5"):
-            if custo_alto_absoluto:
-                codigo = "OPT_OUT_CONDICIONAL"
-                titulo = "OPT-OUT CONDICIONAL — só com repasse de preço"
-                justificativa = (
-                    f"Você tem {b2b_str}% de clientes B2B (empresas que precisam de "
-                    f"crédito de CBS/IBS para abater dos próprios impostos). O Opt-Out "
-                    f"traria competitividade comercial, MAS o custo extra é "
-                    f"{_fmt_brl(disparidade)}/ano ({razao_pct_str}% da receita) — "
-                    f"esse valor sai DIRETO do seu caixa enquanto o crédito vai para o "
-                    f"CLIENTE, não para você. Só compensa se: (1) seus clientes B2B "
-                    f"aceitarem pagar mais para ter o crédito cheio, OU (2) houver risco "
-                    f"real de perderem para concorrentes do regime normal. Avalie com "
-                    f"seu contador antes da janela semestral."
-                )
-            else:
-                codigo = "OPT_OUT_FORTE"
-                titulo = "OPT-OUT FORTEMENTE RECOMENDADO"
-                justificativa = (
-                    f"Você tem {b2b_str}% de clientes B2B (empresas que precisam de "
-                    f"crédito de CBS/IBS para abater dos próprios impostos). No Simples "
-                    f"Puro, eles recebem apenas 1% de crédito — risco real de migrarem "
-                    f"para concorrentes no regime normal. O custo anual extra do Opt-Out "
-                    f"é {_fmt_brl(disparidade)} ({razao_pct_str}% da receita), valor baixo "
-                    f"e normalmente neutralizado pelo repasse no preço. O ganho de "
-                    f"competitividade e retenção de clientes compensa."
-                )
-        elif percentual_b2b >= Decimal("50") and razao_disparidade <= Decimal("10"):
-            codigo = "OPT_OUT_VANTAJOSO"
-            titulo = "OPT-OUT VANTAJOSO — avaliar caixa"
-            ressalva = (
-                " IMPORTANTE: o crédito gerado vai para os clientes B2B, não para você. "
-                "Só compensa se houver poder de repasse no preço ou risco de perda de cliente."
-                if custo_alto_absoluto else ""
-            )
-            justificativa = (
-                f"Você tem {b2b_str}% de clientes B2B. Metade ou mais do seu faturamento "
-                f"vem de empresas que podem exigir crédito IVA. O custo anual extra do "
-                f"Opt-Out é {_fmt_brl(disparidade)} ({razao_pct_str}% da receita). Avalie "
-                f"se o repasse no preço é viável no seu mercado e se há fluxo de caixa "
-                f"para absorver o aumento durante a transição.{ressalva}"
-            )
-        elif percentual_b2b < Decimal("30"):
-            codigo = "MANTER_SIMPLES"
-            titulo = "MANTENHA SIMPLES PURO"
-            justificativa = (
-                f"Você tem apenas {b2b_str}% de clientes B2B — a maioria da sua receita "
-                f"vem de consumidores finais (pessoa física), que NÃO usam crédito de "
-                f"CBS/IBS. Sair do Simples Puro para o Opt-Out aumentaria a complexidade "
-                f"operacional (EFD-Reinf, EFD-Contribuições) e o custo anual em "
-                f"{_fmt_brl(disparidade)} sem trazer benefício comercial. Mantenha o "
-                f"regime atual e reavalie apenas se o perfil de clientes mudar."
-            )
-        else:
-            codigo = "ZONA_CINZA"
-            titulo = "ZONA CINZA — análise individual necessária"
-            justificativa = (
-                f"Seu caso está numa faixa intermediária: {b2b_str}% de clientes B2B com "
-                f"custo anual de Opt-Out de {_fmt_brl(disparidade)} ({razao_pct_str}% da "
-                f"receita). A decisão depende de fatores qualitativos (concentração de "
-                f"clientes, poder de repasse de preço, capacidade de absorver obrigações "
-                f"acessórias adicionais). Recomendamos análise individual com seu contador "
-                f"antes das janelas semestrais (abril e setembro)."
-            )
-
-        return {
-            "codigo": codigo,
-            "titulo": titulo,
-            "justificativa": justificativa,
-            "amparo_legal": (
-                "LC 214/2025, Arts. 41-44 (dispositivo de Opt-Out) | "
-                "CF Art. 146, III, 'd' (regime diferenciado Simples Nacional) | "
-                "Resolução CGSN 183/2025 (janelas semestrais abr/set)"
-            ),
-        }
-
     def _montar_cenarios_com_recomendacao(self) -> Dict[str, Any]:
-        """
-        Monta o bloco 'cenarios' do diagnóstico com recomendação inteligente.
-        """
+        """Monta o bloco 'cenarios' do diagnóstico com recomendação inteligente."""
         rec = self._gerar_recomendacao_opt_out()
         pct_b2b = self.perfil_b2b_ajustado
 
@@ -1185,13 +888,7 @@ class MotorReformaTributaria:
     # ── FASE 5: DIAGNÓSTICO + ALERTAS + LGPD ─────────────────────────────────
 
     def _calcular_difal_diagnostico(self) -> Dict[str, Any]:
-        """
-        Calcula DIFAL interestadual se UF origem != UF destino.
-        EC 87/2015 | LC 190/2022 | LC 87/1996, Art. 13.
-
-        Retorna dict com Decimals convertidos para str (JSON-safe).
-        Se operação interna, retorna dict com aplicavel=False.
-        """
+        """Calcula DIFAL interestadual quando UF origem != UF destino. EC 87/2015 | LC 190/2022."""
         resultado = calcular_difal(
             valor_operacao=self.operacao.valor_operacao,
             uf_origem=self.fornecedora.uf_origem,
@@ -1200,197 +897,29 @@ class MotorReformaTributaria:
             produto_importado=self.operacao.produto_importado,
             trilha=self.trilha_auditoria,
         )
-        # Decimal → str para serialização JSON
         return {
             k: (str(v) if isinstance(v, Decimal) else v)
             for k, v in resultado.items()
         }
 
     def _gerar_alertas(self) -> List[Dict[str, str]]:
-        """
-        Sistema de alertas baseado em gatilhos matemáticos.
-        Cada alerta tem nível: CRITICO, ALTO, MEDIO, INFO.
-        """
-        alertas = []
-        rbt12_val = self.rbt12
-        # CRÍTICO: Desenquadramento imediato (RBT12 > 120% do teto = R$ 5.760.000)
-        # LC 123/2006, Art. 3º, §§ 9º e 10 — exclusão retroativa ao mês do excesso
-        teto_excesso_imediato = TETO_SIMPLES_NACIONAL * Decimal("1.20")  # R$ 5.760.000
-        if rbt12_val > teto_excesso_imediato:
-            alertas.append({
-                "nivel": "CRITICO",
-                "codigo": "DESENQUADRAMENTO_IMEDIATO",
-                "mensagem": (
-                    f"RBT12 {_fmt_brl(rbt12_val)} ultrapassou {_fmt_brl(teto_excesso_imediato)} (120% do teto). "
-                    f"DESENQUADRAMENTO IMEDIATO do Simples Nacional — efeitos RETROATIVOS ao mês do excesso. "
-                    f"LC 123/2006, Art. 3º, §§ 9º e 10."
-                ),
-            })
-        # CRÍTICO: Desenquadramento no exercício seguinte (RBT12 > R$ 4.800.000)
-        # LC 123/2006, Art. 3º, II — exclusão a partir de janeiro do ano seguinte
-        elif rbt12_val > TETO_SIMPLES_NACIONAL:
-            alertas.append({
-                "nivel": "CRITICO",
-                "codigo": "DESENQUADRAMENTO_PROXIMO_ANO",
-                "mensagem": (
-                    f"RBT12 {_fmt_brl(rbt12_val)} excedeu o teto de {_fmt_brl(TETO_SIMPLES_NACIONAL)}. "
-                    f"Empresa será excluída do Simples Nacional a partir de janeiro/{self.operacao.data_emissao.year + 1}. "
-                    f"LC 123/2006, Art. 3º, II."
-                ),
-            })
-        # ALTO: RBT12 > 90% do teto (alerta preventivo)
-        elif rbt12_val > ALERTA_90_PERCENT_TETO:
-            alertas.append({
-                "nivel": "CRITICO",
-                "codigo": "RBT12_PROXIMO_TETO",
-                "mensagem": (
-                    f"RBT12 {_fmt_brl(rbt12_val)} = {(rbt12_val/TETO_SIMPLES_NACIONAL*100):.1f}% do teto. "
-                    f"Planejar migração para Lucro Presumido IMEDIATAMENTE."
-                ),
-            })
-
-        # ALTO: Fator R zona de risco
-        alerta_fr = self.alertar_fator_r()
-        if alerta_fr:
-            alertas.append({
-                "nivel": "ALTO",
-                "codigo": "FATOR_R_ZONA_RISCO",
-                "mensagem": alerta_fr,
-            })
-
-        # ALTO: Split Payment ativo
-        split = self.split_payment_impacto
-        if split["ativo"]:
-            alertas.append({
-                "nivel": "ALTO",
-                "codigo": "SPLIT_PAYMENT_ATIVO",
-                "mensagem": (
-                    f"Split Payment ativo desde Jan/2027. "
-                    f"Retenção na fonte: {_fmt_brl(Decimal(split['retencao_imediata']))} por operação."
-                ),
-            })
-
-        # ALTO: B2B com Simples puro — risco de perda de contrato
-        if (
-            self.compradora.tipo == "B2B_CONTRIBUINTE"
-            and self.fornecedora.regime == "SIMPLES"
-        ):
-            alertas.append({
-                "nivel": "ALTO",
-                "codigo": "RISCO_B2B_CREDITO_INSUFICIENTE",
-                "mensagem": (
-                    "Fornecedor no Simples gera crédito mínimo para comprador B2B. "
-                    "Avaliar Opt-Out para reter contrato com indústria/grande empresa."
-                ),
-            })
-
-        # MÉDIO: Sublimite ICMS/ISS ultrapassado
-        if rbt12_val > SUBLIMITE_ICMS_ISS:
-            alertas.append({
-                "nivel": "MEDIO",
-                "codigo": "SUBLIMITE_ICMS_ISS",
-                "mensagem": (
-                    f"RBT12 {_fmt_brl(rbt12_val)} > sublimite {_fmt_brl(SUBLIMITE_ICMS_ISS)}. "
-                    f"ICMS e ISS devem ser apurados em guias separadas (fora do DAS)."
-                ),
-            })
-
-        # ERR-036 — Alerta BENEFICIO_FISCAL_EXTINCAO removido na Fase 3.2.
-        # Motivo: o campo `beneficio_fiscal_antigo` era DECORATIVO — o valor
-        # nunca entrava em base de cálculo. Alerta com "Art. X" literal,
-        # sem amparo real, viola MAX_FISCAL_02. Phase-out do ADCT Art. 92-A
-        # §3º (redução 20%/ano a partir de 2029) é fase posterior — precisa
-        # de tabela FROZEN por ano + validação fiscal do Luiz Moreira.
-
-        # INFO: Substituição Tributária ICMS extinta
-        if self.operacao.tinha_st_icms:
-            alertas.append({
-                "nivel": "INFO",
-                "codigo": "ST_ICMS_EXTINTA",
-                "mensagem": (
-                    "Substituição Tributária de ICMS será extinta com o IBS. "
-                    "Capital de giro travado na ST será liberado progressivamente até 2032."
-                ),
-            })
-
-        # ─────────────────────────────────────────────────────────────────────────────
-        # ALERTAS FASE 5 (STRESS TEST) — R14 a R17
-        # ─────────────────────────────────────────────────────────────────────────────
-
-        # C1 (R14) Fantasma do Ano Novo: Emissão X Liquidação em mudança de regime
-        if self.operacao.data_liquidacao and self.operacao.data_liquidacao.year > self.operacao.data_emissao.year:
-            # Regra: só dispara se cruzar a virada (ex: emissão 2026, pagto 2027 que inicia split payment dinâmico)
-            if self.operacao.data_emissao.year < ANO_INICIO_SPLIT_PAYMENT and self.operacao.data_liquidacao.year >= ANO_INICIO_SPLIT_PAYMENT:
-                alertas.append({
-                    "nivel": "ALTO",
-                    "codigo": "CONCILIACAO_RISCO",
-                    "mensagem": (
-                        f"Fantasma do Ano Novo: Emissão em {self.operacao.data_emissao.year} "
-                        f"e liquidação em {self.operacao.data_liquidacao.year}. "
-                        "Cuidado: contabilidade gera imposto na emissão, mas retenção do Split Payment atua na liquidação."
-                    ),
-                })
-
-        # C2 (R15) Explosão do Sublimite
-        # Se RBT12 estava seguro, mas o delta dessa operação específica estourou o sublimite
-        if rbt12_val <= SUBLIMITE_ICMS_ISS and (rbt12_val + self.operacao.valor_operacao) > SUBLIMITE_ICMS_ISS:
-            alertas.append({
-                "nivel": "ALTO",
-                "codigo": "SUBLIMITE_CRITICO",
-                "mensagem": (
-                    f"A operação atual ({_fmt_brl(self.operacao.valor_operacao)}) "
-                    f"cruzou o Sublimite Estadual ({_fmt_brl(SUBLIMITE_ICMS_ISS)}). "
-                    "ICMS e ISS serão ejetados do DAS no próximo mês!"
-                ),
-            })
-
-        # C3 (R16) Salada de Frutas (Timeouts)
-        if self.operacao.qtd_itens > 50:
-            alertas.append({
-                "nivel": "MEDIO",
-                "codigo": "RISCO_TIMEOUT_API",
-                "mensagem": (
-                    f"Carga extrema: NF com {self.operacao.qtd_itens} itens. "
-                    "Risco de instabilidade no CGIBS. Se ocorrer timeout de API, "
-                    "o Split Payment pode aplicar retenção punitiva máxima."
-                ),
-            })
-
-        # C4 (R17) Estorno do Medo
-        if self.operacao.estorno_realizado:
-            alertas.append({
-                "nivel": "ALTO",
-                "codigo": "CAPITAL_GIRO_COMPROMETIDO",
-                "mensagem": (
-                    "Estorno após Split Payment: O imposto já foi retido no PIX/Cartão. "
-                    "Com a devolução, esse saldo virará crédito tributário de difícil "
-                    "recuperação, e não dinheiro em conta."
-                ),
-            })
-
-        # MEDIO: CNAE mapeado por fallback (ERR-005)
-        cnae_fonte = getattr(self, "_cnae_fonte", None)
-        if cnae_fonte == "FALLBACK":
-            alertas.append({
-                "nivel": "MEDIO",
-                "codigo": "CNAE_FALLBACK_ERR005",
-                "mensagem": (
-                    f"CNAE {self.fornecedora.cnae_principal} não encontrado na tabela de mapeamento. "
-                    f"Anexo III foi assumido como fallback seguro. "
-                    f"Confirme o Anexo correto com o contador responsável antes de tomar decisões."
-                ),
-            })
-        elif cnae_fonte == "PREFIXO":
-            alertas.append({
-                "nivel": "INFO",
-                "codigo": "CNAE_PREFIXO",
-                "mensagem": (
-                    f"CNAE {self.fornecedora.cnae_principal} mapeado por prefixo (grupo '{self.fornecedora.cnae_principal[:2]}'). "
-                    f"Verifique se o Anexo corresponde à atividade principal da empresa."
-                ),
-            })
-
-        return alertas
+        """Alertas fiscais baseados em gatilhos matemáticos."""
+        from core.alertas_motor import gerar_alertas
+        return gerar_alertas(
+            rbt12=self.rbt12,
+            alerta_fator_r=self.alertar_fator_r(),
+            split_payment=self.split_payment_impacto,
+            tipo_compradora=self.compradora.tipo,
+            regime_fornecedora=self.fornecedora.regime,
+            data_emissao=self.operacao.data_emissao,
+            data_liquidacao=self.operacao.data_liquidacao,
+            valor_operacao=self.operacao.valor_operacao,
+            qtd_itens=self.operacao.qtd_itens,
+            estorno_realizado=self.operacao.estorno_realizado,
+            tinha_st_icms=self.operacao.tinha_st_icms,
+            cnae_principal=self.fornecedora.cnae_principal,
+            cnae_fonte=getattr(self, "_cnae_fonte", None),
+        )
 
     def _diagnostico_lucro_real(self) -> Dict[str, Any]:
         """Diagnóstico para regime Lucro Real via LucroRealEngine."""
@@ -1410,7 +939,6 @@ class MotorReformaTributaria:
         lucro = self.operacao.lucro_real_mensal or receita_mensal
         creditos = self.operacao.creditos_pis_cofins
 
-        # CNAE fonte para alertas (Lucro Real também pode ter CNAE em fallback)
         _, cnae_fonte = determinar_anexo_por_cnae_com_fonte(self.fornecedora.cnae_principal)
         self._cnae_fonte = cnae_fonte
 
@@ -1420,7 +948,6 @@ class MotorReformaTributaria:
             creditos_pis_cofins=creditos,
         )
 
-        # Registrar na trilha se usou proxy
         if self.operacao.lucro_real_mensal is None:
             self.trilha_auditoria.append({
                 "tipo": "ALERTA_PROXY",
@@ -1489,13 +1016,7 @@ class MotorReformaTributaria:
         }
 
     def gerar_diagnostico(self) -> Dict[str, Any]:
-        """
-        Diagnóstico completo em JSON estruturado.
-        Integra Fases 2, 3, 4 e 5 num único payload tipificado.
-        Condiciona output por regime: Simples usa cálculos internos, Lucro Real usa engine.
-        LGPD: purge() é chamado automaticamente após geração.
-        """
-        # Lucro Real: delega ao engine dedicado
+        """Diagnóstico completo em JSON estruturado. Fases 2-5. LGPD: purge() automático após geração."""
         if self.fornecedora.regime == "REAL":
             diagnostico = self._diagnostico_lucro_real()
             self._diagnostico_gerado = True
@@ -1507,7 +1028,6 @@ class MotorReformaTributaria:
         f_r = self.fator_r
         aliquotas_iva = self.get_aliquotas_iva_por_ano()
 
-        # Serializa cronograma IVA 2026-2033 como lista ordenada
         cronograma_iva_lista = [
             {
                 "ano": ano,
@@ -1559,17 +1079,15 @@ class MotorReformaTributaria:
 
             "cenarios": self._montar_cenarios_com_recomendacao(),
 
-            # DIFAL Interestadual (EC 87/2015 | LC 190/2022)
             "difal": self._calcular_difal_diagnostico(),
 
             "split_payment": self.split_payment_impacto,
 
-            # Cronograma de transição IVA 2026-2033 — LC 214/2025, Art. 348
             "cronograma_iva": cronograma_iva_lista,
 
             "alertas": self._gerar_alertas(),
 
-            "trilha_auditoria": self.trilha_auditoria, # [MAX_FISCAL_01]
+            "trilha_auditoria": self.trilha_auditoria,
 
             "meta": {
                 "elaborado_por": "Escritório Conect — Motor Tributário v1.0",
@@ -1585,15 +1103,10 @@ class MotorReformaTributaria:
         self._diagnostico_gerado = True
         return diagnostico
 
-    # ── LGPD — PURGE OBRIGATÓRIO ──────────────────────────────────────────────
+    # ── LGPD ──────────────────────────────────────────────────────────────────
 
     def purge(self) -> None:
-        """
-        LGPD Art. 15 — Eliminação de dados após finalidade cumprida.
-        Chamado automaticamente após gerar_diagnostico().
-        Pode ser chamado manualmente a qualquer momento.
-        Após purge(), o objeto não deve ser reutilizado.
-        """
+        """LGPD Art. 15 — Elimina dados após finalidade cumprida. Chamado automaticamente após gerar_diagnostico()."""
         setattr(self, "fornecedora", None)
         setattr(self, "compradora", None)
         setattr(self, "operacao", None)
