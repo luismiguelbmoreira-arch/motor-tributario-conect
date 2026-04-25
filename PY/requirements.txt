@@ -28,6 +28,9 @@ weasyprint>=61.0                    # HTML → PDF (relatórios tributários)
 # ── Parsers multi-documento (Fase 1) ──────────────────────────────────────────
 lxml>=5.0                           # Parse XML NFe/NFCe 4.0 com validação namespace
 
+# ── Integrações HTTP (e-CAC, Sieg, Integra Contador) ─────────────────────────
+requests>=2.31.0                    # HTTP client — integra_adapter.py, sieg_service.py
+
 # ── Migrations ────────────────────────────────────────────────────────────────
 alembic>=1.13.0                     # Versionamento de schema (database migrations)
 
