@@ -1,9 +1,11 @@
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Optional
+
 from sqlalchemy.exc import IntegrityError, OperationalError
+
 from ..connection import get_session
-from ..models import AlertaDB
 from ..enums import NivelAlerta
+from ..models import AlertaDB
 from .diagnostico_repo import validar_competencia
 
 logger = logging.getLogger("motor_conect.database.alerta")
@@ -14,7 +16,7 @@ def salvar_alertas(empresa_id: int, competencia: str, alertas: List[Dict[str, st
         for alerta in alertas:
             nivel_str = alerta.get("nivel", "INFO")
             NivelAlerta(nivel_str)  # Valida
-            
+
             db_alerta = AlertaDB(
                 empresa_id=empresa_id,
                 competencia=competencia,

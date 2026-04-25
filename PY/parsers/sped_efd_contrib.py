@@ -30,8 +30,6 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 
-
-
 class SPEDEfdContribParserError(ValueError):
     """Erro ao parsear SPED EFD-Contribuicoes."""
 

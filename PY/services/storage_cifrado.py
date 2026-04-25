@@ -9,7 +9,6 @@ import logging
 import os
 import secrets
 from pathlib import Path
-from typing import Optional
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives import hashes
@@ -29,9 +28,14 @@ STORAGE_ROOT = Path(
     )
 )
 
-class StorageCifradoError(Exception): """Erro genérico."""
-class MasterKeyAusente(StorageCifradoError): """Master key não encontrada."""
-class IntegridadeViolada(StorageCifradoError): """Falha na integridade (AES-GCM tag)."""
+class StorageCifradoError(Exception):
+    """Erro genérico."""
+
+class MasterKeyAusente(StorageCifradoError):
+    """Master key não encontrada."""
+
+class IntegridadeViolada(StorageCifradoError):
+    """Falha na integridade (AES-GCM tag)."""
 
 def _master_key() -> bytes:
     """Lê master key da env var MOTOR_CONECT_MASTER_KEY. Zero fallback — falha ruidosa."""

@@ -66,7 +66,7 @@ jobs:
       - name: Cobertura por módulo — motor_tributario.py (≥85%)
         run: |
           coverage report \
-            --include="motor_tributario.py" \
+            --include="core/motor_tributario.py" \
             --fail-under=85 \
             --show-missing
         working-directory: PY
@@ -74,7 +74,7 @@ jobs:
       - name: Cobertura por módulo — regimes/ (≥90%)
         run: |
           coverage report \
-            --include="regimes/*.py" \
+            --include="core/regimes/*.py" \
             --fail-under=90 \
             --show-missing
         working-directory: PY

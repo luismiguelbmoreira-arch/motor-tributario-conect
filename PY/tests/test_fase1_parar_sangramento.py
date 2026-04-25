@@ -43,7 +43,7 @@ def test_refresh_proximo_expiracao_retorna_200_com_token_novo(client_sem_auth):
     """Token com < 2h restantes → 200 com renewed=true e token novo."""
     from datetime import datetime, timedelta, timezone
 
-    from jose import jwt
+    import jwt
 
     from auth import ALGORITHM, SECRET_KEY
 

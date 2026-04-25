@@ -1,15 +1,16 @@
 import logging
 from typing import Literal, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from api.dependencies import limiter, require_admin
 from auth import (
     criar_usuario,
-    listar_usuarios,
     desativar_usuario,
+    listar_usuarios,
     resetar_senha,
 )
-from api.dependencies import require_admin, limiter
 
 logger = logging.getLogger("motor_conect.api")
 

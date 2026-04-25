@@ -1,10 +1,14 @@
 import logging
+import re
 from typing import Literal, Optional
-from fastapi import APIRouter, Depends, HTTPException, Form, UploadFile, File
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from api.dependencies import get_current_user, extrair_user_id
+from api.dependencies import extrair_user_id, get_current_user
+from database import tem_acesso_cnpj
+from database.repositories.auditoria_tentativa_repo import registrar_tentativa_acesso
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Constantes de motivo público (mensagens neutras, sem vazar caminho/senha)
@@ -12,6 +16,51 @@ from api.dependencies import get_current_user, extrair_user_id
 _MOTIVO_INATIVA = "Integração inativa — configure credenciais."
 _MOTIVO_INDISPONIVEL = "Integração indisponível neste ambiente."
 _MOTIVO_OK = None  # Status OK → motivo_erro_publico = null
+
+
+def _verificar_ownership_cnpj(
+    cnpj: str,
+    current_user: dict,
+    request: Optional[Request],
+    endpoint: str,
+) -> None:
+    """
+    Guard de ownership horizontal (ERR-018.b).
+
+    Admin bypassa a verificação. Usuários comuns precisam de ao menos um
+    diagnóstico ou documento vinculado ao CNPJ. Bloqueia com 403 e registra
+    tentativa de acesso cruzado (LGPD Art. 46 §1º + Art. 48).
+
+    Amparo: CTN Art. 198 (sigilo fiscal) + LGPD Art. 48.
+    """
+    # Admin tem acesso a qualquer CNPJ
+    if current_user.get("role") == "admin":
+        return
+
+    user_id = extrair_user_id(current_user)
+    if user_id is None:
+        raise HTTPException(status_code=403, detail="Acesso negado.")
+
+    apenas_digitos = re.sub(r"\D", "", cnpj or "")
+    if not tem_acesso_cnpj(user_id, apenas_digitos):
+        ip = "unknown"
+        if request is not None:
+            try:
+                ip = request.client.host if request.client else "unknown"
+            except Exception:
+                pass
+        # Prefixo do CNPJ como id de recurso (não vaza o CNPJ completo)
+        registrar_tentativa_acesso(
+            analise_id_prefix=apenas_digitos[:8],
+            user_id_tentando=user_id,
+            user_id_dono=None,
+            ip=ip,
+            endpoint=endpoint,
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="Acesso negado. Você não tem diagnóstico ou documento vinculado a este CNPJ.",
+        )
 
 logger = logging.getLogger("motor_conect.api")
 
@@ -41,8 +90,10 @@ class SiegSincronizarRequest(BaseModel):
 @router.post("/sieg/sincronizar")
 async def sieg_sincronizar(
     payload: SiegSincronizarRequest,
+    request: Request,
     current_user: dict = Depends(get_current_user),
 ) -> JSONResponse:
+    _verificar_ownership_cnpj(payload.cnpj, current_user, request, "/sieg/sincronizar")
     from datetime import date as _date
     if payload.ano_base:
         if payload.data_inicio or payload.data_fim:
@@ -58,7 +109,7 @@ async def sieg_sincronizar(
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=f"Data inválida: {exc}") from exc
 
-    from integrations.sieg_service import SiegCredentialError, SiegError, SiegService, XML_TYPES_VALIDOS
+    from integrations.sieg_service import XML_TYPES_VALIDOS, SiegCredentialError, SiegError, SiegService
 
     if payload.xml_type not in XML_TYPES_VALIDOS:
         raise HTTPException(status_code=422, detail=f"xml_type inválido — esperado {list(XML_TYPES_VALIDOS)}")
@@ -106,15 +157,17 @@ class IntegraSincronizarRequest(BaseModel):
 @router.post("/integra/sincronizar")
 async def integra_sincronizar(
     payload: IntegraSincronizarRequest,
+    request: Request,
     current_user: dict = Depends(get_current_user),
 ):
+    _verificar_ownership_cnpj(payload.cnpj, current_user, request, "/integra/sincronizar")
     try:
         periodos = payload.resolver_periodos()
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
     try:
-        from integrations.integra_adapter import (IntegraAdapter, IntegraAuthError, IntegraCertError, IntegraError)
+        from integrations.integra_adapter import IntegraAdapter, IntegraAuthError, IntegraCertError, IntegraError
         from integrations.integra_credentials import IntegraCredentialError, get_integra_credenciais
         from integrations.integra_ingestor import IntegraIngestor
     except ImportError as exc:
@@ -145,23 +198,22 @@ async def integra_sincronizar(
 
 # --- E-CAC ---
 try:
-    from integrations.ecac_scraper import EcacScraper, CertificateData, load_pfx_to_pem
+    from integrations.ecac_scraper import EcacScraper, load_pfx_to_pem
     _ECAC_AVAILABLE = True
 except ImportError:
     _ECAC_AVAILABLE = False
 
 @router.post("/integracoes/ecac/sync")
 async def ecac_sync_a1(
+    request: Request,
     cnpj: str = Form(...),
     senha_cert: str = Form(...),
-    certificado_pfx: UploadFile = File(...)
+    certificado_pfx: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
 ):
-    # ⚠️ TODO CRÍTICO (ver LOG_ERROS.md ERR-013):
-    # Validar ownership do CNPJ contra current_user antes de processar.
-    # Hoje qualquer user autenticado consegue extrair dados de qualquer CNPJ.
-    # PRAZO: antes de qualquer deploy multi-tenant — é IDOR horizontal que
-    # viola CTN Art. 198 (sigilo fiscal) e é incidente reportável à ANPD
-    # (LGPD Art. 48). Não pode virar dívida eterna.
+    # ERR-018.b (Fase 5): guard de ownership — CTN Art. 198 + LGPD Art. 48.
+    # Admin bypass implícito em _verificar_ownership_cnpj.
+    _verificar_ownership_cnpj(cnpj, current_user, request, "/integracoes/ecac/sync")
     if not _ECAC_AVAILABLE:
         raise HTTPException(status_code=501, detail="Integração e-CAC indisponível neste ambiente.")
     try:

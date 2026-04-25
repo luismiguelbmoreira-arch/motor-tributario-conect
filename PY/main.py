@@ -65,30 +65,20 @@ from typing import Any, Literal, Optional  # noqa: E402
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-from fastapi.responses import JSONResponse, Response, StreamingResponse  # noqa: E402
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # noqa: E402
+from fastapi.responses import JSONResponse, Response  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator  # noqa: E402
 from pydantic import ValidationError as PydanticValidationError  # noqa: E402
-from slowapi import Limiter, _rate_limit_exceeded_handler  # noqa: E402
+from slowapi import _rate_limit_exceeded_handler  # noqa: E402
 from slowapi.errors import RateLimitExceeded  # noqa: E402
-from slowapi.util import get_remote_address  # noqa: E402
 
 # Adiciona PY/ ao path para imports relativos
 sys.path.insert(0, str(Path(__file__).parent))
 
+import database  # noqa: E402
 from auth import (  # noqa: E402
-    autenticar_usuario,
     criar_admin_default,
     criar_tabela_users,
-    criar_usuario,
-    desativar_usuario,
-    gerar_token_jwt,
-    listar_usuarios,
-    renovar_token_jwt,
-    resetar_senha,
-    trocar_senha_proprio,
-    verificar_token,
 )
 from core.motor_tributario import (  # noqa: E402
     EmpresaCompradora,
@@ -100,9 +90,8 @@ from schemas.catalogo_documentos import montar_cards  # noqa: E402
 from schemas.documentos_requeridos import CardsResponse  # noqa: E402
 from schemas.responses import DiagnosticoResponse  # noqa: E402
 from utils.periodo_base import ANO_MAX, ANO_MIN  # noqa: E402
-import database  # noqa: E402
-from validadores import validar_cnpj, validar_uf, validar_cnae  # noqa: E402
 from utils.periodo_base import derivar as derivar_periodo  # noqa: E402
+from validadores import validar_cnae, validar_cnpj, validar_uf  # noqa: E402
 
 # relatorio_pdf importado lazy no endpoint — evita crash de startup se GTK ausente (Windows)
 try:
@@ -157,14 +146,13 @@ def _setup_logging() -> None:
 _setup_logging()
 logger = logging.getLogger("motor_conect.api")
 
-TOTAL_TESTES = 327  # Atualizado 08/04/2026: + 7 testes LGPD PII separation (fix bug latente Lucro Real)
+TOTAL_TESTES = 984  # Atualizado 24/04/2026: 57 arquivos, 984 funções de teste (inclui suite HTTP Fase 5)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SECURITY — Importados de api.dependencies
 # ─────────────────────────────────────────────────────────────────────────────
-from api.dependencies import get_current_user, require_admin, security, limiter
-
+from api.dependencies import get_current_user, limiter  # noqa: E402
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MODELOS DE REQUEST — Auditoria (existentes)
@@ -516,7 +504,8 @@ def _persistir_diagnostico_best_effort(
         return
 
     try:
-        from database import salvar_empresa, salvar_diagnostico as _sd
+        from database import salvar_diagnostico as _sd
+        from database import salvar_empresa
 
         empresa_db = salvar_empresa(fornecedora)
 
@@ -594,14 +583,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-from api.routers import auth, usuarios
+from api.routers import auth, usuarios  # noqa: E402
+
 app.include_router(auth.router)
 app.include_router(usuarios.router)
-from api.routers import integracoes, auditoria
+from api.routers import auditoria, integracoes  # noqa: E402
+
 app.include_router(integracoes.router)
 app.include_router(auditoria.router)
 # Fase 5 — páginas fantasmas vivas: histórico + configurações
-from api.routers import historico, configuracoes
+from api.routers import configuracoes, historico  # noqa: E402
+
 app.include_router(historico.router)
 app.include_router(configuracoes.router)
 
@@ -1610,15 +1602,6 @@ async def analise_pdf(
             status_code=500,
             detail="Falha na extração dos documentos. Verifique os arquivos enviados.",
         )
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# GET /auditoria/prova/cnpj/{cnpj} — Dossiê de prova ZIP (Gap P0 / Etapa 5)
-#
-# Decifra todos os PDFs cifrados de um cliente e devolve um ZIP com:
-#   - originais/<nome>.pdf         (decifrados on-the-fly)
-#   - HASHES.txt                   (hash SHA-256 esperado de cada arquivo)
-
 
 
 

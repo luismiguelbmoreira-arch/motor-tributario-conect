@@ -1,9 +1,11 @@
 import logging
 from datetime import datetime
 from typing import List, Optional
-from sqlalchemy.exc import IntegrityError, OperationalError
+
+from sqlalchemy.exc import IntegrityError
+
 from ..connection import get_session
-from ..models import AuditoriaDocumentoDB, AuditoriaAcessoDB
+from ..models import AuditoriaAcessoDB, AuditoriaDocumentoDB
 
 logger = logging.getLogger("motor_conect.database.auditoria")
 
@@ -125,7 +127,7 @@ def registrar_acesso_documento(
 ) -> AuditoriaAcessoDB:
     if not motivo or not motivo.strip():
         raise ValueError("motivo do acesso e obrigatorio (LGPD Art. 37)")
-    
+
     log = AuditoriaAcessoDB(
         documento_id=documento_id,
         acessado_por_user_id=acessado_por_user_id,

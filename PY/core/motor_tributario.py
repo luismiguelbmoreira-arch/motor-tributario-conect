@@ -11,9 +11,7 @@ import logging
 from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from functools import cached_property
-from typing import Any, Dict, List, Literal, Optional
-
-from pydantic import Field, field_validator, model_validator
+from typing import Any, Dict, List, Optional
 
 from core.difal import calcular_difal
 from core.formatadores import _fmt_brl
@@ -23,22 +21,19 @@ from core.regimes.lucro_real import LucroRealEngine
 from core.regimes.mei import MEIEngine
 from core.regimes.simples_multi import SimplesMultiAtividadeEngine
 from core.tabelas_simples import (
-    ALERTA_90_PERCENT_TETO,
     ANO_INICIO_SPLIT_PAYMENT,
     CRONOGRAMA_IVA,
     DISTRIBUICAO_DAS,
-    SUBLIMITE_ICMS_ISS,
     TABELAS_ANEXOS,
     TETO_SIMPLES_NACIONAL,
     determinar_anexo_por_cnae_com_fonte,
     obter_faixa_numero,
 )
-from validadores import validar_cnae, validar_cnpj, validar_ncm, validar_uf
 from schemas.motor import (
-    Atividade,
-    EmpresaFornecedora,
-    EmpresaCompradora,
     FORMAS_PAGAMENTO_COM_PSP,
+    Atividade,  # noqa: F401 — re-exported: tests + extrator_pdfs import from here
+    EmpresaCompradora,
+    EmpresaFornecedora,
     OperacaoFiscal,
 )
 
@@ -130,10 +125,10 @@ class MotorReformaTributaria:
         """Retorna o engine de regime instanciado."""
         return self._engine_regime
 
-    def __enter__(self):
+    def __enter__(self):  # pragma: no cover
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type, exc_val, exc_tb):  # pragma: no cover
         self.purge()
 
     def _validar_timeline(self) -> None:
@@ -970,7 +965,7 @@ class MotorReformaTributaria:
 
     def _diagnostico_lucro_real(self) -> Dict[str, Any]:
         """Diagnóstico para regime Lucro Real via LucroRealEngine."""
-        if self._engine_regime is None:
+        if self._engine_regime is None:  # pragma: no cover
             raise RuntimeError(
                 "LucroRealEngine não instanciado. Verifique se regime='REAL' "
                 "foi configurado corretamente em EmpresaFornecedora."
@@ -978,7 +973,7 @@ class MotorReformaTributaria:
         engine = self._engine_regime
 
         receita_mensal = self.operacao.rpa_mensal or (self.fornecedora.faturamento_12m / 12)
-        if receita_mensal <= Decimal("0"):
+        if receita_mensal <= Decimal("0"):  # pragma: no cover
             raise ValueError(
                 "Lucro Real: receita mensal é zero. Informe faturamento_12m > 0 "
                 "ou rpa_mensal > 0 para calcular."

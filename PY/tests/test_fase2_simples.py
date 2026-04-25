@@ -15,6 +15,7 @@ from decimal import Decimal
 from datetime import date
 
 from core.motor_tributario import (
+    Atividade,
     EmpresaFornecedora,
     EmpresaCompradora,
     OperacaoFiscal,
@@ -250,3 +251,65 @@ class TestCalcularAliquotaEfetiva:
         motor = make_motor("500000.00")
         resultado = motor.aliquota_efetiva
         assert type(resultado) is Decimal, "Alíquota DEVE ser Decimal, nunca float"
+
+
+class TestMotorMultiAtividade:
+    """Cobre o path de multi-atividade via MotorReformaTributaria (não via engine direto).
+    LC 123/2006, Art. 18, § 3º — cada atividade apurada no Anexo correto.
+    """
+
+    def _make_motor_multi(self) -> MotorReformaTributaria:
+        fornecedora = EmpresaFornecedora(
+            cnpj="11.222.333/0001-81",
+            razao_social="Multi Atividade Ltda",
+            regime="SIMPLES",
+            cnae_principal="4711302",
+            uf_origem="SP",
+            faturamento_12m=Decimal("720000.00"),
+            atividades=[
+                Atividade(receita=Decimal("50000.00"), anexo="I"),
+                Atividade(receita=Decimal("10000.00"), anexo="III"),
+            ],
+        )
+        compradora = EmpresaCompradora(tipo="B2B_CONTRIBUINTE", uf_destino="SP")
+        operacao = OperacaoFiscal(
+            data_emissao=date(2026, 6, 1),
+            valor_operacao=Decimal("10000.00"),
+            ncm_nbs="84099190",
+            forma_recebimento="PIX_VIA_PSP",
+        )
+        return MotorReformaTributaria(fornecedora, compradora, operacao)
+
+    def test_instancia_simples_multi_engine(self):
+        """_instanciar_engine() deve retornar SimplesMultiAtividadeEngine quando atividades presente."""
+        from core.regimes.simples_multi import SimplesMultiAtividadeEngine
+        motor = self._make_motor_multi()
+        assert isinstance(motor.obter_engine_regime(), SimplesMultiAtividadeEngine)
+
+    def test_das_mensal_multi_atividade_e_decimal(self):
+        """das_mensal com atividades percorre o loop por atividade — retorno Decimal."""
+        motor = self._make_motor_multi()
+        das = motor.das_mensal
+        assert isinstance(das, Decimal)
+        assert das > Decimal("0")
+
+    def test_calcular_ae_por_anexo_rbt12_zero_retorna_zero(self):
+        """calcular_ae_por_anexo com RBT12=0 retorna 0 sem dividir por zero."""
+        fornecedora = EmpresaFornecedora(
+            cnpj="11.222.333/0001-81",
+            razao_social="Empresa Sem Receita",
+            regime="SIMPLES",
+            cnae_principal="4711302",
+            uf_origem="SP",
+            faturamento_12m=Decimal("0"),
+        )
+        compradora = EmpresaCompradora(tipo="B2C_CONSUMIDOR_FINAL", uf_destino="SP")
+        operacao = OperacaoFiscal(
+            data_emissao=date(2026, 6, 1),
+            valor_operacao=Decimal("100.00"),
+            ncm_nbs="84099190",
+            forma_recebimento="DINHEIRO",
+        )
+        motor = MotorReformaTributaria(fornecedora, compradora, operacao)
+        ae = motor.calcular_ae_por_anexo("I")
+        assert ae == Decimal("0.00")

@@ -1,15 +1,16 @@
 import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import BaseModel, ConfigDict, Field
 
+from api.dependencies import get_current_user, limiter, security
 from auth import (
     autenticar_usuario,
     gerar_token_jwt,
     renovar_token_jwt,
     trocar_senha_proprio,
 )
-from api.dependencies import get_current_user, security, limiter
 
 logger = logging.getLogger("motor_conect.api")
 

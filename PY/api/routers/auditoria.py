@@ -3,13 +3,11 @@ import logging
 import zipfile
 from datetime import datetime as _dt
 from pathlib import Path as _Path
-from decimal import Decimal
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
-from api.dependencies import get_current_user, extrair_user_id
+from api.dependencies import extrair_user_id, get_current_user
 from database import (
     buscar_documentos_por_cnpj,
     registrar_acesso_documento,
@@ -46,7 +44,7 @@ async def gerar_dossie_prova(
             status_code=422,
             detail=f"CNPJ deve ter 14 digitos. Recebido: {len(apenas_digitos)}.",
         )
-    
+
     # Formata para o formato canônico XX.XXX.XXX/XXXX-XX
     cnpj_formatado = (
         f"{apenas_digitos[:2]}.{apenas_digitos[2:5]}.{apenas_digitos[5:8]}"
@@ -58,7 +56,7 @@ async def gerar_dossie_prova(
     # ERR-049 (Fase 5): JWT real usa claim "sub". current_user.get("id")
     # sempre devolvia None em produção — dossiê ficava sem rastro do solicitante.
     user_id = extrair_user_id(current_user)
-    
+
     ip = None
     if request is not None:
         try:
@@ -115,7 +113,7 @@ async def gerar_dossie_prova(
                 erros.append(f"{doc.nome_original}: {type(exc).__name__}")
 
         zf.writestr("HASHES.txt", "\n".join(hashes_txt).encode("utf-8"))
-        
+
         readme = [
             "DOSSIE DE PROVA — Motor Tributario Conect",
             "=" * 50,

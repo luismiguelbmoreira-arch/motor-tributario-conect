@@ -1,9 +1,12 @@
 from decimal import Decimal
-from typing import Any, Dict, List
-from sqlmodel import select, func
+from typing import Any, Dict
+
+from sqlmodel import func, select
+
 from ..connection import get_session
-from ..models import EmpresaDB, DiagnosticoDB, AlertaDB, AuditoriaAcessoDB
 from ..enums import NivelAlerta, StatusAlerta
+from ..models import AlertaDB, DiagnosticoDB, EmpresaDB
+
 
 def get_dashboard_metrics() -> Dict[str, Any]:
     """Agrega métricas reais para o Dashboard."""
@@ -12,7 +15,7 @@ def get_dashboard_metrics() -> Dict[str, Any]:
         total_empresas = session.exec(select(func.count(EmpresaDB.id))).one()
 
         # 2. Economia Total
-        diagnosticos = session.exec(select(DiagnosticoDB.delta).where(DiagnosticoDB.delta != None)).all()
+        diagnosticos = session.exec(select(DiagnosticoDB.delta).where(DiagnosticoDB.delta != None)).all()  # noqa: E711
         soma_delta = sum((Decimal(d) for d in diagnosticos), Decimal("0"))
 
         # 3. Alertas Críticos/Altos (ABERTOS)
@@ -46,7 +49,7 @@ def get_dashboard_metrics() -> Dict[str, Any]:
             .order_by(DiagnosticoDB.competencia.desc())
             .limit(12)
         ).all()
-        
+
         all_diags = list(all_diags)
         all_diags.reverse()
 
