@@ -11,7 +11,9 @@ from api.dependencies import extrair_user_id, get_current_user
 from database import (
     buscar_documentos_por_cnpj,
     registrar_acesso_documento,
+    tem_acesso_cnpj,
 )
+from database.repositories.auditoria_tentativa_repo import registrar_tentativa_acesso
 from services.storage_cifrado import anonimizar_cnpj, decifrar
 
 logger = logging.getLogger("motor_conect.api")
@@ -44,6 +46,30 @@ async def gerar_dossie_prova(
             status_code=422,
             detail=f"CNPJ deve ter 14 digitos. Recebido: {len(apenas_digitos)}.",
         )
+
+    # Guard de ownership horizontal (ERR-018.b).
+    # Admin bypass automático. Dados pré-Fase 5 (uploaded_by_user_id NULL) = admin-only.
+    # Amparo: LGPD Art. 46 §1º + Art. 6º VII. CTN Art. 198 (subsidiário).
+    if current_user.get("role") != "admin":
+        _uid = extrair_user_id(current_user)
+        if _uid is None or not tem_acesso_cnpj(_uid, apenas_digitos):
+            _ip_t = "unknown"
+            if request is not None:
+                try:
+                    _ip_t = request.client.host if request.client else "unknown"
+                except Exception:
+                    pass
+            registrar_tentativa_acesso(
+                analise_id_prefix=apenas_digitos[:8],
+                user_id_tentando=_uid or 0,
+                user_id_dono=None,
+                ip=_ip_t,
+                endpoint="/auditoria/prova/cnpj",
+            )
+            raise HTTPException(
+                status_code=403,
+                detail="Acesso negado. Você não tem documento vinculado a este CNPJ.",
+            )
 
     # Formata para o formato canônico XX.XXX.XXX/XXXX-XX
     cnpj_formatado = (

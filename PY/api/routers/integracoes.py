@@ -17,6 +17,8 @@ _MOTIVO_INATIVA = "Integração inativa — configure credenciais."
 _MOTIVO_INDISPONIVEL = "Integração indisponível neste ambiente."
 _MOTIVO_OK = None  # Status OK → motivo_erro_publico = null
 
+logger = logging.getLogger("motor_conect.api")
+
 
 def _verificar_ownership_cnpj(
     cnpj: str,
@@ -29,12 +31,18 @@ def _verificar_ownership_cnpj(
 
     Admin bypassa a verificação. Usuários comuns precisam de ao menos um
     diagnóstico ou documento vinculado ao CNPJ. Bloqueia com 403 e registra
-    tentativa de acesso cruzado (LGPD Art. 46 §1º + Art. 48).
+    tentativa de acesso cruzado (LGPD Art. 46 §1º + Art. 6º VII).
 
-    Amparo: CTN Art. 198 (sigilo fiscal) + LGPD Art. 48.
+    Amparo: LGPD Art. 46 §1º + Art. 6º VII (segurança no tratamento).
+            CTN Art. 198 (sigilo fiscal, fundamento subsidiário).
     """
-    # Admin tem acesso a qualquer CNPJ
+    # Admin tem acesso a qualquer CNPJ — registra para rastreabilidade (LGPD Art. 37)
     if current_user.get("role") == "admin":
+        logger.info(
+            "ADMIN_CNPJ_ACCESS | user_id=%s | endpoint=%s",
+            extrair_user_id(current_user),
+            endpoint,
+        )
         return
 
     user_id = extrair_user_id(current_user)
@@ -61,8 +69,6 @@ def _verificar_ownership_cnpj(
             status_code=403,
             detail="Acesso negado. Você não tem diagnóstico ou documento vinculado a este CNPJ.",
         )
-
-logger = logging.getLogger("motor_conect.api")
 
 # Auth aplicada no router inteiro — todo endpoint herda get_current_user.
 # Adicionar novo endpoint aqui fica AUTOMATICAMENTE protegido.

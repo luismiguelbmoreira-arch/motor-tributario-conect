@@ -36,12 +36,14 @@ import anthropic
 from pydantic import BaseModel, Field, field_validator
 
 # Carrega .env automaticamente (procura em PY/.env, raiz, e cwd)
+# override=True em dev/prod, mas NÃO em ENVIRONMENT=test (testes setam env antes do import)
 try:
     from dotenv import load_dotenv
     _here = Path(__file__).resolve().parent
+    _override = os.environ.get("ENVIRONMENT", "").lower() != "test"
     for _candidato in (_here / ".env", _here.parent / ".env", Path.cwd() / ".env"):
         if _candidato.exists():
-            load_dotenv(_candidato, override=True)
+            load_dotenv(_candidato, override=_override)
             break
 except ImportError:
     pass  # python-dotenv opcional — variável pode vir do ambiente do SO

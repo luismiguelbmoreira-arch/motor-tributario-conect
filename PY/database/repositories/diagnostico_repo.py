@@ -81,6 +81,10 @@ def tem_acesso_cnpj(user_id: int, cnpj: str) -> bool:
 
     Aceita CNPJ com ou sem pontuação — normaliza internamente para 14 dígitos.
     Admin bypass deve ser feito ANTES de chamar esta função.
+
+    Registros com uploaded_by_user_id = NULL (pré-Fase 5) são intencionalmente
+    excluídos — admin-only por design (decisão ERR-018.b, 24/04/2026).
+    Usuários com dados antigos precisam rodar nova análise para estabelecer ownership.
     """
     apenas_digitos = re.sub(r"\D", "", cnpj or "")
     if len(apenas_digitos) != 14:

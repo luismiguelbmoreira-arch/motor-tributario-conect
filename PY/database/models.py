@@ -202,9 +202,11 @@ class AuditoriaTentativaAcessoDB(SQLModel, table=True):
     # User que tentou o acesso (sempre existe — o endpoint é autenticado).
     user_id_tentando: int = Field(foreign_key="users.id", index=True)
 
-    # User dono do recurso. Pode ser None apenas em endpoints futuros onde
-    # o id existe mas está desvinculado de um dono identificável. No uso
-    # atual (/analise/sessao), um mismatch sempre tem dono != tentando.
+    # User dono do recurso. None quando o CNPJ não está vinculado a nenhum
+    # usuário no banco (ex: endpoint de integração com CNPJ sem diagnóstico
+    # ou documento associado). Registrar é obrigatório mesmo sem dono
+    # identificado — LGPD Art. 37 (registro de operações) + Art. 46 §1º
+    # (medidas de segurança). O dono é desconhecido, mas a tentativa ocorreu.
     user_id_dono: Optional[int] = Field(default=None, foreign_key="users.id")
 
     # IP de origem em cleartext (LGPD Art. 7º VI — legítimo interesse).

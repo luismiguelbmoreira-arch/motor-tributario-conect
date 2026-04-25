@@ -47,12 +47,17 @@ os.environ.setdefault("G_MESSAGES_DEBUG", "")
 os.environ.setdefault("NO_AT_BRIDGE", "1")
 
 # ── Carrega .env (ANTHROPIC_API_KEY, JWT_SECRET_KEY, LOG_LEVEL, etc) ──────
+# override=True em dev/prod: o .env é a fonte canônica e supera shell vars vazias.
+# Em ambiente de teste (ENVIRONMENT=test), NÃO sobrescreve — os testes setam
+# DATABASE_URL/JWT_SECRET_KEY antes do import e precisam que esses valores
+# vençam o .env de desenvolvimento.
 try:
     from dotenv import load_dotenv
     _here = Path(__file__).resolve().parent
+    _override = os.environ.get("ENVIRONMENT", "").lower() != "test"
     for _candidato in (_here / ".env", _here.parent / ".env", Path.cwd() / ".env"):
         if _candidato.exists():
-            load_dotenv(_candidato, override=True)  # override=True: forca re-leitura mesmo se env ja existe (vazia)
+            load_dotenv(_candidato, override=_override)
             break
 except ImportError:
     pass  # dotenv opcional
