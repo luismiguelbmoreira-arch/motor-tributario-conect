@@ -3,8 +3,12 @@ schema_registry.py — Registro de versão e checksum dos parsers de documentos 
 
 Quando um parser for alterado:
   1. Bump de VERSION no dicionário correspondente
-  2. Atualizar CHECKSUM com o SHA-256 do arquivo modificado:
-     python -c "import hashlib; print(hashlib.sha256(open('parsers/nome.py','rb').read()).hexdigest())"
+  2. Atualizar CHECKSUM com o SHA-256 do conteúdo NORMALIZADO (CRLF→LF):
+     python -c "import hashlib; b=open('parsers/nome.py','rb').read().replace(b'\\r\\n', b'\\n').replace(b'\\r', b'\\n'); print(hashlib.sha256(b).hexdigest())"
+
+O hash é calculado sobre o conteúdo com line endings normalizados (LF) para
+manter o gate estável cross-platform — Windows com core.autocrlf=true reescreve
+LF→CRLF no checkout sem mudar o conteúdo fonte, o que invalidaria o hash bruto.
 
 O CI (schema-registry.yml) bloqueia merge se qualquer parser mudar sem
 atualização do checksum aqui. Isso garante rastreabilidade de mudanças de

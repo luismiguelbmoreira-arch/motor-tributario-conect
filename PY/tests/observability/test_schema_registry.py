@@ -19,7 +19,18 @@ PARSERS_DIR = Path(__file__).resolve().parent.parent.parent / "parsers"
 
 
 def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    """
+    SHA-256 com line endings normalizados (CRLF/CR → LF).
+
+    Motivo: Windows com core.autocrlf=true reescreve LF→CRLF no checkout, o
+    que muda o hash dos bytes em disco sem que o conteúdo fonte tenha mudado.
+    Hashing pelos bytes brutos torna o gate dependente de plataforma. Hashing
+    sobre o conteúdo normalizado mantém o registry estável cross-platform e
+    ainda detecta toda mudança real de conteúdo.
+    """
+    raw = path.read_bytes()
+    normalizado = raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return hashlib.sha256(normalizado).hexdigest()
 
 
 def test_todos_parsers_registrados():
