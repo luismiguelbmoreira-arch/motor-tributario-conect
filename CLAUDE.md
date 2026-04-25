@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # 🏛️ MOTOR TRIBUTÁRIO CONECT — BÍBLIA DA REFORMA TRIBUTÁRIA
 
-**Status:** 🚀 Produção — 760 testes passando (100%) | 4 regimes + DIFAL + Cronograma + PDF educativo + Auditoria Documental LGPD
+**Status:** 🚀 Produção — 1021 testes passando (100%) | 4 regimes + DIFAL + Cronograma + PDF educativo + Auditoria Documental LGPD + IDOR Guard + Stack front-back sincronizada
 **Âncora Legal:** EC 132/2023 | LC 123/2006 | LC 214/2025 | LC 224/2025 | EC 87/2015 | LGPD 13.709/2018 | CTN Arts. 142 e 173
-**Data Certificação:** 08/04/2026
+**Data Certificação:** 24/04/2026 (entrega plano Front/Backend Fases 1–5 + ERR-018.b IDOR guard)
 
 ---
 
@@ -91,7 +91,7 @@ Requer: `pip install boto3` + IAM role com permissão `secretsmanager:GetSecretV
 ## 🏗️ ARQUITETURA — VISÃO GERAL
 
 ```
-motor_tributario.py         ← Orquestrador principal + Dispatcher de regime
+core/motor_tributario.py    ← Orquestrador principal + Dispatcher de regime
 ├── EmpresaFornecedora       ← Pydantic V2 — regime: SIMPLES|PRESUMIDO|REAL|MEI
 ├── EmpresaCompradora        ← tipo: B2B_CONTRIBUINTE|B2C_CONSUMIDOR_FINAL
 ├── OperacaoFiscal           ← data_emissao: date (2026-2033), valor: Decimal
@@ -106,17 +106,40 @@ regimes/
 │
 tabelas_simples.py           ← FROZEN — Anexos I–V, CNAE→Anexo, cronograma IVA 2026-2033
 validadores.py               ← CNPJ Mod.11, CNAE, NCM, UF → retornam ValidationResult
-database.py                  ← SQLModel + SQLite, Enums, LGPD purge, ciclo de vida alertas
-extrator_pdfs.py             ← Claude Vision API — extração de PDFs de clientes
 │
-tests/                       ← 760 testes (100% passando)
+database/                    ← Pacote modularizado (era database.py monolítico)
+├── connection.py            ← Engine + get_session
+├── enums.py                 ← RegimeTributario, NivelAlerta, StatusAlerta, StatusAuditoria
+├── models.py                ← UserDB, EmpresaDB, AuditoriaDocumentoDB, AuditoriaAcessoDB, etc.
+└── repositories/            ← auditoria_repo, diagnostico_repo, empresa_repo, alerta_repo,
+                                auditoria_tentativa_repo (IDOR guard)
+
+services/
+├── extrator_pdfs.py         ← Claude Vision API — extração de PDFs de clientes
+├── storage_cifrado.py       ← AES-256-GCM + HKDF — auditoria documental LGPD
+├── analise_buffer.py        ← Sessão de análise (hidratação do /resultado)
+└── relatorio_pdf.py         ← Geração de PDF educativo
+
+api/routers/                 ← Endpoints FastAPI segregados por domínio
+├── auth.py                  ← /auth/login, /refresh (RefreshResponse), /me
+├── auditoria.py             ← /auditoria/prova/cnpj/{digitos}, /auditorias
+├── usuarios.py              ← CRUD de usuários (admin)
+├── integracoes.py           ← /sieg/sincronizar, /integra/sincronizar, /integracoes/ecac/sync
+│                              (router-level Depends(get_current_user) + ownership guard)
+├── historico.py             ← Lista paginada de diagnósticos
+└── configuracoes.py         ← /settings/tema, /settings/notificacoes (Fase 5)
+│
+tests/                       ← 1021 testes (100% passando)
 ├── test_fase2_simples.py    ← RBT12, Fator R, Anexo, Alíquota Efetiva
 ├── test_fase3_iva.py        ← Cronograma IBS/CBS 2026-2033, Split Payment
 ├── test_fase4_optout.py     ← Opt-Out, cenários comparativos
 ├── test_regime_guard.py     ← Guard Clauses (Camada 3 — bloqueia deploy se falhar)
 ├── test_mei_guard.py        ← MEI guard, DAS 2026, teto, sem crédito IVA
 ├── test_database.py         ← CRUD, Decimal como TEXT, LGPD, ciclo alertas
-└── test_validadores.py      ← CNPJ/CNAE/NCM/UF
+├── test_validadores.py      ← CNPJ/CNAE/NCM/UF
+├── test_fase1_parar_sangramento.py  ← Plano Front/Backend Fase 1 (auth, IDOR)
+├── test_idor_*.py           ← IDOR guard ERR-018.b
+└── api/test_endpoints.py    ← Integração HTTP do contrato público
 ```
 
 ---
@@ -204,7 +227,7 @@ chamada de `POST /analise/pdf` autenticada.
 ### Arquitetura dos módulos
 
 ```
-PY/storage_cifrado.py        ← AES-256-GCM + HKDF, puro
+PY/services/storage_cifrado.py  ← AES-256-GCM + HKDF, puro
 ├── cifrar_e_persistir(bytes, cnpj) → (hash, path)
 ├── decifrar(path, cnpj, hash_esperado) → bytes
 ├── hash_documento(bytes) → sha256 hex
@@ -212,7 +235,7 @@ PY/storage_cifrado.py        ← AES-256-GCM + HKDF, puro
 ├── existe(cnpj, hash) → bool
 └── purge(cnpj, hash) → bool (sobrescreve + unlink, LGPD Art. 16)
 
-PY/database.py::AuditoriaDocumentoDB   ← metadata em SQLite
+PY/database/models.py::AuditoriaDocumentoDB   ← metadata em SQLite
 ├── hash_sha256 (unique, PK lógica)
 ├── empresa_cnpj (indexed)
 ├── nome_original, mime, tamanho, paginas
@@ -223,17 +246,18 @@ PY/database.py::AuditoriaDocumentoDB   ← metadata em SQLite
 ├── purge_after (uploaded_at + 5 anos)
 └── purged_at
 
-PY/database.py::AuditoriaAcessoDB      ← log LGPD Art. 37
+PY/database/models.py::AuditoriaAcessoDB      ← log LGPD Art. 37
 ├── documento_id (FK)
 ├── acessado_em, acessado_por_user_id, ip
 └── motivo (obrigatório, 10-500 chars)
 
-PY/extrator_pdfs.py
+PY/services/extrator_pdfs.py
 ├── processar_pdfs_bytes(conteudos, *, arquivos_nomes, user_id, persistir_auditoria)
 └── _inferir_campo_origem(passo_id) → label humano do campo-fonte
 
-PY/api_motor.py
-├── POST /analise/pdf                     ← cifra + registra no upload
+PY/main.py
+└── POST /analise/pdf                     ← cifra + registra no upload (router default)
+PY/api/routers/auditoria.py
 └── GET /auditoria/prova/cnpj/{digitos}?motivo=... ← dossiê ZIP
 ```
 
@@ -381,20 +405,23 @@ mv data/backups/diarios/2026-04-08.db data/motor_tributario.db
 
 ---
 
-## 🗺️ ROADMAP — STATUS ATUAL (29/03/2026)
+## 🗺️ ROADMAP — STATUS ATUAL (24/04/2026)
 
 | Fase | Status | Bloqueador |
 | --- | --- | --- |
 | Simples Nacional (Anexo I) | ✅ Certificado | — |
 | Lucro Presumido | ✅ Certificado | — |
-| MEI | ✅ Implementado | Validação Luiz Moreira (salário mínimo 2026) |
+| MEI | ✅ Certificado | — |
+| Auditoria Documental LGPD | ✅ Certificado | — |
+| Plano Front/Backend (Fases 1-5) | ✅ Entregue | — |
+| IDOR Guard horizontal (ERR-018.b) | ✅ Certificado | — |
 | ERR-005 (CNAE incompleto ~970 CNAEs) | 🔴 Pendente | — |
 | Lucro Real | 🔵 Próxima fase | — |
 | Dashboard Split Payment | 🔵 Próxima fase | — |
 | DIFAL Interestadual | 🟡 Pendente | — |
 | Fase 4 (relatórios PDF clientes) | 🟡 Bloqueado | Documentos reais do escritório |
 
-**ERR ativos críticos:** ERR-005 (CNAE incompleto), ERR-012 (purge vs anonimizar LGPD). Ver `docs/roadmap/LOG_ERROS.md`.
+**ERR ativos críticos:** ERR-005 (CNAE incompleto), ERR-012 (purge vs anonimizar LGPD). Recentes fechados: ERR-013, ERR-018.b (IDOR), ERR-049 (JWT sub vs id), ERR-050 (uploaded_by_user_id), ERR-051 (salvar_diagnostico). Ver `docs/roadmap/LOG_ERROS.md`.
 
 ---
 
@@ -408,6 +435,9 @@ Disponíveis como subagentes Claude Code (`.claude/agents/`):
 | **Luiz Moreira** | Validação matemática fiscal, LC 214/2025, Fator R | Antes de congelar alíquotas |
 | **Master Zen** | UX/UI, Dashboard Split Payment, glassmorphism | Interface e visualizações |
 | **O CHEFE** | Decisões arquitetônicas, roadmap, conflitos de prioridade | Visão macro |
+| **Escrivão** | Verificação legal anti-alucinação (planalto.gov.br) | Antes de aceitar `amparo_legal` em código |
+| **Migrador** | Atualização anual de tabelas fiscais (SM, CGSN, IVA) | Quando lei nova for publicada |
+| **Sentinela** | Coverage guard — ratio testes/LOC, scaffolding de testes | Antes de qualquer PR/checkpoint |
 
 ---
 
