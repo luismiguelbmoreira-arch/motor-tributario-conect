@@ -367,6 +367,44 @@ mv data/backups/diarios/2026-04-08.db data/motor_tributario.db
 
 ---
 
+## 📊 PARAMETRIZAÇÃO POR TIPO SOCIETÁRIO (WS6 — Sprint 2)
+
+Cada tipo societário tem regras próprias de tributação e limites de faturamento. Motor distingue `regime` tributário de `tipo_societario` (ex: LTDA pode estar no Simples; SA geralmente é forçada pra Lucro Real).
+
+| Tipo societário | Limite faturamento | Regimes permitidos | Obrigações principais | Extrapolação |
+| :--- | :--- | :--- | :--- | :--- |
+| **MEI** | R$ 81 mil/ano | Simples (DAS fixo) | DAS mensal, DASN-SIMEI | → ME (Simples) |
+| **ME (Microempresa)** | R$ 360 mil/ano | Simples, Presumido, Real | SPED, PGDAS-D, ECD/ECF | → EPP |
+| **EPP** | R$ 4,8 mi/ano | Simples, Presumido, Real | SPED, PGDAS-D, ECD/ECF | → Presumido/Real obrigatório |
+| **Lucro Presumido** | R$ 78 mi/ano | Presumido | ECF, SPED, Livro Caixa | → Real obrigatório (Lei 9.718/98 Art. 13) |
+| **Lucro Real** | Sem limite (obrigatório > R$ 78 mi ou setores específicos) | Real | ECD, ECF, SPED completo | — |
+| **LTDA / SA** | Conforme porte | Simples, Presumido, Real | Escrituração completa, SPED; SA: publicações | SA geralmente Real |
+| **Cooperativas** | Sem teto | Geralmente Real | ECF, SPED, atos cooperativos segregados | Perde benefício se não segregar (Lei 5.764/71 Art. 79) |
+| **Associações / Fundações / ONGs / Igrejas / Escolas** | Sem limite (sem fins lucrativos) | Imunidade (CF Art. 150 VI c) | Escrituração contábil, ECF | Tributada como empresa se descumprir requisitos |
+
+**Fonte única em código:** `core/limites_societarios.py` com `VersionedRule` (R3 — versão normativa). Cada limite cita Lei + vigência + URL planalto.gov.br. **Validação Escrivão obrigatória** (Q13) antes de hardcoding.
+
+**Alerta de migração obrigatória (R7-extended):** quando RBT12 ≥ 90% do limite vigente, motor dispara entrada `ALERTA_MIGRACAO_OBRIGATORIA` na trilha com lei + janela de risco.
+
+---
+
+## ⚖️ RAILS DE IMPLEMENTAÇÃO SEGURA (meta-MAX — orientam o que MAX_FISCAL protege)
+
+Os 8 rails são **invioláveis** acima das MAX_FISCAL. Quando uma regra MAX entra em conflito com um Rail, o Rail vence. Isso é o que torna o motor defensável em fiscalização nacional ou estadual.
+
+| Rail | Diretriz |
+| :--- | :--- |
+| **R1 — Fonte normativa única** | Toda alíquota, limite e regra vem de documento oficial (lei, decreto, IN, manual RFB, planalto.gov.br). Cada cálculo aponta o PDF/URL original com SHA-256 e `campo_origem`. Sem fonte oficial → não vira código. |
+| **R2 — Proibição de extrapolação** | Sem lei publicada, sem cálculo. Lacuna aplica conservadorismo fiscal (alíquota maior, regime mais oneroso). Premissas econômicas (IPCA, crescimento) só com fonte oficial (BCB Focus, IBGE SIDRA). |
+| **R3 — Controle de versões normativas** | Cada cálculo registra qual lei estava vigente na `data_emissao`. `VersionedRule` em todas as constantes; lookup por data. Janela atual: 2024-01-01 a 2033-12-31 (Q12). |
+| **R4 — Validação cruzada com sistemas oficiais** | Motor compara seus resultados contra PGDAS-D, ECF, SPED. Divergência → sinaliza pra revisão manual, não corrige silenciosamente. Tolerância delta < 0,5%. |
+| **R5 — Separação rígida de regimes** | Sistema **impede** aplicar regras de MEI a SA, imunidade de igreja a empresa comercial. Guard Clause em 3 camadas (Pydantic + Engine + pytest). Estende-se a `tipo_societario × regime`. |
+| **R6 — Logs refazíveis** | Cada cálculo gera log auto-suficiente: base, deduções, alíquota, valor, fonte normativa. `python PY/scripts/refazer_calculo.py --diagnostico-id N` reconstrói o número apenas do log (gate de WS5). |
+| **R7 — Opt-Out automático ≥ 90% do teto** | RBT12 ≥ 90% do teto Simples (R$ 4,32M de R$ 4,8M) força análise Opt-Out. Sem cenário Opt-Out comparado, PDF não emite. |
+| **R8 — Consistência temporal** | Motor valida se norma usada estava vigente na data da operação. CBS/IBS não aplica em 2025 (entra só em 2026 — LC 214/2025). |
+
+---
+
 ## 🛑 REGRAS MÁXIMAS — MAX_FISCAL (Inegociáveis)
 
 | ID | Diretriz |
@@ -405,7 +443,7 @@ mv data/backups/diarios/2026-04-08.db data/motor_tributario.db
 
 ---
 
-## 🗺️ ROADMAP — STATUS ATUAL (24/04/2026)
+## 🗺️ ROADMAP — STATUS ATUAL (25/04/2026)
 
 | Fase | Status | Bloqueador |
 | --- | --- | --- |
@@ -415,13 +453,24 @@ mv data/backups/diarios/2026-04-08.db data/motor_tributario.db
 | Auditoria Documental LGPD | ✅ Certificado | — |
 | Plano Front/Backend (Fases 1-5) | ✅ Entregue | — |
 | IDOR Guard horizontal (ERR-018.b) | ✅ Certificado | — |
-| ERR-005 (CNAE incompleto ~970 CNAEs) | 🔴 Pendente | — |
-| Lucro Real | 🔵 Próxima fase | — |
+| **DIFAL Interestadual (EC 87/2015 + LC 190/2022)** | ✅ **Implementado** (`core/difal.py`, partilha 100% destino, transição 2029-2032 modelada) | — |
+| **Refinamento Final 2026-2033** | 🟡 **Em execução** (Sprint 1: WS1+WS4+WS10 — base normativa, bugs ERR-026/027/028, versionamento `VersionedRule`) | Plano aprovado 25/04 — `.claude/plans/revisar-o-plano-e-twinkling-hennessy.md` |
+| ERR-005 (CNAE — REABERTO) | 🔴 **REABERTO em 25/04 — Escrivão reprovou**: arquivo `data/cnae_completo.json` existe (1332 entradas) mas tem ~127 entradas (~10%) com classificação errada contra LC 123/2006: Divisão 56 (Restaurantes) classificada como I quando é III/V (§5º-D I); Divisão 69 (Advocacia/Contabilidade) fixa em V quando é III sempre (§5º-B XIV e §5º-C V); Divisões 62/71/73/74/86 fixas em V sem marcador Fator R. Schema `Dict[str,str]` é insuficiente — não comporta Fator R. Motor produziria DAS errado se consultasse a tabela direto. (Caso MOREIRA passou ontem porque Vision API infere Anexo do contexto do PDF, não usa esta tabela.) | Schema novo `{cnae: {anexo_padrao, anexo_fator_r_alto, anexo_fator_r_baixo, base_legal}}` + reescrita do `scripts/gerar_mapa_cnae.py` consumindo Resolução CGSN 140/2018 Anexo VI |
+| ERR-012 (purge vs anonimizar LGPD) | 🟡 Pendente | Decisão jurídica — LGPD Art. 19 §1º (15 dias úteis pra resposta a titular) registrada |
+| Lucro Real refinado (adições/exclusões extracontábeis) | 🟡 Em planejamento (WS6.b, Sprint 2) | Fixture real (DRE+ECF) do Escritório Moreira |
+| Tipo societário + Imunidade + Cooperativas | 🔵 WS6 (Sprint 2) | — |
+| Obrigações acessórias com alerta ativo de multas | 🔵 WS7 (Sprint 2) | — |
+| Matriz 3×3 cenários (conservador/realista/otimista × Simples/Opt-Out 2026/2027) | 🔵 WS2 (Sprint 3) | Fonte oficial pras premissas econômicas (BCB Focus, IBGE SIDRA) |
+| PDF refundido dual (auditor + empresário) | 🔵 WS3 (Sprint 4) | Template genérico Conect (Q5) |
+| Dossiê integrado + script `refazer_calculo.py` | 🔵 WS5 (Sprint 5) | — |
+| Hook jurisprudência manual (sem indexação) | 🔵 WS8 (Sprint 5) | — |
+| Elasticidade econômica | ⚪ **Fora deste ciclo** (Q9) — projeto separado | Definir base oficial (IPCA BCB, IBGE) antes de retomar |
 | Dashboard Split Payment | 🔵 Próxima fase | — |
-| DIFAL Interestadual | 🟡 Pendente | — |
-| Fase 4 (relatórios PDF clientes) | 🟡 Bloqueado | Documentos reais do escritório |
+| Itens fora do escopo realista | ⚪ ISS municipal completo (5570 cidades), IPI/TIPI completo (10k NCMs), benefícios estaduais (27 UFs), jurisprudência indexada (CARF/STJ/STF) — sem fonte oficial estruturada unificada | — |
 
-**ERR ativos críticos:** ERR-005 (CNAE incompleto), ERR-012 (purge vs anonimizar LGPD). Recentes fechados: ERR-013, ERR-018.b (IDOR), ERR-049 (JWT sub vs id), ERR-050 (uploaded_by_user_id), ERR-051 (salvar_diagnostico). Ver `docs/roadmap/LOG_ERROS.md`.
+**ERR ativos críticos:** ERR-012 (purge vs anonimizar LGPD — 15 dias úteis), ERR-026 (response_model inerte), ERR-027 (_erros perdido), ERR-028 (CPF em campo CNPJ). ERR-005 ✅ resolvido (verificação 25/04 — `data/cnae_completo.json` com 1332 CNAEs; aguarda só validação Escrivão Q13). Recentes fechados: ERR-013, ERR-018.b (IDOR), ERR-049 (JWT sub vs id), ERR-050 (uploaded_by_user_id), ERR-051 (salvar_diagnostico), ERR-054 (load_dotenv override), ERR-055 (CRLF/LF schema). Ver `docs/roadmap/LOG_ERROS.md`.
+
+**Plano de Refinamento Final aprovado em 25/04/2026:** ver `.claude/plans/revisar-o-plano-e-twinkling-hennessy.md`. 11 workstreams ativos (WS9 fora), 6 sprints, suite final esperada ~1220-1300 testes, com 8 Rails de implementação segura como gates transversais.
 
 ---
 

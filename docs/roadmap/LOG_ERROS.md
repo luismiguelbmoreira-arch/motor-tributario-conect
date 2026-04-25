@@ -24,6 +24,35 @@
 
 ---
 
+### ERR-054 — `load_dotenv(override=True)` no `main.py` quebrava `DATABASE_URL` em testes
+**Data:** 24/04/2026
+**Severidade:** 🔴 Crítico
+**Arquivo:** `PY/main.py` (linha 55) + `PY/services/extrator_pdfs.py` (linha 44)
+**Descoberto em:** sweep pós-Fase 5 — 8 testes vermelhos em `tests/api/test_endpoints.py`
+**Descrição:** `load_dotenv(_candidato, override=True)` sobrescrevia env vars setadas pelos testes ANTES do import de `main`. `test_endpoints.py` apontava `DATABASE_URL` pra um arquivo temporário, mas o `.env` do projeto ressuscitava `DATABASE_URL=sqlite:///motor_tributario.db` no momento do import. Resultado: o lifespan criava o admin no DB de **produção** com a senha que estivesse lá, mas o teste tentava login no tmpfile vazio — `verificar_senha` falhava silenciosamente com 401. Mascarava como "credenciais erradas" um vazamento de DB de teste pra prod.
+**Evidência:**
+```
+WARNING  motor_conect.auth:auth.py:240 Falha de autenticação | user_id=REDACTED
+auth._auth_engine.url = sqlite:///motor_tributario.db   ← deveria ser tmpfile
+os.environ DATABASE_URL: sqlite:///motor_tributario.db  ← reescrito pelo dotenv
+```
+**Solução aplicada:** `load_dotenv(_candidato, override=_override)` onde `_override = ENVIRONMENT != "test"`. Em dev/prod o `.env` continua sendo fonte canônica; em teste, o env-var do teste vence. Aplicado nos dois pontos com `load_dotenv` no projeto.
+**Status:** ✅ Corrigido — 13/13 testes em `tests/api/test_endpoints.py` verdes; 1021/1021 da suíte completa verdes.
+
+---
+
+### ERR-055 — SHA-256 do schema_registry frágil a CRLF/LF (Windows core.autocrlf)
+**Data:** 24/04/2026
+**Severidade:** 🟡 Atenção
+**Arquivo:** `PY/tests/observability/test_schema_registry.py` — `_sha256()`
+**Descoberto em:** mesmo sweep — `test_checksums_correspondem_aos_arquivos` falhava em `csv_folha.py`, `xml_nfce.py`, `xml_nfe.py`
+**Descrição:** O hash era calculado sobre os bytes brutos do arquivo. No Windows com `core.autocrlf=true`, o checkout transforma LF→CRLF em alguns arquivos, mudando o tamanho em bytes (ex.: csv_folha.py 11336→11680 bytes) e quebrando o gate sem que o conteúdo semântico tenha mudado. `sped_ecd.py` e `sped_efd_contrib.py` mantinham LF (sorte do checkout) — daí a divergência seletiva.
+**Evidência:** `csv_folha.py` no git: 11336 bytes (LF), no working tree: 11680 bytes (CRLF). Hash com bytes brutos diverge; hash com `replace(b"\r\n", b"\n").replace(b"\r", b"\n")` bate com o registry intacto.
+**Solução aplicada:** `_sha256()` agora normaliza CRLF/CR→LF antes do hash. Docstring de `schema_registry.py` atualizado com a regra. Hashes registrados não mudaram — eram corretos para o conteúdo normalizado.
+**Status:** ✅ Corrigido — gate cross-platform estável; 2/2 testes do schema registry verdes.
+
+---
+
 ### ERR-013 — Falta campo "Data de Inicio de Atividade" para RBT12 proporcional
 **Data:** 03/04/2026
 **Severidade:** 🔴 Critico

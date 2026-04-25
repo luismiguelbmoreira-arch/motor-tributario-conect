@@ -1,0 +1,261 @@
+{
+  "_meta": {
+    "natureza": "FIXTURE_FICTICIA",
+    "rigor": "TRATADA_COMO_REAL",
+    "criada_em": "2026-04-25",
+    "criada_por": "Refinamento Final WS6.b — Sprint 2 (Q14 do plano)",
+    "validada_por": "PENDENTE — Luiz Moreira deve revisar antes de uso em testes oficiais",
+    "objetivo": "Fixture pra fechar gate WS6.b sem cliente Real real testado. Risco registrado em revisar-o-plano-e-twinkling-hennessy.md",
+    "rails_aplicaveis": [
+      "R1 — fonte normativa em cada número (citação Lei abaixo)",
+      "R2 — sem extrapolação (todos os ajustes têm lei publicada)",
+      "R3 — vigência declarada (ano fiscal 2025)",
+      "R4 — autoconsistência DRE↔ECF↔Balancete (delta zero)",
+      "R5 — separação rígida (LTDA não-imune não-cooperativa)",
+      "R6 — log refazível (cada cálculo aqui pode ser refeito a mão)",
+      "R8 — consistência temporal (vigências batem com 2025)"
+    ]
+  },
+
+  "cartao_cnpj": {
+    "cnpj": "15.644.601/0001-04",
+    "razao_social": "INDUSTRIA AURORA LTDA",
+    "nome_fantasia": "AURORA PRE-MOLDADOS",
+    "natureza_juridica": "206-2 SOCIEDADE EMPRESARIA LIMITADA",
+    "cnae_principal": "1622600",
+    "descricao_cnae_principal": "Fabricacao de estruturas pre-moldadas de concreto armado, em serie e sob encomenda",
+    "cnae_secundarios": ["2342702", "4222702"],
+    "tipo_societario": "LTDA",
+    "porte": "DEMAIS",
+    "uf_origem": "SP",
+    "municipio": "Sorocaba",
+    "data_inicio_atividade": "2008-03-15",
+    "situacao_cadastral": "ATIVA",
+    "capital_social": "12000000.00",
+    "regime_tributario_optante": "LUCRO_REAL_TRIMESTRAL",
+    "amparo_legal_regime": "Lei 9.718/98 Art. 13 — receita bruta superior a R$ 78.000.000 obriga ao Lucro Real"
+  },
+
+  "dre_2025_anual": {
+    "_amparo_legal": "Lei 6.404/76 Art. 187 (estrutura DRE) + CPC 26 (Apresentacao DF)",
+    "_competencia": "01/2025 a 12/2025",
+    "_moeda": "BRL",
+    "_unidade": "Decimal puro",
+
+    "receita_bruta_vendas": "95000000.00",
+    "deducoes_receita_bruta": {
+      "icms_destacado": "11400000.00",
+      "ipi_destacado": "2375000.00",
+      "pis_cobranca": "1567500.00",
+      "cofins_cobranca": "7220000.00",
+      "devolucoes_vendas": "850000.00",
+      "_amparo_legal_deducoes": "Lei 12.973/14 Art. 12 + RIR/2018 Art. 208"
+    },
+    "_subtotal_deducoes": "23412500.00",
+    "receita_liquida": "71587500.00",
+
+    "cmv": "52000000.00",
+    "_amparo_legal_cmv": "RIR/2018 Art. 296 (custo dos produtos vendidos)",
+
+    "lucro_bruto": "19587500.00",
+
+    "despesas_operacionais": {
+      "salarios_encargos_administrativos": "4500000.00",
+      "despesas_gerais_administrativas": "3200000.00",
+      "depreciacao_amortizacao": "2800000.00",
+      "multas_administrativas_nao_dedutiveis": "200000.00",
+      "brindes_nao_dedutiveis": "80000.00",
+      "outras_despesas_operacionais": "3130000.00",
+      "_subtotal": "13910000.00"
+    },
+
+    "outras_receitas_operacionais": {
+      "jcp_recebido_de_investidas": "90000.00",
+      "_amparo_legal": "Lei 9.249/95 Art. 9 § 6 (JCP ja tributado pela fonte)"
+    },
+
+    "resultado_operacional": "5767500.00",
+
+    "despesas_financeiras_liquidas": "1500000.00",
+
+    "lucro_antes_ir_csll": "4267500.00",
+    "_alerta_dre": "Lucro contabil R$ 4,27M parece baixo para R$ 95M de faturamento (margem 4,5%). Coerente com industria de pre-moldados (margem tipica 4-7%)."
+  },
+
+  "ecf_2025_bloco_n_apuracao_irpj": {
+    "_amparo_legal_geral": "IN RFB 2.004/21 (ECF) + Lei 9.249/95 + Lei 9.430/96",
+    "_periodo": "2025-01-01 a 2025-12-31",
+
+    "lucro_liquido_contabil_apos_csll_provisionada": "4267500.00",
+
+    "adicoes_extracontabeis": {
+      "multas_administrativas": {
+        "valor": "200000.00",
+        "amparo_legal": "Lei 9.249/95 Art. 41 II — multas por infracoes administrativas nao sao dedutiveis"
+      },
+      "brindes": {
+        "valor": "80000.00",
+        "amparo_legal": "Lei 9.249/95 Art. 13 VII — brindes a clientes nao sao dedutiveis"
+      },
+      "csll_provisionada_no_resultado": {
+        "valor": "384075.00",
+        "amparo_legal": "Lei 9.249/95 Art. 13 I — CSLL nao e dedutivel para IRPJ"
+      },
+      "_subtotal": "664075.00"
+    },
+
+    "exclusoes_extracontabeis": {
+      "jcp_recebido_ja_tributado_pela_fonte": {
+        "valor": "90000.00",
+        "amparo_legal": "Lei 9.249/95 Art. 9 § 6 — JCP recebido com IRRF nao integra base do IRPJ do beneficiario"
+      },
+      "_subtotal": "90000.00"
+    },
+
+    "lucro_real_antes_compensacao": "4841575.00",
+
+    "compensacao_prejuizo_fiscal": {
+      "prejuizo_fiscal_acumulado_2024": "4500000.00",
+      "limite_30_porcento_lucro_ajustado": "1452472.50",
+      "compensado": "1452472.50",
+      "saldo_remanescente_para_2026": "3047527.50",
+      "amparo_legal": "Lei 8.981/95 Art. 42 + Lei 9.065/95 Art. 15 — limite de compensacao 30%"
+    },
+
+    "lucro_real_base_calculo_irpj": "3389102.50",
+
+    "irpj_aliquota_basica": {
+      "aliquota": "0.15",
+      "base_calculo": "3389102.50",
+      "valor_devido": "508365.38",
+      "amparo_legal": "Lei 9.249/95 Art. 3 caput — aliquota IRPJ 15%"
+    },
+
+    "irpj_adicional_10_porcento": {
+      "aliquota": "0.10",
+      "limite_anual_isento": "240000.00",
+      "base_excedente": "3149102.50",
+      "valor_devido": "314910.25",
+      "amparo_legal": "Lei 9.249/95 Art. 3 § 1 — adicional 10% sobre excedente R$ 240k anuais (R$ 60k trimestrais)"
+    },
+
+    "irpj_total_devido": "823275.63",
+
+    "_validacao_cruzada_R4": {
+      "lucro_contabil_dre": "4267500.00",
+      "lucro_contabil_ecf_bloco_M": "4267500.00",
+      "delta": "0.00",
+      "status": "PASSA — DRE e ECF batem na linha do lucro contabil"
+    }
+  },
+
+  "ecf_2025_csll_apuracao": {
+    "_amparo_legal": "Lei 7.689/88 + Lei 9.316/96 Art. 1 + IN RFB 1.700/17",
+    "lucro_liquido_contabil": "4267500.00",
+    "ajustes_csll": {
+      "adicoes": "280000.00",
+      "exclusoes": "90000.00",
+      "compensacao_base_negativa_csll": "1452472.50"
+    },
+    "base_calculo_csll": "3005027.50",
+    "csll_aliquota": "0.09",
+    "csll_devida": "270452.48",
+    "_nota": "CSLL provisionada no resultado foi R$ 384.075 (estimada). Valor real apurado e R$ 270.452,48. Diferenca de R$ 113.622,52 vai para conta de ajuste no proximo trimestre.",
+    "amparo_legal_aliquota": "Lei 9.316/96 Art. 1 — CSLL 9% para empresas em geral (15% para financeiras)"
+  },
+
+  "pis_cofins_nao_cumulativo_2025": {
+    "_amparo_legal": "Lei 10.637/02 (PIS) + Lei 10.833/03 (COFINS) + IN RFB 2.121/22",
+    "regime": "NAO_CUMULATIVO",
+    "receita_bruta_base": "95000000.00",
+
+    "pis": {
+      "aliquota": "0.0165",
+      "valor_bruto": "1567500.00",
+      "creditos_sobre_insumos": {
+        "cmv_aplicavel": "52000000.00",
+        "aliquota_credito": "0.0165",
+        "valor": "858000.00",
+        "amparo_legal": "Lei 10.637/02 Art. 3 II — credito sobre insumos diretos da producao"
+      },
+      "valor_a_recolher_liquido": "709500.00"
+    },
+
+    "cofins": {
+      "aliquota": "0.076",
+      "valor_bruto": "7220000.00",
+      "creditos_sobre_insumos": {
+        "valor": "3952000.00",
+        "amparo_legal": "Lei 10.833/03 Art. 3 II"
+      },
+      "valor_a_recolher_liquido": "3268000.00"
+    }
+  },
+
+  "balancete_resumo_2025": {
+    "_amparo_legal": "CPC 26 + Lei 6.404/76 Art. 178",
+    "ativo_total": "85000000.00",
+    "passivo_circulante": "32000000.00",
+    "passivo_nao_circulante": "18000000.00",
+    "patrimonio_liquido": "35000000.00",
+    "_validacao_R4": "Ativo (85M) = Passivo + PL (32M + 18M + 35M = 85M) — equacao patrimonial OK"
+  },
+
+  "dctfweb_obrigacoes_acessorias_pendentes": {
+    "_amparo_legal": "IN RFB 2.005/21",
+    "competencia_pendente_no_diagnostico": "12/2025",
+    "prazo_legal": "2026-01-15",
+    "valor_irpj_csll_em_aberto": "1093728.11",
+    "alerta_multa_potencial": {
+      "tipo": "MULTA_POR_ATRASO",
+      "regra": "0.33% ao dia ate 20% (Lei 9.430/96 Art. 61)",
+      "valor_max_se_atrasar_60_dias": "218745.62"
+    }
+  },
+
+  "payload_motor_reforma_tributaria": {
+    "_observacao": "Formato compativel com MotorReformaTributaria.__init__ (EmpresaFornecedora + EmpresaCompradora + OperacaoFiscal)",
+    "fornecedora": {
+      "cnpj": "15644601000104",
+      "razao_social": "INDUSTRIA AURORA LTDA",
+      "regime": "REAL",
+      "cnae_principal": "1622600",
+      "uf_origem": "SP",
+      "faturamento_12m": "95000000.00",
+      "folha_salarios_12m": "4500000.00",
+      "anexo_simples": null,
+      "data_inicio_atividade": "2008-03-15"
+    },
+    "compradora": {
+      "tipo": "B2B_CONTRIBUINTE",
+      "regime": "REAL",
+      "uf_destino": "RJ"
+    },
+    "operacao": {
+      "data_emissao": "2026-08-20",
+      "valor_operacao": "180000.00",
+      "ncm_nbs": "68101900",
+      "forma_recebimento": "BOLETO_VIA_PSP",
+      "lucro_real_mensal": "355625.00",
+      "creditos_pis_cofins": "14808.00",
+      "produto_importado": false,
+      "tinha_st_icms": false,
+      "reducao_cbs_ibs": "INTEGRAL"
+    }
+  },
+
+  "_resultado_esperado_motor": {
+    "carga_tributaria_total_anual": {
+      "irpj_principal": "508365.38",
+      "irpj_adicional": "314910.25",
+      "csll": "270452.48",
+      "pis_liquido": "709500.00",
+      "cofins_liquido": "3268000.00",
+      "icms_destacado_estimado": "11400000.00",
+      "ipi_destacado_estimado": "2375000.00",
+      "_total": "18846228.11",
+      "_carga_efetiva_sobre_receita_bruta": "0.1984",
+      "_observacao": "Carga ~19,8% sobre receita bruta — consistente com industria de transformacao no Lucro Real (faixa tipica 18-22%)."
+    }
+  }
+}
