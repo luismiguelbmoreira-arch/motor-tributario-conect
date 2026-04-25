@@ -121,12 +121,23 @@ class EmpresaFornecedora(BaseModel):
     # Tipo societário = forma jurídica (CC + Tabela RFB Naturezas Jurídicas).
     # Distinto de `regime` (tributário) e `enquadramento_simples` (porte/MEI).
     # Default None preserva compatibilidade com chamadas legadas.
+    #
+    # Aliases tratados em `_expandir_alias_mei`:
+    #   - "MEI"     → "EI" + enquadramento_simples="MEI" (LC 123/2006 Art. 18-A)
+    #   - "EIRELI"  → "SLU"  (Lei 14.195/2021 — extinção da EIRELI)
+    #
+    # Manter sincronizado com `core.elegibilidade_societaria.TipoSocietario`.
     tipo_societario: Optional[
         Literal["EI", "SLU", "LTDA", "SS", "SA", "COOPERATIVA",
-                "ASSOCIACAO", "FUNDACAO", "ORGANIZACAO_RELIGIOSA"]
+                "ASSOCIACAO", "FUNDACAO", "ORGANIZACAO_RELIGIOSA",
+                # WS6 Etapa 2 — adicionados para evitar KeyError em CNPJs reais
+                "SCP", "ESC", "CONSORCIO", "PRODUTOR_RURAL_PF"]
     ] = Field(
         default=None,
-        description="Forma jurídica RFB. MEI é alias aceito (normalizado para EI + enquadramento_simples=MEI).",
+        description=(
+            "Forma jurídica RFB. Aliases aceitos: 'MEI' (→ EI + MEI), "
+            "'EIRELI' (→ SLU, Lei 14.195/2021)."
+        ),
     )
 
     # Qualificações especiais ortogonais ao tipo societário.
@@ -140,25 +151,42 @@ class EmpresaFornecedora(BaseModel):
 
     # Porte/enquadramento dentro do Simples — derivado de RBT12, mas pode
     # ser declarado pra MEI (Art. 18-A LC 123/2006) onde é status, não porte.
-    enquadramento_simples: Optional[Literal["MEI", "ME", "EPP"]] = Field(
+    enquadramento_simples: Optional[Literal["MEI", "MEI_CAMINHONEIRO", "ME", "EPP"]] = Field(
         default=None,
-        description="MEI/ME/EPP — status no Simples Nacional. MEI é Art. 18-A.",
+        description=(
+            "Status no Simples Nacional. "
+            "MEI = Art. 18-A LC 123/2006 (teto R$ 81k). "
+            "MEI_CAMINHONEIRO = LC 188/2021 (sublimite específico). "
+            "ME/EPP = porte conforme RBT12."
+        ),
     )
 
     @model_validator(mode="before")
     @classmethod
     def _expandir_alias_mei(cls, data: Any) -> Any:
         """
-        Aceita tipo_societario="MEI" como alias UX-friendly e normaliza para
-        a representação fiscalmente correta: tipo_societario="EI" +
-        enquadramento_simples="MEI" (Art. 18-A LC 123/2006 — MEI é status
-        do Simples para Empresário Individual com faturamento ≤ R$ 81k).
+        Normaliza aliases UX-friendly para a representação fiscalmente correta:
+
+          - tipo_societario="MEI"   → "EI" + enquadramento_simples="MEI"
+            (LC 123/2006 Art. 18-A — MEI é status do Simples para EI ≤ R$ 81k)
+
+          - tipo_societario="MEI_CAMINHONEIRO" → "EI" + enquadramento_simples="MEI_CAMINHONEIRO"
+            (LC 188/2021 — sublimite específico do MEI Caminhoneiro)
+
+          - tipo_societario="EIRELI" → "SLU"
+            (Lei 14.195/2021 — convertou EIRELI em Sociedade Limitada Unipessoal)
         """
         if not isinstance(data, dict):
             return data
-        if data.get("tipo_societario") == "MEI":
+        tipo = data.get("tipo_societario")
+        if tipo == "MEI":
             data["tipo_societario"] = "EI"
             data.setdefault("enquadramento_simples", "MEI")
+        elif tipo == "MEI_CAMINHONEIRO":
+            data["tipo_societario"] = "EI"
+            data.setdefault("enquadramento_simples", "MEI_CAMINHONEIRO")
+        elif tipo == "EIRELI":
+            data["tipo_societario"] = "SLU"
         return data
 
     @computed_field  # type: ignore[prop-decorator]
@@ -171,6 +199,8 @@ class EmpresaFornecedora(BaseModel):
         """
         if self.enquadramento_simples == "MEI":
             return "MEI"
+        if self.enquadramento_simples == "MEI_CAMINHONEIRO":
+            return "MEI Caminhoneiro"
         return self.tipo_societario
 
     @field_validator("cnpj")

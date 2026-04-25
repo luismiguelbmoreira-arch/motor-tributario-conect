@@ -21,6 +21,47 @@
 
 ---
 
+### ERR-017.b — Citação inventada de Solução de Consulta COSIT (anti-alucinação)
+**Data:** 25/04/2026
+**Severidade:** 🔴 Crítico
+**Arquivo:** `PY/core/elegibilidade_societaria.py` — células ASSOCIACAO/FUNDACAO/ORGANIZACAO_RELIGIOSA × PRESUMIDO
+**Descoberto em:** auditoria do Escrivão pós-correção do WS6 Etapa 2
+**Amparo legal violado:** MAX_FISCAL_02 (toda regra cita base legal)
+
+**Descrição:**
+Durante a correção do WS6 Etapa 2 (após reprovação Chefe+Luiz), o agente "O Viciado"
+introduziu citação a `Solução de Consulta COSIT 174/2019` em 3 células
+(ASSOCIACAO/FUNDACAO/ORGANIZACAO_RELIGIOSA × PRESUMIDO) para sustentar a opção
+do regime Lucro Presumido para entidades sem fins lucrativos sobre receitas
+não amparadas pela imunidade.
+
+**A SC COSIT 174/2019 não existe sobre esse tema.** A SC nº 174 de fato existente
+é de **2023** e trata de **Imposto sobre Importação — Ex-Tarifário**. Foi feita
+confusão de números/anos.
+
+Citação inventada em código tributário é exatamente o vetor que MAX_FISCAL_02
+bloqueia, em sentido inverso ao ERR-017 original ("dado errado culpa do contador" →
+"dado errado culpa do motor"). Se commitado, contador defenderia em fiscalização
+com precedente RFB inexistente — ERR-017 redux.
+
+**Solução aplicada (Escrivão, 25/04/2026):**
+1. Removida toda menção a "SC COSIT 174/2019" do `base_legal` e `observacao` das 3 células
+2. Reescritas com tríade defensável: `RIR/2018 Arts. 184 e 587 + Lei 9.532/97 Art. 12 §2º + Lei 9.718/98 Art. 13`
+3. Reforçado em `observacao`: "Não há ato COSIT vinculante específico — aplicação por composição normativa"
+4. Adicionado teste anti-alucinação `test_associacao_presumido_base_legal_sem_citacao_inventada` que rejeita "COSIT 174/2019" no `base_legal` e `observacao`
+
+**Lição aprendida:**
+Agentes Pydantic-rigorous (O Viciado) ainda podem alucinar precedentes RFB.
+**Toda citação a Solução de Consulta deve passar pelo Escrivão antes do commit.**
+Adicionar gate transversal: `escrivao` valida toda menção a "SC COSIT", "SC RFB",
+"Acórdão CARF" no diff antes de aprovar PR.
+
+**Status:** ✅ Corrigido — 1272 testes verdes; teste de regressão anti-citação inventada.
+
+**Fontes consultadas pelo Escrivão:**
+- Texto consolidado LC 123/2006 (`comprasnet.gov.br/legislacao/leis/lei123_2006.htm`)
+- SC COSIT 174/2023 (Ex-Tarifário, `legisweb.com.br/legislacao/?id=449708`)
+- Portal Tributário (referência SC 99.011/2016 — caso real de associação no Real, não Presumido)
 
 ---
 
