@@ -415,6 +415,7 @@ Os 8 rails são **invioláveis** acima das MAX_FISCAL. Quando uma regra MAX entr
 | **MAX_04** | Premissa alterada → salvar como `Cenario_Estudo_A`, nunca deletar |
 | **MAX_05** | Toda análise via `/analise/pdf` deve ter os PDFs-fonte cifrados e registrados em `auditoria_documentos` — sem isso o diagnóstico não pode ser usado em defesa jurídica. Ativado por `persistir_auditoria=True`. |
 | **MAX_06** | Crédito B2B de fornecedor do Simples Nacional é **fração do DAS** (não `valor_operacao × alíquota IVA`). Fórmula: `credito = DAS_mensal × _fracao_iva_no_das(anexo, faixa, ano)`. Usar `DISTRIBUICAO_DAS[anexo][faixa]` como fonte única. LC 214/2025 Art. 47 §II + Arts. 344, 353, 356-360. |
+| **MAX_07** | **Anti-alucinação de citação legal** (ERR-017.b — 25/04/2026). Toda menção a Solução de Consulta COSIT, Acórdão CARF, súmula STJ/STF ou ato normativo da Receita Federal **deve passar pelo agente Escrivão** antes do commit. Falha em verificar precedente foi vetor confirmado de erro: SC COSIT 174/2019 foi inventada num código que passou nos testes — só Escrivão validando contra fonte oficial pegou. Adicionar teste regressivo anti-alucinação quando aplicável. |
 
 ---
 
@@ -443,34 +444,78 @@ Os 8 rails são **invioláveis** acima das MAX_FISCAL. Quando uma regra MAX entr
 
 ---
 
-## 🗺️ ROADMAP — STATUS ATUAL (25/04/2026)
+## 🗺️ ROADMAP — STATUS ATUAL (25/04/2026 — pausa em WS6 etapa 3)
 
-| Fase | Status | Bloqueador |
+**Suite atual:** **1297 testes verdes** | **0 regressão** | crescimento desde início do refinamento: **1021 → 1297 (+276 testes em 9 commits)**
+
+### ✅ Entregue e commitado nesta sessão
+
+| Fase | Commit | Detalhe |
 | --- | --- | --- |
-| Simples Nacional (Anexo I) | ✅ Certificado | — |
-| Lucro Presumido | ✅ Certificado | — |
-| MEI | ✅ Certificado | — |
-| Auditoria Documental LGPD | ✅ Certificado | — |
-| Plano Front/Backend (Fases 1-5) | ✅ Entregue | — |
-| IDOR Guard horizontal (ERR-018.b) | ✅ Certificado | — |
-| **DIFAL Interestadual (EC 87/2015 + LC 190/2022)** | ✅ **Implementado** (`core/difal.py`, partilha 100% destino, transição 2029-2032 modelada) | — |
-| **Refinamento Final 2026-2033** | 🟡 **Em execução** (Sprint 1: WS1+WS4+WS10 — base normativa, bugs ERR-026/027/028, versionamento `VersionedRule`) | Plano aprovado 25/04 — `.claude/plans/revisar-o-plano-e-twinkling-hennessy.md` |
-| ERR-005 (CNAE — REABERTO) | 🔴 **REABERTO em 25/04 — Escrivão reprovou**: arquivo `data/cnae_completo.json` existe (1332 entradas) mas tem ~127 entradas (~10%) com classificação errada contra LC 123/2006: Divisão 56 (Restaurantes) classificada como I quando é III/V (§5º-D I); Divisão 69 (Advocacia/Contabilidade) fixa em V quando é III sempre (§5º-B XIV e §5º-C V); Divisões 62/71/73/74/86 fixas em V sem marcador Fator R. Schema `Dict[str,str]` é insuficiente — não comporta Fator R. Motor produziria DAS errado se consultasse a tabela direto. (Caso MOREIRA passou ontem porque Vision API infere Anexo do contexto do PDF, não usa esta tabela.) | Schema novo `{cnae: {anexo_padrao, anexo_fator_r_alto, anexo_fator_r_baixo, base_legal}}` + reescrita do `scripts/gerar_mapa_cnae.py` consumindo Resolução CGSN 140/2018 Anexo VI |
-| ERR-012 (purge vs anonimizar LGPD) | 🟡 Pendente | Decisão jurídica — LGPD Art. 19 §1º (15 dias úteis pra resposta a titular) registrada |
-| Lucro Real refinado (adições/exclusões extracontábeis) | 🟡 Em planejamento (WS6.b, Sprint 2) | Fixture real (DRE+ECF) do Escritório Moreira |
-| Tipo societário + Imunidade + Cooperativas | 🔵 WS6 (Sprint 2) | — |
-| Obrigações acessórias com alerta ativo de multas | 🔵 WS7 (Sprint 2) | — |
-| Matriz 3×3 cenários (conservador/realista/otimista × Simples/Opt-Out 2026/2027) | 🔵 WS2 (Sprint 3) | Fonte oficial pras premissas econômicas (BCB Focus, IBGE SIDRA) |
-| PDF refundido dual (auditor + empresário) | 🔵 WS3 (Sprint 4) | Template genérico Conect (Q5) |
-| Dossiê integrado + script `refazer_calculo.py` | 🔵 WS5 (Sprint 5) | — |
-| Hook jurisprudência manual (sem indexação) | 🔵 WS8 (Sprint 5) | — |
-| Elasticidade econômica | ⚪ **Fora deste ciclo** (Q9) — projeto separado | Definir base oficial (IPCA BCB, IBGE) antes de retomar |
-| Dashboard Split Payment | 🔵 Próxima fase | — |
-| Itens fora do escopo realista | ⚪ ISS municipal completo (5570 cidades), IPI/TIPI completo (10k NCMs), benefícios estaduais (27 UFs), jurisprudência indexada (CARF/STJ/STF) — sem fonte oficial estruturada unificada | — |
+| Sprint 1 — base normativa + Aurora fixture | `2291cd6` | Rails+Parametrização Societária no CLAUDE.md; fixture Lucro Real Aurora; .bin órfãos pra `.lixeira/`; diagnóstico Vision API com Moreira (97% confiança) |
+| **WS12 spec — schema CNAE com Fator R** (Luiz Moreira) | `57e0703` | Especificação fiscal aprovada (5 categorias semânticas) |
+| **WS12 implementação** — `core/regras_cnae.py` + `cnae_excecoes.py` | `f60aa61` | API `resolve_anexo(cnae, fator_r)`, 14 casos cirúrgicos, 5 categorias (A_FIXO/B_ANEXO_III/C_FATOR_R/D_ESPECIAL/E_VEDADO), 24 testes |
+| **WS10 — VersionedRule[T] piloto** | `45c177b` | 4 constantes versionadas (TETO Simples, Sublimite ICMS/ISS, Teto MEI, Limite Presumido); janela 2024-2033; 26 testes |
+| **WS6 etapa 1** — schema `EmpresaFornecedora` ampliado | `1dd2aee` | `tipo_societario` (9→13 tipos), `qualificacoes_especiais` (OSCIP/OS/CEBAS), `enquadramento_simples` (MEI/MEI_CAMINHONEIRO/ME/EPP); alias "MEI" UX-friendly; 20 testes |
+| WS6 etapa 2 v1 — REPROVADA | `b1f2f69` | 4 críticos do Chefe + 4 erros de citação do Luiz |
+| **WS6 etapa 2 v2** — matriz societária 13×4 | `cc67199` | 52 células validadas por Escrivão; **ERR-017.b** (citação inventada SC COSIT 174/2019) bloqueado antes do commit; helpers retornam Elegibilidade completo; MATRIZ frozen via `MappingProxyType`; novos tipos SCP/ESC/CONSORCIO/PRODUTOR_RURAL_PF; aliases EIRELI→SLU; 130 testes |
+| **WS6 etapa 3** — sub-validador MEI | `4da125f` | `validar_mei(...)` valida tipo+teto+CNAE+modalidade; lista parcial conservadora ~30 CNAEs Anexo XI (anti-alucinação: fora da lista → Indeterminado, não False); MEI Caminhoneiro (LC 188/2021) modelado; 25 testes |
 
-**ERR ativos críticos:** ERR-012 (purge vs anonimizar LGPD — 15 dias úteis), ERR-026 (response_model inerte), ERR-027 (_erros perdido), ERR-028 (CPF em campo CNPJ). ERR-005 ✅ resolvido (verificação 25/04 — `data/cnae_completo.json` com 1332 CNAEs; aguarda só validação Escrivão Q13). Recentes fechados: ERR-013, ERR-018.b (IDOR), ERR-049 (JWT sub vs id), ERR-050 (uploaded_by_user_id), ERR-051 (salvar_diagnostico), ERR-054 (load_dotenv override), ERR-055 (CRLF/LF schema). Ver `docs/roadmap/LOG_ERROS.md`.
+### ⏸️ Próximas etapas (ao retomar)
 
-**Plano de Refinamento Final aprovado em 25/04/2026:** ver `.claude/plans/revisar-o-plano-e-twinkling-hennessy.md`. 11 workstreams ativos (WS9 fora), 6 sprints, suite final esperada ~1220-1300 testes, com 8 Rails de implementação segura como gates transversais.
+| Fase | Estado | Próxima ação |
+| --- | --- | --- |
+| **WS6 etapa 4 — `regimes/imune.py`** | ⏸️ **RETOMAR AQUI** | CF Art. 150 VI b/c + CTN Art. 14; distinção atividade-fim (imune) × atividade-meio (tributada); ORG_RELIGIOSA com STF RE 325.822 |
+| WS6 etapa 5 — `regimes/cooperativa.py` | 🔵 Pendente | Lei 5.764/71 Art. 79 (ato cooperativo) + Art. 87/111 (ato não-cooperativo); cooperativa de consumo |
+| WS6 etapa 6 — Orquestrador `validar_combinacao()` | 🔵 Pendente | AND lógico WS6+WS10+WS12 + ligação ao motor; concatena TODAS as falhas |
+| WS10 extensão — `TABELAS_ANEXOS` + `CRONOGRAMA_IVA` | 🔵 Pendente | Constantes versionadas com vigência por faixa |
+| WS12 — regenerar `data/cnae_completo.json` | 🔴 **Pendente** | CSV oficial CGSN 140/2018 Anexo VI; fecha ERR-005 oficialmente |
+| WS6.b — Lucro Real refinado | 🔵 Aguarda Aurora rodar pelo motor | Adições/exclusões extracontábeis + extrator DRE; fixture em `samples/casos_clinicos/lucro_real_aurora_ficticio/` |
+| WS7 — Obrigações acessórias + alerta ativo de multas | 🔵 Pendente | Matriz porte×regime → obrigações+multas |
+| WS2 — Matriz 3×3 cenários 2026-2033 | 🔵 Pendente (depende de WS6+WS10) | Fonte oficial premissas econômicas (BCB Focus, IBGE SIDRA) |
+| WS4 — ERR-026/027/028 | 🟡 Pendente | response_model inerte, _erros perdido, CPF em campo CNPJ |
+| WS3 — PDF refundido dual | 🔵 Pendente | Template genérico Conect (Q5) |
+| WS5 — Dossiê integrado + `refazer_calculo.py` | 🔵 Pendente | — |
+| WS8 — Hook jurisprudência manual | 🔵 Pendente | — |
+| WS11 — CLAUDE.md final + Teste do Legado | 🔵 Pendente | Última peça do refinamento |
+
+### ⚪ Fora deste ciclo (decisões registradas)
+
+| Item | Razão |
+| --- | --- |
+| Elasticidade econômica (WS9) | Q9 — projeção econômica não mistura com cálculo tributário; vira projeto separado |
+| ISS municipal completo (5570 cidades) | Sem fonte oficial estruturada unificada |
+| IPI/TIPI completo (10k NCMs) | Sem API oficial machine-readable |
+| Benefícios estaduais (27 UFs) | Sem catálogo unificado |
+| Jurisprudência indexada (CARF/STJ/STF) | Curadoria humana especializada — projeto de anos. WS8 entrega só hook estrutural manual |
+
+### 🔴 ERR ativos
+
+| ID | Severidade | Status |
+| --- | --- | --- |
+| **ERR-005** (CNAE → Anexo) | 🔴 Crítico | Schema novo aprovado e implementado (`regras_cnae.py` em `f60aa61`); aguarda regeneração do `cnae_completo.json` via CSV CGSN 140/2018 Anexo VI |
+| **ERR-017.b** (citação inventada SC COSIT) | ✅ Resolvido em `cc67199` | Teste regressivo anti-alucinação adicionado; **MAX_07** documentado |
+| ERR-012 (purge vs anonimizar LGPD) | 🟡 Pendente | Decisão jurídica — LGPD Art. 19 §1º (15 dias úteis) |
+| ERR-026 (response_model inerte) | 🟡 Pendente | WS4 |
+| ERR-027 (_erros perdido na persistência) | 🟡 Pendente | WS4 |
+| ERR-028 (CPF em campo CNPJ via Vision) | 🟡 Pendente | WS4 |
+
+Recentes fechados: ERR-013, ERR-018.b (IDOR), ERR-049 (JWT sub vs id), ERR-050 (uploaded_by_user_id), ERR-051 (salvar_diagnostico), ERR-054 (load_dotenv override), ERR-055 (CRLF/LF schema), ERR-017.b (citação inventada). Ver `docs/roadmap/LOG_ERROS.md`.
+
+### 🤖 Protocolo de auditoria multi-agente — confirmado em 25/04/2026
+
+Sequência defensável quando há decisão fiscal complexa:
+
+1. **Implementação inicial** (assistente principal ou O Viciado)
+2. **Auditoria arquitetônica** — Chefe Deus aplica Teste do Legado e procura gambiarra escondida
+3. **Auditoria fiscal célula-a-célula** — Luiz Moreira confronta cada citação contra texto da lei
+4. **Anti-alucinação obrigatória** — Escrivão valida toda menção a SC COSIT, Acórdão CARF, súmula STJ/STF antes do commit (ver MAX_07)
+5. **Correção blindada** — O Viciado reescreve com Pydantic V2/Decimal/frozen consumindo o relatório consolidado dos 3 anteriores
+6. **Re-auditoria Escrivão** dos pontos onde Viciado tocou em citação legal
+
+**Caso real instrutivo (ERR-017.b):** WS6 etapa 2 v1 → reprovada por Chefe+Luiz → reescrita por Viciado → introduziu citação inventada (SC COSIT 174/2019, que não existe sobre o tema) → bloqueada por Escrivão antes do commit. Sem o protocolo, citação inventada teria ido pra produção e seria descoberta em auditoria fiscal real.
+
+**Plano completo:** `.claude/plans/revisar-o-plano-e-twinkling-hennessy.md` — 11 workstreams, 8 Rails de implementação segura, suite alvo ~1300 testes (já atingida em parte).
 
 ---
 
