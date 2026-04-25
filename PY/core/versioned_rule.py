@@ -133,6 +133,18 @@ TETO_MEI_VERSIONADO: list[VersionedRule[Decimal]] = [
     ),
 ]
 
+# Teto MEI Caminhoneiro (LC 188/2021 — modalidade específica)
+# Sublimite maior pra acomodar margem do transporte rodoviário de carga.
+TETO_MEI_CAMINHONEIRO_VERSIONADO: list[VersionedRule[Decimal]] = [
+    VersionedRule(
+        valor=Decimal("251600.00"),
+        vigencia_inicio=date(2022, 1, 1),
+        vigencia_fim=None,
+        lei="LC 188/2021 (institui MEI Caminhoneiro)",
+        url_planalto="https://www.planalto.gov.br/ccivil_03/leis/lcp/lcp188.htm",
+    ),
+]
+
 # Limite do Lucro Presumido (Lei 9.718/98 Art. 13)
 # Lei 12.814/13 elevou de R$ 48M para R$ 78M, vigência 01/01/2014.
 LIMITE_LUCRO_PRESUMIDO_VERSIONADO: list[VersionedRule[Decimal]] = [
