@@ -43,10 +43,18 @@ class TestDeterminarAnexoPorCNAE:
         assert fonte in ("EXPLICITO", "PREFIXO")
 
     def test_cnae_com_fonte_prefixo(self):
-        """CNAE não mapeado explicitamente deve usar prefixo."""
-        # CNAE fictício com prefixo 47 (comércio varejo) → Anexo I via prefixo
+        """CNAE não mapeado explicitamente cai em divisão (WS12).
+
+        Pré-WS12: caía em prefixo (CNAE_PREFIXO_PARA_ANEXO). Pós-WS12: cai
+        em DIVISAO_PARA_CATEGORIA com base legal LC 123/2006 Art. 18 §4º I
+        (Comércio varejista). Fonte agora é "EXPLICITO" porque tem categoria
+        explícita (A_FIXO), não mais um mapa anônimo de prefixo.
+
+        Requisito de negócio preservado: CNAE 47xxxxx → Anexo I.
+        """
         anexo, fonte = determinar_anexo_por_cnae_com_fonte("4700000")
-        assert fonte == "PREFIXO"
+        assert anexo == "I"
+        assert fonte in ("EXPLICITO", "PREFIXO")  # aceita ambos pra transição
 
     def test_cnae_com_fonte_fallback(self):
         """CNAE totalmente desconhecido deve retornar fallback Anexo III."""

@@ -366,7 +366,13 @@ except FileNotFoundError:
 def determinar_anexo_por_cnae(cnae_7_digitos: str) -> str:
     """
     Motor de Busca Inteligente de Anexo por CNAE.
-    Prioridade: 1. Mapa de 7 dígitos | 2. Prefixo de 2 dígitos | 3. Fallback Anexo III
+    Prioridade: 1. Override cirúrgico (WS12) | 2. Regra por divisão (WS12) |
+                3. Mapa antigo cnae_completo.json | 4. Prefixo 2 dígitos | 5. Anexo III
+
+    NOTA WS12: para CNAEs C_FATOR_R sem Fator R informado, retorna V
+    (conservador — Constraint 6 Luiz Moreira, Rail R2 sem extrapolação).
+    Caller que precisa do Anexo correto considerando Fator R deve usar
+    `core.regras_cnae.resolve_anexo(cnae, fator_r)`.
     """
     anexo, _ = determinar_anexo_por_cnae_com_fonte(cnae_7_digitos)
     return anexo
@@ -374,19 +380,46 @@ def determinar_anexo_por_cnae(cnae_7_digitos: str) -> str:
 
 def determinar_anexo_por_cnae_com_fonte(cnae_7_digitos: str) -> tuple:
     """
-    Retorna (anexo, fonte) onde fonte é "EXPLICITO", "PREFIXO" ou "FALLBACK".
-    Usado pela trilha de auditoria para transparência ERR-005.
+    Retorna (anexo, fonte) usado pela trilha de auditoria.
+
+    Pós-WS12: a fonte agora vem do schema novo `core.regras_cnae`. Os labels
+    "EXPLICITO" / "PREFIXO" / "FALLBACK" foram preservados para não quebrar
+    consumidores antigos (motor_tributario.py, main.py, testes), mas o motor
+    novo categoriza melhor:
+      - "EXPLICITO" : override cirúrgico ou regra por divisão (WS12)
+      - "PREFIXO"   : (deprecated, mantido como fallback secundário)
+      - "FALLBACK"  : CNAE não mapeado (Rail R2 — fallback Anexo III)
+
+    Para resolução completa com Fator R, usar core.regras_cnae.resolve_anexo().
     """
-    # 1. Busca exata (7 dígitos)
+    # Import lazy para evitar circular (regras_cnae não depende de tabelas_simples)
+    from core.regras_cnae import resolve_anexo
+
+    if not cnae_7_digitos or len(cnae_7_digitos) != 7 or not cnae_7_digitos.isdigit():
+        return "III", "FALLBACK"
+
+    # WS12: tenta resolver via schema novo (override cirúrgico + divisão)
+    anexo_novo, categoria_nova = resolve_anexo(cnae_7_digitos, fator_r=None)
+
+    # Mapeia categoria nova -> fonte legada (compatibilidade com testes/motor)
+    if categoria_nova in {
+        "A_FIXO", "B_ANEXO_III", "D_ESPECIAL",
+        "C_FATOR_R_ALTO", "C_FATOR_R_BAIXO", "C_FATOR_R_CONSERVADOR",
+        "E_VEDADO_FALLBACK_III",
+    }:
+        return anexo_novo, "EXPLICITO"
+
+    # Fallback secundário: JSON antigo (1332 entradas) — para CNAEs sem regra WS12
+    # Mantido enquanto cnae_completo.json não é regenerado no schema novo (ERR-005).
     if cnae_7_digitos in CNAE_PARA_ANEXO:
         return CNAE_PARA_ANEXO[cnae_7_digitos], "EXPLICITO"
 
-    # 2. Busca por prefixo (Primeiros 2 dígitos)
+    # Fallback terciário: prefixo 2 dígitos (mapa CNAE_PREFIXO_PARA_ANEXO)
     prefixo = cnae_7_digitos[:2]
     if prefixo in CNAE_PREFIXO_PARA_ANEXO:
         return CNAE_PREFIXO_PARA_ANEXO[prefixo], "PREFIXO"
 
-    # 3. Fallback (Serviços gerais conforme LC 123/2006)
+    # Fallback final: Anexo III (serviços gerais conforme LC 123/2006)
     return "III", "FALLBACK"
 
 
