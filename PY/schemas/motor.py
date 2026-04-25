@@ -10,7 +10,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 from validadores import validar_cnae, validar_cnpj, validar_ncm, validar_uf
 
@@ -116,6 +116,62 @@ class EmpresaFornecedora(BaseModel):
     data_inicio_atividade: Optional[date] = Field(
         default=None, description="Data de início de atividade."
     )
+
+    # ── WS6 — Eixo societário (separado do regime tributário) ──────────────
+    # Tipo societário = forma jurídica (CC + Tabela RFB Naturezas Jurídicas).
+    # Distinto de `regime` (tributário) e `enquadramento_simples` (porte/MEI).
+    # Default None preserva compatibilidade com chamadas legadas.
+    tipo_societario: Optional[
+        Literal["EI", "SLU", "LTDA", "SS", "SA", "COOPERATIVA",
+                "ASSOCIACAO", "FUNDACAO", "ORGANIZACAO_RELIGIOSA"]
+    ] = Field(
+        default=None,
+        description="Forma jurídica RFB. MEI é alias aceito (normalizado para EI + enquadramento_simples=MEI).",
+    )
+
+    # Qualificações especiais ortogonais ao tipo societário.
+    # Uma associação pode ter OSCIP (Lei 9.790/99) + CEBAS (Lei 12.101/2009).
+    qualificacoes_especiais: List[
+        Literal["OSCIP", "OS", "CEBAS", "UTILIDADE_PUBLICA_FEDERAL"]
+    ] = Field(
+        default_factory=list,
+        description="Qualificações que podem coexistir (OSCIP+CEBAS é real).",
+    )
+
+    # Porte/enquadramento dentro do Simples — derivado de RBT12, mas pode
+    # ser declarado pra MEI (Art. 18-A LC 123/2006) onde é status, não porte.
+    enquadramento_simples: Optional[Literal["MEI", "ME", "EPP"]] = Field(
+        default=None,
+        description="MEI/ME/EPP — status no Simples Nacional. MEI é Art. 18-A.",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _expandir_alias_mei(cls, data: Any) -> Any:
+        """
+        Aceita tipo_societario="MEI" como alias UX-friendly e normaliza para
+        a representação fiscalmente correta: tipo_societario="EI" +
+        enquadramento_simples="MEI" (Art. 18-A LC 123/2006 — MEI é status
+        do Simples para Empresário Individual com faturamento ≤ R$ 81k).
+        """
+        if not isinstance(data, dict):
+            return data
+        if data.get("tipo_societario") == "MEI":
+            data["tipo_societario"] = "EI"
+            data.setdefault("enquadramento_simples", "MEI")
+        return data
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def tipo_exibicao(self) -> Optional[str]:
+        """
+        Rótulo amigável pra UI/PDF: 'MEI' quando enquadramento_simples='MEI',
+        senão o tipo societário cru. Mantém storage fiel à RFB e display
+        fiel à linguagem do contador.
+        """
+        if self.enquadramento_simples == "MEI":
+            return "MEI"
+        return self.tipo_societario
 
     @field_validator("cnpj")
     @classmethod
