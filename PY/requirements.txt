@@ -32,7 +32,7 @@ lxml>=5.0                           # Parse XML NFe/NFCe 4.0 com validação nam
 requests>=2.31.0                    # HTTP client — integra_adapter.py, sieg_service.py
 
 # ── Migrations ────────────────────────────────────────────────────────────────
-alembic>=1.13.0                     # Versionamento de schema (database migrations)
+alembic>=1.18.4                     # Versionamento de schema (database migrations)
 
 # ── Testes ────────────────────────────────────────────────────────────────────
 pytest>=8.0.0
