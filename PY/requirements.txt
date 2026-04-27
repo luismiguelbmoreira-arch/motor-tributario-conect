@@ -20,7 +20,7 @@ cryptography>=42.0.0                # AES-256-GCM + HKDF para auditoria document
 # ── Autenticação ──────────────────────────────────────────────────────────────
 passlib[bcrypt]>=1.7.4              # Hash de senhas bcrypt
 bcrypt>=4.0.1,<5.0.0               # Pinado: 5.x+ quebra passlib detect_wrap_bug (ValueError: password >72 bytes em detect_wrap_bug)
-PyJWT>=2.8.0                        # JWT tokens (substitui python-jose — sem CVEs)
+PyJWT>=2.12.1                        # JWT tokens (substitui python-jose — sem CVEs)
 
 # ── Geração de PDF ─────────────────────────────────────────────────────────────
 weasyprint>=61.0                    # HTML → PDF (relatórios tributários)
