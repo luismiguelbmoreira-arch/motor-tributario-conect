@@ -3,7 +3,7 @@
 
 # ── Core ──────────────────────────────────────────────────────────────────────
 anthropic>=0.25.0           # Claude Vision API — extração de PDFs
-pydantic>=2.6.0             # V2 — validação de modelos de dados
+pydantic>=2.13.3             # V2 — validação de modelos de dados
 email-validator>=2.1.0      # Habilita pydantic.EmailStr (validação de email)
 sqlmodel>=0.0.16            # ORM SQLite — persistência (database.py)
 python-dotenv>=1.0.0        # Carrega .env automaticamente
