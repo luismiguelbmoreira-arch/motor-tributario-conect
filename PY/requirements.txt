@@ -10,7 +10,7 @@ python-dotenv>=1.0.0        # Carrega .env automaticamente
 
 # ── API FastAPI (api_motor.py) ─────────────────────────────────────────────
 fastapi>=0.111.0
-uvicorn[standard]>=0.29.0   # Servidor ASGI com websockets + httptools
+uvicorn[standard]>=0.46.0   # Servidor ASGI com websockets + httptools
 python-multipart>=0.0.9     # Dependência runtime do FastAPI
 
 # ── Segurança ────────────────────────────────────────────────────────────────
