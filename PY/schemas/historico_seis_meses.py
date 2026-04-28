@@ -85,7 +85,10 @@ class OperacaoMensal(BaseModel):
 
     tipo: TipoOperacao
     valor_total: Decimal = Field(..., gt=0, max_digits=15, decimal_places=2)
-    quantidade_notas: int = Field(..., ge=1)
+
+    # AJUSTE pode ser lançamento contábil sem NF (ge=0 admite zero); demais
+    # tipos exigem ≥1 nota — validado em ``_quantidade_notas_por_tipo`` abaixo.
+    quantidade_notas: int = Field(..., ge=0)
 
     # CNAE 7 dígitos sem hífen (padrão do projeto — ver tabelas_simples.py:55)
     cnae_predominante: str = Field(..., pattern=r"^\d{7}$")
@@ -93,19 +96,34 @@ class OperacaoMensal(BaseModel):
     # DIFAL: UF destino só faz sentido pra venda interestadual; opcional.
     uf_destino: Optional[str] = Field(None, pattern=r"^[A-Z]{2}$")
 
-    # Tesoureiro precisa pra fluxo de caixa. Obrigatório em VENDA_*,
-    # opcional nos outros tipos (compras saem por contas a pagar — outro fluxo).
+    # Tesoureiro precisa pra fluxo de caixa. Obrigatório em VENDA_* e
+    # DEVOLUCAO_VENDA (estorno entra/sai do caixa); opcional nos demais.
     forma_recebimento: Optional[FormaRecebimento] = Field(
         None,
-        description="Obrigatório em VENDA_B2B / VENDA_B2C; opcional nos demais tipos.",
+        description=(
+            "Obrigatório em VENDA_B2B / VENDA_B2C / DEVOLUCAO_VENDA "
+            "(Tesoureiro reconstrói fluxo de caixa). Opcional nos demais."
+        ),
     )
 
     @model_validator(mode="after")
     def _venda_exige_forma_recebimento(self) -> "OperacaoMensal":
-        if self.tipo.startswith("VENDA_") and self.forma_recebimento is None:
+        # Fix #5: DEVOLUCAO_VENDA também afeta caixa (estorno via Pix/cartão).
+        if self.tipo.startswith(("VENDA_", "DEVOLUCAO_")) and self.forma_recebimento is None:
             raise ValueError(
                 f"Operação {self.tipo} exige forma_recebimento "
                 "(Tesoureiro precisa pra reconstruir fluxo de caixa)."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _quantidade_notas_por_tipo(self) -> "OperacaoMensal":
+        """Fix #4: AJUSTE pode ser lançamento contábil sem NF (qtd=0 OK).
+        Vendas, compras e devoluções exigem pelo menos 1 nota fiscal."""
+        if self.tipo != "AJUSTE" and self.quantidade_notas < 1:
+            raise ValueError(
+                f"Operação {self.tipo} exige quantidade_notas ≥ 1; "
+                f"recebido {self.quantidade_notas}. Apenas AJUSTE aceita zero."
             )
         return self
 
@@ -176,21 +194,39 @@ class MesFiscal(BaseModel):
 
     @model_validator(mode="after")
     def _coerencia_faturamento_operacoes(self) -> "MesFiscal":
-        """Soma das operações ≈ faturamento_mes (tolerância 1%).
+        """Soma das operações de RECEITA ≈ faturamento_mes (tolerância 1%).
+
+        Fix #1: ``DEVOLUCAO_VENDA`` entra com sinal NEGATIVO (sai do caixa do
+        cliente, reduz receita); ``AJUSTE`` é ignorado (lançamento contábil
+        sem impacto direto em receita bruta — pode ser ativo, encargo, etc).
+        Compras (``COMPRA_*``) também não entram na soma — faturamento_mes é
+        receita bruta, não inclui despesa.
 
         Opera apenas quando há operações registradas e faturamento > 0;
-        meses sem detalhamento de operações ficam isentos.
+        meses sem detalhamento ficam isentos.
         """
         if not self.operacoes or self.faturamento_mes == 0:
             return self
-        soma_ops = sum((o.valor_total for o in self.operacoes), Decimal("0"))
-        if soma_ops <= 0:
+
+        soma_receita = Decimal("0")
+        for op in self.operacoes:
+            if op.tipo.startswith("VENDA_"):
+                soma_receita += op.valor_total
+            elif op.tipo == "DEVOLUCAO_VENDA":
+                soma_receita -= op.valor_total
+            # COMPRA_* e AJUSTE não entram no cálculo de receita bruta.
+
+        if soma_receita <= 0:
+            # Sem componentes de receita ou devoluções > vendas — pula
+            # validação cruzada (caso degenerado).
             return self
-        delta = abs(soma_ops - self.faturamento_mes) / self.faturamento_mes
+
+        delta = abs(soma_receita - self.faturamento_mes) / self.faturamento_mes
         if delta > Decimal("0.01"):
             raise ValueError(
-                f"Soma das operações (R$ {soma_ops}) diverge de "
-                f"faturamento_mes (R$ {self.faturamento_mes}) em mais de 1%."
+                f"Soma de receita líquida (vendas - devoluções = "
+                f"R$ {soma_receita}) diverge de faturamento_mes "
+                f"(R$ {self.faturamento_mes}) em mais de 1%."
             )
         return self
 
@@ -204,11 +240,25 @@ class MesFiscal(BaseModel):
         houver divergência, registra um marcador interno via
         ``object.__setattr__`` (driblando ``frozen=True``) pra orquestrador
         externo decidir se promove a warning na trilha de auditoria.
+
+        Fix #2: usa CNAE da PRIMEIRA VENDA (não da primeira operação),
+        porque ``cnae_predominante`` em compras é do FORNECEDOR, não da
+        empresa — usar isso como CNAE da empresa daria falso positivo.
+
+        Débito técnico (Risco #2 do Viciado): ``object.__setattr__`` em
+        frozen model é hack documentado. Estrutura externa de divergência
+        ficará pra iteração futura.
         """
         if self.faturamento_mes == 0 or not self.operacoes:
             return self
 
-        cnae_principal = self.operacoes[0].cnae_predominante
+        # Fix #2: CNAE da empresa só aparece em VENDA_* (em COMPRA_* o
+        # cnae_predominante é do fornecedor).
+        vendas = [op for op in self.operacoes if op.tipo.startswith("VENDA_")]
+        if not vendas:
+            return self
+        cnae_principal = vendas[0].cnae_predominante
+
         try:
             anexo_esperado, fonte_categoria = resolve_anexo(
                 cnae_principal,
@@ -351,7 +401,9 @@ class HistoricoSeisMeses(BaseModel):
         bloqueador atrapalha cliente legítimo. Quem quiser bloquear pode
         promover o warning a erro fora do schema.
         """
-        for i in range(1, 6):
+        # Fix #3: range dinâmico — suporta ampliação futura do schema
+        # (ex: HistoricoSeisMeses → HistoricoNMeses) sem regressão silenciosa.
+        for i in range(1, len(self.meses)):
             anterior = self.meses[i - 1].rbt12_declarado
             atual = self.meses[i].rbt12_declarado
             if anterior > 0:
@@ -392,6 +444,12 @@ class HistoricoSeisMeses(BaseModel):
         Correção 2: usa ``valor_em(TETO_SIMPLES_NACIONAL_VERSIONADO, data)``
         em vez do inexistente ``resolve_teto_simples``. Cumpre Rail R5
         (separação rígida de regimes).
+
+        Issue #8 (revisão fina): lookup usa ``date(ano, 1, 1)`` — primeiro
+        dia do ano da competência. Aceitável porque LCs do teto Simples
+        historicamente entram em vigor em 1º de janeiro (LC 155/2016
+        vigência 2018-01-01). Se algum dia houver lei retroativa intra-anual,
+        revisar pra usar o último dia do mês da competência.
         """
         if self.regime_atual != "SIMPLES":
             return self

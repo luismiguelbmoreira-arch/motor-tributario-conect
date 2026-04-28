@@ -36,6 +36,7 @@ alembic>=1.13.0                     # Versionamento de schema (database migratio
 
 # ── Datas com timezone Brasil (Fase 0a — janelas legais setembro/março) ────
 pendulum>=3.0.0                     # Janelas opt-out, prazos CTN, dias úteis
+python-dateutil>=2.9.0              # relativedelta — janela 18m em HistoricoSeisMeses (transitive de pydantic, declarado pra estabilidade)
 
 # Nota: pandas e apscheduler serão adicionados quando entrarem em uso real
 # (Fase 3 — agregação Nibo de 200 CNPJs / Fase 5 — scheduler mensal).
