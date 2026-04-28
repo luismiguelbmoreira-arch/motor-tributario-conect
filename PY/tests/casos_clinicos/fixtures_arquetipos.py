@@ -32,7 +32,8 @@ def arquetipo_3_misto_5050():
 
     Características modeladas:
         - 6 meses: novembro/2025 a abril/2026
-        - Anexo I (comércio — padaria CNAE 1091102 fabricação produtos panificação)
+        - Anexo I (comércio — CNAE 4721102 "Padaria e confeitaria com
+          predominância de revenda", balcão B2C + entrega B2B restaurantes)
         - Sazonalidade dezembro +33% (panetones, ceia)
         - Mix 50/50 B2B (restaurantes) + B2C (balcão)
         - Folha 12m ~R$ 348k (4 funcionários CLT + pró-labore)
@@ -50,7 +51,12 @@ def arquetipo_3_misto_5050():
         OperacaoMensal,
     )
 
-    cnae_padaria = "1091102"  # CNAE 7 dígitos sem hífen — padrão do projeto
+    # CNAE 4721102 — "Padaria e confeitaria com predominância de revenda".
+    # Resolve pra Anexo I em regras_cnae.py (comércio varejista). É o CNAE
+    # típico da padaria de bairro com balcão B2C + entrega B2B pra restaurantes.
+    # Diferencia de 1091102 ("Fabricação produtos panificação industrial",
+    # Anexo II) usado por padarias industriais grandes — não é nosso caso.
+    cnae_padaria = "4721102"
 
     def _mes(
         competencia: str,

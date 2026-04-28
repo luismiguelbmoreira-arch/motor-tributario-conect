@@ -192,13 +192,15 @@ def test_arquetipo_3_soma_operacoes_bate_com_faturamento():
 
 
 def test_arquetipo_3_cnae_e_padaria_formato_projeto():
-    """CNAE 1091102 (Fabricação de produtos de panificação industrial) com
-    7 dígitos sem hífen — formato do projeto (ver tabelas_simples.py:55)."""
+    """CNAE 4721102 (Padaria e confeitaria com predominância de revenda) com
+    7 dígitos sem hífen — formato do projeto (ver tabelas_simples.py:55).
+    Resolve pra Anexo I em regras_cnae.py (comércio varejista) — coerente
+    com anexo_aplicado='I' declarado nos meses."""
     historico = arquetipo_3_misto_5050()
     for mes in historico.meses:
         for op in mes.operacoes:
-            assert op.cnae_predominante == "1091102", (
-                f"{mes.competencia}: CNAE {op.cnae_predominante} ≠ '1091102'"
+            assert op.cnae_predominante == "4721102", (
+                f"{mes.competencia}: CNAE {op.cnae_predominante} ≠ '4721102'"
             )
             assert len(op.cnae_predominante) == 7
             assert op.cnae_predominante.isdigit()
