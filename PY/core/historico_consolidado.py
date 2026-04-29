@@ -16,7 +16,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from statistics import linear_regression
 from typing import List
 
-from core.motor_tributario import FATOR_R_ZONA_RISCO_MAX, FATOR_R_ZONA_RISCO_MIN
+from core.fator_r_modulo import alertar_migracao_anexo, calcular_fator_r_serie
 from core.tabelas_simples import ALERTA_90_PERCENT_TETO, TETO_SIMPLES_NACIONAL
 from schemas.diagnostico_consolidado import (
     AlertaTransicao,
@@ -132,8 +132,20 @@ def _extrair_resumo_mensal(
     )
 
 
-def _gerar_alertas_transicao(resumos: List[DiagnosticoMensalResumo]) -> List[AlertaTransicao]:
+def _gerar_alertas_transicao(
+    resumos: List[DiagnosticoMensalResumo],
+    historico: HistoricoSeisMeses,
+) -> List[AlertaTransicao]:
     alertas: List[AlertaTransicao] = []
+
+    # Alertas de zona de risco do Fator R — delegado ao módulo dedicado.
+    # Série calculada direto do histórico (folha_12m / rbt12) — fonte única.
+    # LC 123/2006, Art. 18, § 24.
+    serie_fator_r = calcular_fator_r_serie(historico)
+    alertas.extend(alertar_migracao_anexo(
+        serie=serie_fator_r,
+        competencias=[mes.competencia for mes in historico.meses],
+    ))
 
     for i, r in enumerate(resumos):
         # TETO_90PCT — normativo (LC 123/2006, Art. 3º, II)
@@ -147,20 +159,6 @@ def _gerar_alertas_transicao(resumos: List[DiagnosticoMensalResumo]) -> List[Ale
                     "Risco de extrapolação do Simples Nacional."
                 ),
                 amparo_legal="LC 123/2006, Art. 3º, II — teto R$ 4.800.000,00",
-            ))
-
-        # FATOR_R_ZONA_RISCO — heurística interna
-        if r.fator_r is not None and _FATOR_R_ZONA_RISCO_MIN <= r.fator_r <= _FATOR_R_ZONA_RISCO_MAX:
-            alertas.append(AlertaTransicao(
-                tipo="FATOR_R_ZONA_RISCO",
-                competencia=r.competencia,
-                detalhe=(
-                    f"Fator R {r.fator_r:.4f} na zona de risco "
-                    f"[{_FATOR_R_ZONA_RISCO_MIN}, {_FATOR_R_ZONA_RISCO_MAX}]. "
-                    "Risco de oscilação entre Anexo III e V. "
-                    "Heurística interna — não é valor normativo."
-                ),
-                amparo_legal="LC 123/2006, Art. 18, § 24 — Fator R",
             ))
 
         if i == 0:
@@ -290,7 +288,7 @@ def gerar_diagnostico_consolidado(historico: HistoricoSeisMeses) -> DiagnosticoC
     else:
         tendencia = "ESTAVEL"
 
-    alertas_transicao = _gerar_alertas_transicao(resumos)
+    alertas_transicao = _gerar_alertas_transicao(resumos, historico)
 
     # Contagem de meses opt-out (OPT_OUT_CONDICIONAL excluído — conservadorismo fiscal)
     meses_optout = sum(1 for r in resumos if r.recomendacao_codigo in _CODIGOS_OPTOUT_DEFINITIVO)
