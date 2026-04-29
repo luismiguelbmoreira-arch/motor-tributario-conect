@@ -137,6 +137,21 @@ def _mapear_tipo_societario(
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+# Mapeamento entre os 7 valores de OperacaoMensal.forma_recebimento e os
+# 5 valores aceitos por OperacaoFiscal.forma_recebimento (schema antigo).
+# Conservador: cartões (débito/crédito) viram CARTAO; transferência bancária
+# instantânea aproxima de PIX_DIRETO (canal digital banco-a-banco).
+_MAPA_FORMA_RECEBIMENTO_CONSOLIDADA: Dict[str, str] = {
+    "PIX_DIRETO": "PIX_DIRETO",
+    "PIX_VIA_PSP": "PIX_VIA_PSP",
+    "BOLETO": "BOLETO",
+    "DINHEIRO": "DINHEIRO",
+    "CARTAO_DEBITO": "CARTAO",
+    "CARTAO_CREDITO": "CARTAO",
+    "TRANSFERENCIA": "PIX_DIRETO",
+}
+
+
 def _predominante(
     items: List[OperacaoMensal],
     key: str,
@@ -330,11 +345,19 @@ def _adaptar_mes_para_motor(
         mes.faturamento_mes if mes.faturamento_mes > 0 else Decimal("0.01")
     )
 
+    # Mapeia forma_recebimento de OperacaoMensal (7 valores) pra OperacaoFiscal
+    # (5 valores). CARTAO_DEBITO/CREDITO → CARTAO; TRANSFERENCIA → PIX_DIRETO.
+    forma_consolidada = (
+        _MAPA_FORMA_RECEBIMENTO_CONSOLIDADA.get(forma_pred, "PIX_DIRETO")
+        if forma_pred
+        else "PIX_DIRETO"
+    )
+
     operacao = OperacaoFiscal(
         valor_operacao=valor_operacao,
         data_emissao=data_emissao,
         ncm_nbs=_NCM_AGREGADO_DEFAULT,
-        forma_recebimento=forma_pred or "PIX_DIRETO",
+        forma_recebimento=forma_consolidada,
         rpa_mensal=mes.faturamento_mes if mes.faturamento_mes > 0 else None,
     )
 

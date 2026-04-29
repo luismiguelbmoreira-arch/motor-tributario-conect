@@ -657,9 +657,6 @@ class TestCenariosPendentesBlueprint:
     """Cenários do blueprint seção 6 que dependem de fixtures que ainda
     não existem. Caso-Clínico implementa quando Misto 50/50 estiver verde."""
 
-    @pytest.mark.skip(
-        reason="Fixture arquetipo_5_proximo_sublimite pendente — Caso-Clínico"
-    )
     def test_cenario_2_distribuidora_cruza_432m_no_mes_5(self):
         """Distribuidora cruza R$ 4.32M no mês 5 → REVISAR_MANUALMENTE BAIXA."""
         from tests.casos_clinicos.fixtures_arquetipos import (
@@ -674,9 +671,6 @@ class TestCenariosPendentesBlueprint:
         tipos_alertas = [a.tipo for a in diag.alertas_transicao]
         assert "RBT12_90PCT_TETO" in tipos_alertas
 
-    @pytest.mark.skip(
-        reason="Fixture arquetipo_2_b2b_anexo_iii_fator_r pendente — Caso-Clínico"
-    )
     def test_cenario_3_clinica_oscilando_fator_r(self):
         """Clínica oscilando F_R 0.27↔0.29 → ≥2 alertas FATOR_R_ATRAVESSOU_028."""
         from tests.casos_clinicos.fixtures_arquetipos import (
@@ -692,9 +686,6 @@ class TestCenariosPendentesBlueprint:
         ]
         assert len(alertas_fator_r) >= 2
 
-    @pytest.mark.skip(
-        reason="Fixture arquetipo_4_b2b_anexo_v pendente — Caso-Clínico"
-    )
     def test_cenario_4_software_house_b2b_60_b2c_40(self):
         """Software house MISTO → percentual_b2b adapter ~60.00."""
         from tests.casos_clinicos.fixtures_arquetipos import arquetipo_4_b2b_anexo_v
@@ -706,9 +697,6 @@ class TestCenariosPendentesBlueprint:
         # rodou para mix B2B.
         assert diag is not None
 
-    @pytest.mark.skip(
-        reason="Fixture arquetipo_1_b2c_puro com pico sazonal pendente — Caso-Clínico"
-    )
     def test_cenario_5_loja_sazonal_pico_dezembro(self):
         """Loja com dezembro = 5× média → sazonalidade=True, pico=dez."""
         from tests.casos_clinicos.fixtures_arquetipos import arquetipo_1_b2c_puro
