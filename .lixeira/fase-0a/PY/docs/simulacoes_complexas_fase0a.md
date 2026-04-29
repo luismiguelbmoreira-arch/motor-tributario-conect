@@ -1,13 +1,32 @@
+<!--
+VALIDADO_POR: scripts/auditoria_revisao_critica.py
+EXECUTADO_EM: 2026-04-29
+SUITE_VERDE: 1360 testes
+RESULTADO: 12/15 cenarios numericos da versao anterior estavam errados (80%); valores abaixo extraidos do motor real
+ERRO_MATERIAL_CORRIGIDO: C02_M6 (alq 0.190329 -> 0.190350; DAS R$ 199.846,01 -> R$ 199.867,50; delta R$ 21,49)
+-->
+
 # 10 Simulações COMPLEXAS — Stress-Test Fase 0a
 
-**Data:** 29/04/2026 | **Autor:** Luiz Moreira (cravamento) + Caso-Clínico (consolidação)
+**Data:** 29/04/2026 | **Autor:** Luiz Moreira (cravamento intenção+lei) + Caso-Clínico (consolidação) + script de auditoria (números reais)
 **Branch:** `fase-0a-historico-seis-meses` | **Suite atual:** 1360 testes verdes
+**Status:** valores **EXTRAÍDOS DO MOTOR** via `scripts/auditoria_revisao_critica.py`
+
+## ⚠️ Histórico de correção
+
+A versão anterior deste documento (cravada em 28/04/2026) tinha **12 de 15 cenários numéricos com valores errados** (80% de erro), descobertos em auditoria automatizada em 29/04/2026.
+
+**Erro material:** **C02_M6** — alíquota cravada `0,190329` divergia da real `0,190350`. DAS doc R$ 199.846,01 vs motor R$ 199.867,50 (**Δ R$ 21,49/mês**). Em 200 CNPJs × 12 meses, esse padrão de erro gera ~R$ 51.576/ano de descontrole.
+
+**Demais 11 erros:** arredondamento da última casa decimal (≤ R$ 0,30/cenário), causados por sub-agente texto fazendo `quantize` manual com precisão diferente do motor.
+
+**Regra cravada pelo dono em 29/04/2026:** *"você roda toda mudança"* → **MAX_08 (Regra da Fonte Executada)** no CLAUDE.md.
 
 ## 🎯 Diferença vs validação falsificável simples
 
 | Documento | Cenários | Complexidade | Objetivo |
 |---|---|---|---|
-| `validacao_falsificavel_fase0a.md` | 16 simples | 1 dimensão por cenário | Verificar fórmula básica |
+| `validacao_falsificavel_fase0a.md` | 13 simples + 3 estouros | 1 dimensão por cenário | Verificar fórmula básica |
 | **`simulacoes_complexas_fase0a.md`** (este) | **10 adversariais** | **3+ dimensões combinadas** | **Stress-test + vetores RFB** |
 
 Cada simulação aqui combina **3+ dimensões de complexidade**: mudança de regime, cruzamento de Anexo, mix heterogêneo de operações, múltiplas UFs, sazonalidade extrema, NCM monofásico, profissão regulamentada, MEI estourando teto, regimes especiais (cooperativa/igreja), Lucro Real.
@@ -31,22 +50,49 @@ Cada simulação aqui combina **3+ dimensões de complexidade**: mudança de reg
 
 ---
 
+## 📋 Meses-chave numéricos — VALORES REAIS DO MOTOR
+
+> Todos os valores abaixo foram extraídos rodando a fórmula do motor (`tabelas_simples.py::TABELAS_ANEXOS` + `((RBT12 × Alíq_Nominal) − Parcela_Deduzir) ÷ RBT12`).
+
+| Cenário | Mês | Anexo / Faixa | RBT12 | Faturamento | Alíq Efetiva (motor) | DAS (motor) |
+|---|---|---|---|---|---|---|
+| **C01_M1** | Out/2025 | I / 4 | R$ 1.420.000 | R$ 138.000 | 0,091155 | **R$ 12.579,39** |
+| **C01_M3** | Dez/2025 | I / 4 | R$ 1.470.000 | R$ 175.000 | 0,091694 | **R$ 16.046,45** |
+| **C02_M3** | Nov/2025 (FR=0,2841 cruza pra III) | III / 5 | R$ 3.150.000 | R$ 540.000 | 0,170114 | **R$ 91.861,56** |
+| **C02_M6** ⚠️ erro material corrigido | Fev/2026 (RBT12=98,1% teto) | V / 6 | R$ 4.710.000 | R$ 1.050.000 | 0,190350 | **R$ 199.867,50** |
+| **C03_M1** | Out/2025 (FR=0,15 → Anexo V) | V / 4 | R$ 1.650.000 | R$ 138.000 | 0,194636 | **R$ 26.859,77** |
+| **C04_M6** | Mar/2026 (outlier — entrega obra) | IV / 5 | R$ 2.950.000 | R$ 1.450.000 | 0,157702 | **R$ 228.667,90** |
+| **C05_M2** | Out/2025 (FR=0,2728) | V / 4 | R$ 940.000 | R$ 82.000 | 0,186809 | **R$ 15.318,34** |
+| **C05_M3** | Nov/2025 (FR=0,2813 cruza pra III) | III / 4 | R$ 960.000 | R$ 85.000 | 0,122875 | **R$ 10.444,38** |
+| **C05_M4** | Dez/2025 (FR=0,2995 alta — 13º) | III / 4 | R$ 985.000 | R$ 95.000 | 0,123817 | **R$ 11.762,62** |
+| **C05_M5** | Jan/2026 (FR=0,2716 volta pra V) | V / 4 | R$ 1.020.000 | R$ 100.000 | 0,188235 | **R$ 18.823,50** |
+| **C07_M1** | Out/2025 (Bazar Anexo I F3) | I / 3 | R$ 480.000 | R$ 40.000 | 0,066125 | **R$ 2.645,00** |
+| **C08_M1** | Out/2025 (cooperativa SEGREGADA) | III / 3 | R$ 660.000 | R$ 55.000 | 0,108273 | **R$ 5.955,02** |
+| **C08_M1_NS** | Out/2025 (sem segregação — bug) | III / 4 | R$ 1.900.000 | R$ 195.000 | 0,141242 | **R$ 27.542,19** |
+| **C09_M3** | Dez/2025 (filial em F5) | I / 5 | R$ 3.580.000 | R$ 280.000 | 0,118615 | **R$ 33.212,20** |
+| **C09_M4** | Jan/2026 (cruza pra F6) | I / 6 | R$ 3.640.000 | R$ 240.000 | 0,086154 | **R$ 20.676,96** |
+
+> **C10 (Lucro Real)** não tem alíquota Simples calculável — motor delega pra `LucroRealEngine` ou retorna MIGRAR_REAL com aviso.
+
+---
+
 ## 📋 Tabela de Validação Excel-Friendly (10 linhas críticas)
 
 | Sim | Mês | Campo a verificar | Valor esperado | Tolerância | Lei amparo |
 |---|---|---|---|---|---|
-| **C01** | 2025-12 | DAS M3 (Anexo I faixa 4) | R$ 16.046,49 | ±R$ 0,05 | LC 123 Art. 18 §1º |
+| **C01** | 2025-12 | DAS M3 (Anexo I faixa 4) | **R$ 16.046,45** | ±R$ 0,01 | LC 123 Art. 18 §1º |
 | **C02** | 2025-11 | Anexo aplicado M3 (FR=0,2841) | III | exato | LC 123 Art. 18 §24 |
 | **C02** | 2026-02 | Alerta `RBT12_90PCT_TETO` | DISPARA (98,125%) | exato | Rail R7 |
-| **C03** | 2025-10 | Δ Simples vs Presumido | +4,93% (R$ 6.809) | ±0,1pp | Lei 9.249/95 Art. 15 §1º III "a" |
-| **C04** | 2026-03 | ISS efetivo aplicado (cap) | R$ 72.500,00 (5%) | ±R$ 0,02 | LC 123 Art. 18 §5°-F |
+| **C02** | 2026-02 | DAS M6 ⚠️ | **R$ 199.867,50** | ±R$ 0,01 | LC 123 Art. 18 §1º |
+| **C03** | 2025-10 | DAS M1 Anexo V F4 | **R$ 26.859,77** | ±R$ 0,01 | Lei 9.249/95 Art. 15 §1º III "a" |
+| **C04** | 2026-03 | DAS M6 (outlier) | **R$ 228.667,90** | ±R$ 0,01 | LC 123 Art. 18 §5°-F |
 | **C04** | 2025-11 | `difal_status` | INDISPONIVEL_AGREGADO | exato | EC 87/2015 / ADI 5464 |
 | **C05** | qualquer | Recomendação consolidada | REVISAR_MANUALMENTE | exato | Bug-prevention OLS |
 | **C05** | 2025-11→2026-01 | Alertas FATOR_R_ATRAVESSOU_028 | ≥2 | mín | LC 123 Art. 18 §24 |
 | **C06** | 2026-03 | RBT12 vs teto MEI Caminhoneiro | 98,57% de R$ 251.600 | exato | LC 188/2021 |
 | **C07** | qualquer | Recomendação | REVISAR_MANUALMENTE + BAIXA | exato | STF RE 325.822 |
-| **C08** | qualquer | DAS sem segregação vs com | Diferença ~5× | ±10% | Lei 5.764/71 Art. 79 |
-| **C09** | 2026-01 | Faixa virada 5→6 (RBT12=3,64M raiz) | faixa 6, alíq 8,62% | ±0,02pp | LC 123 Art. 13 §1º |
+| **C08** | qualquer | DAS sem segregação vs com | R$ 27.542,19 vs R$ 5.955,02 (~4,6×) | ±5% | Lei 5.764/71 Art. 79 |
+| **C09** | 2026-01 | Faixa virada 5→6 (RBT12=3,64M raiz) | F6 alíq 0,086154 | ±0,000001 | LC 123 Art. 13 §1º |
 | **C10** | 2025-12 | DEVOLUCAO_VENDA M5 (380k) coerência | delta < 1% | exato | Schema fix #1 |
 
 ---
@@ -84,29 +130,15 @@ Cada simulação aqui combina **3+ dimensões de complexidade**: mudança de reg
 | **C09** | Consolidação RBT12 raiz×filial via API CNPJ | Fase 1 — integração SIEG/eCAC | 🔵 Pendente — operador declara |
 | **C10** | Engine Lucro Real com LALUR + adições/exclusões | WS6.b — Lucro Real refinado | 🟡 Em curso |
 
-**Decisão arquitetural:** todas 10 simulações são **construíveis no schema atual** (`HistoricoSeisMeses`). C07, C08, C10 documentam comportamento esperado para futuras fases — motor deve devolver `REVISAR_MANUALMENTE` + confiança BAIXA + amparo legal explícito até que engine especializado entre.
-
 ---
 
-## 🔬 Detalhamento — Veja `~/.claude/plans/blueprint-simulacoes-complexas-luiz-moreira.md`
+## 🛡️ Como validar este documento
 
-O reporte completo do Luiz Moreira (passo a passo dos cálculos, justificativas, vetores RFB detalhados) está preservado no arquivo de plano externo (~3000 palavras). Este documento (`simulacoes_complexas_fase0a.md`) é a vista resumida pra navegar e bater na planilha.
+```bash
+cd PY/
+python scripts/auditoria_revisao_critica.py
+```
 
----
+Se output mostrar qualquer "DIVERGE" → este documento está desatualizado em relação ao motor. Reexecutar o script e atualizar.
 
-## 🎯 Próximas Ações
-
-1. **Dono valida 3-5 simulações em Excel** (recomendo C02, C04, C05 — mais críticas pra carteira de 200 CNPJs).
-2. **Sentinela transforma em testes regressivos** — `tests/casos_clinicos/test_simulacoes_complexas.py` (1 fixture por simulação + 1 asserção por linha da Tabela de Validação).
-3. **Caso-Clínico cria 4 fixtures** das simulações que não dependem de fases posteriores (C02, C05, C06, C09).
-4. **Outras 6 simulações** ficam como documentação até suas fases entrarem (C01, C03, C04, C07, C08, C10).
-
----
-
-## 🛡️ Invariantes de TODAS as 10 simulações
-
-1. **Determinismo:** mesmo input → mesmo `hash_reprodutibilidade`. Se 2 execuções produzirem hashes diferentes → vazamento de timestamp/dict order/Decimal.
-2. **MAX_01:** todo cálculo tem 4 elementos (Base → Deduções → Alíquota → Valor). Trilha unificada audita isso.
-3. **MAX_02:** todo `amparo_legal` em alerta cita lei real verificável em planalto.gov.br.
-4. **MAX_07:** sem inventar SC COSIT/Acórdão CARF/súmula. Escrivão valida toda menção.
-5. **Schema V1.0 frozen:** se simulação precisa de campo novo (`faturamento_ato_cooperativo`, `cnpj_raiz`, `iss_cap_aplicado`) → abrir `ERR-XXX` em LOG_ERROS.md, **não estender schema sem revisão Chefe + Luiz + Escrivão**.
+**MAX_08 (Regra da Fonte Executada):** nenhum valor numérico Decimal entra neste documento sem ter sido executado contra o motor real.

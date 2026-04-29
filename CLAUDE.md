@@ -419,6 +419,27 @@ Os 8 rails são **invioláveis** acima das MAX_FISCAL. Quando uma regra MAX entr
 
 ---
 
+## 🔍 PMD — GATE OBRIGATÓRIO ANTES DE TODO COMMIT (PROJETO INTEIRO)
+
+**Agente:** `.claude/agents/pmd.md` — PutaMadre de Documentação. Supervisão estrutural permanente.
+
+Nenhum commit sem PMD aprovar. Vale pra qualquer fase, workstream, hotfix, refactor.
+
+**Regra de ouro — inviolável:** Qualquer número no projeto que o motor é capaz de calcular DEVE ter sido gerado pelo motor rodando. Não importa onde aparece: doc, agente, plano, comentário, fixture, seed de teste. Se o motor calcula aquele valor, o número TEM que vir do motor. Cálculo mental = BLOQUEIO. Valor "estimado" = BLOQUEIO. Sem exceção, sem negociação.
+
+**Sequência obrigatória:**
+1. Código/doc pronto
+2. Invocar PMD (`subagent_type: pmd`)
+3. PMD verifica estrutura + valida que todo número tem evidência de execução real
+4. PMD reporta achados com `arquivo:linha`
+5. Fix os achados críticos e altos
+6. PMD confirma: "aprovado"
+7. Commit
+
+Se PMD não foi invocado, commit não acontece. Sem exceção.
+
+---
+
 ## ⚙️ CONVENÇÕES DE CÓDIGO
 
 - **Nunca usar `float` para valores monetários.** Sempre `Decimal` com `ROUND_HALF_UP`.
@@ -444,34 +465,9 @@ Os 8 rails são **invioláveis** acima das MAX_FISCAL. Quando uma regra MAX entr
 
 ---
 
-## 🗺️ ROADMAP — STATUS ATUAL (29/04/2026 — Fase 0a quase fechada, validação falsificável pendente)
+## 🗺️ ROADMAP — STATUS ATUAL (25/04/2026 — pausa em WS6 etapa 3)
 
-**Suite atual:** **1360 testes verdes** | **0 regressão** | crescimento desde início do refinamento: **1021 → 1360 (+339 testes em 15 commits)**
-
-### 🚀 Sessão 28-29/04/2026 — Fase 0a do plano "mesmo-antes-de-puxar-rippling-frog"
-
-**Branch:** `fase-0a-historico-seis-meses` (6 commits no remoto)
-
-| # | Commit | Detalhe |
-| --- | --- | --- |
-| 1 | `18cda50` | **Kickoff Fase 0a** — 4 agentes novos (Tesoureiro, Coletor, Caso-Clínico, Auditor-Risco) + libs (pendulum, hypothesis) + revisão crítica aplicada (10 fixes) |
-| 2 | `0a2f0d3` | **Fixture Arquétipo 3 (Misto 50/50)** — Padaria Doce Manhã, TDD red phase, 13 testes skipped |
-| 3 | `0b58ad0` | **Schema HistoricoSeisMeses** — 331 linhas, Pydantic V2 frozen, Decimal, 11 validators de continuidade temporal (TDD green phase) |
-| 4 | `b547ea6` | **7 fixes da revisão fina** — DEVOLUCAO_VENDA com sinal, vendas-only Fator R, range dinâmico, quantidade_notas por tipo, forma_recebimento DEVOLUCAO, dateutil explícito + 14 testes regressivos |
-| 5 | `f40a49a` | **`gerar_diagnostico_consolidado` + DiagnosticoConsolidado** — agregação 6 meses, hash SHA-256 reprodutibilidade determinístico, 5 funções de agregação (carga, tendência, sazonalidade, recomendação, confiança), 5 alertas de transição |
-| 6 | `52977f8` | **4 arquétipos restantes** — Boutique (B2C sazonal), Vértice (Fator R oscilante), Aço Forte (B2B Anexo V mix 60/40), Trovão (próximo sublimite). Adapter forma_recebimento mapeia 7→5 valores. |
-
-**Agentes novos disponíveis (`.claude/agents/`):** `tesoureiro`, `coletor`, `caso-clinico`, `auditor-risco` (além dos 7 originais).
-
-**Plano-mestre:** `~/.claude/plans/mesmo-antes-de-puxar-rippling-frog.md` (8 fases, ~28-30 dias úteis com IA).
-
-### ⏸️ Próximo passo da Fase 0a (gate pra fechar)
-
-| Item | Estado | Próxima ação |
-| --- | --- | --- |
-| **Validação falsificável** | 🟡 **Pendente** | Luiz Moreira crava 15 cenários numéricos (3 por arquétipo); dono bate em Excel; motor vs planilha (não vs intuição — CBS/IBS é novo, ninguém tem intuição calibrada ainda) |
-
-### Histórico anterior (refinamento WS6/WS10/WS12)
+**Suite atual:** **1297 testes verdes** | **0 regressão** | crescimento desde início do refinamento: **1021 → 1297 (+276 testes em 9 commits)**
 
 ### ✅ Entregue e commitado nesta sessão
 

@@ -11,7 +11,7 @@ import logging
 from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from core.difal import calcular_difal
 from core.formatadores import _fmt_brl
@@ -36,10 +36,6 @@ from schemas.motor import (
     EmpresaFornecedora,
     OperacaoFiscal,
 )
-
-if TYPE_CHECKING:  # pragma: no cover
-    from schemas.diagnostico_consolidado import DiagnosticoConsolidado
-    from schemas.historico_seis_meses import HistoricoSeisMeses
 
 logger = logging.getLogger("motor_conect.motor")
 
@@ -1158,174 +1154,6 @@ class MotorReformaTributaria:
 
         self._diagnostico_gerado = True
         return diagnostico
-
-    # ── FASE 0a: DIAGNÓSTICO CONSOLIDADO (6 MESES) ───────────────────────────
-
-    def gerar_diagnostico_consolidado(
-        self,
-        historico: "HistoricoSeisMeses",
-    ) -> "DiagnosticoConsolidado":
-        """Diagnóstico de regime sobre janela de 6 meses sequenciais.
-
-        Substitui análise mês-a-mês manual. Cada mês instancia um motor
-        próprio (cuidado com cached_property: criar instância nova evita
-        contaminação) e a saída é agregada via funções privadas em
-        ``core.historico_consolidado``.
-
-        Disponibilidade reduzida (D1):
-            - DIFAL → INDISPONIVEL_AGREGADO
-            - Split Payment → INDISPONIVEL_AGREGADO
-
-        Amparo: LC 123/2006 Art. 12 §1º; LC 214/2025 Art. 47.
-        """
-        # Imports locais — evita ciclo entre motor_tributario e
-        # historico_consolidado (que importa schemas e usa o motor).
-        from core.historico_consolidado import (
-            _adaptar_mes_para_motor,
-            _calcular_carga_tributaria_media,
-            _calcular_confianca_final,
-            _calcular_hash_reprodutibilidade,
-            _consolidar_recomendacao,
-            _detectar_alertas_transicao,
-            _detectar_sazonalidade,
-            _detectar_tendencia,
-        )
-        from schemas.diagnostico_consolidado import (
-            DiagnosticoConsolidado,
-            DiagnosticoMensalResumo,
-        )
-
-        diagnosticos_meses: List[DiagnosticoMensalResumo] = []
-        trilha_unificada: List[Dict[str, Any]] = []
-
-        for mes in historico.meses:
-            (
-                fornecedora_mes,
-                compradora_mes,
-                operacao_mes,
-                entradas_trilha_adapter,
-            ) = _adaptar_mes_para_motor(historico, mes)
-
-            # Instância nova por mês — bug do cached_property documentado
-            # no risco 1 do blueprint.
-            motor_mes = MotorReformaTributaria(
-                fornecedora_mes,
-                compradora_mes,
-                operacao_mes,
-            )
-            diag_completo = motor_mes.gerar_diagnostico()
-
-            # Recomendação individual: motor SIMPLES traz em
-            # cenarios.recomendacao_inteligente.codigo. Outros regimes
-            # usam fallback mapeado no consolidador.
-            cenarios = diag_completo.get("cenarios", {})
-            rec_inteligente = cenarios.get("recomendacao_inteligente", {})
-            codigo_individual = rec_inteligente.get("codigo", "DADOS_INSUFICIENTES")
-
-            diagnosticos_meses.append(
-                DiagnosticoMensalResumo(
-                    competencia=mes.competencia,
-                    rbt12_aplicado=mes.rbt12_declarado,
-                    faturamento_mes=mes.faturamento_mes,
-                    anexo_aplicado=mes.anexo_aplicado,
-                    fator_r=mes.fator_r_calculado,
-                    aliquota_efetiva=motor_mes.aliquota_efetiva,
-                    das_mensal=motor_mes.das_mensal,
-                    recomendacao_individual=codigo_individual,
-                    diagnostico_completo=diag_completo,
-                )
-            )
-
-            # Trilha: entradas do adapter (NCM_AGREGADO_DEFAULT,
-            # AGREGACAO_MES_HETEROGENEA) + trilha do motor do mês.
-            trilha_unificada.extend(entradas_trilha_adapter)
-            trilha_unificada.extend(diag_completo.get("trilha_auditoria", []))
-
-        # Warnings do histórico (oscilação RBT12, etc) entram na trilha.
-        for w in historico.warnings:
-            trilha_unificada.append({**w, "origem": "schema_historico"})
-
-        # Agregação fiscal.
-        carga_media, c_min, c_min_comp, c_max, c_max_comp = (
-            _calcular_carga_tributaria_media(diagnosticos_meses)
-        )
-
-        # Heurísticas D2.
-        tendencia, delta_pct = _detectar_tendencia(historico.meses)
-        sazonal, mes_pico, mes_vale = _detectar_sazonalidade(historico.meses)
-
-        # Reconciliação + confiança.
-        rec, conf_inicial, justificativa, amparo, votos = (
-            _consolidar_recomendacao(historico, diagnosticos_meses, tendencia)
-        )
-        confianca = _calcular_confianca_final(
-            conf_inicial, historico, diagnosticos_meses
-        )
-
-        # Alertas de transição.
-        alertas = _detectar_alertas_transicao(historico, diagnosticos_meses)
-
-        # Hash de reprodutibilidade (Rail R6).
-        hash_reproducao = _calcular_hash_reprodutibilidade(
-            historico,
-            versao_motor=MOTOR_VERSAO,
-            versao_lei="LC123_2006_LC214_2025",
-        )
-
-        # Totais.
-        faturamento_total = sum(
-            (m.faturamento_mes for m in historico.meses), Decimal("0")
-        )
-        das_total = sum(
-            (d.das_mensal for d in diagnosticos_meses), Decimal("0")
-        )
-
-        return DiagnosticoConsolidado(
-            versao_schema="1.0",
-            versao_motor=MOTOR_VERSAO,
-            versao_lei="LC123_2006_LC214_2025",
-            cnpj=historico.cnpj,
-            competencia_referencia=historico.competencia_referencia,
-            competencia_inicio=historico.meses[0].competencia,
-            competencia_fim=historico.meses[-1].competencia,
-            regime_atual=historico.regime_atual,
-            tipo_societario=historico.tipo_societario,
-            hash_reprodutibilidade=hash_reproducao,
-            diagnosticos_meses=diagnosticos_meses,
-            faturamento_total_6m=faturamento_total,
-            das_total_6m=das_total,
-            carga_tributaria_media_6m=carga_media,
-            carga_min=c_min,
-            carga_max=c_max,
-            carga_min_competencia=c_min_comp,
-            carga_max_competencia=c_max_comp,
-            tendencia_rbt12=tendencia,
-            delta_rbt12_pct=delta_pct,
-            sazonalidade_detectada=sazonal,
-            mes_pico=mes_pico,
-            mes_vale=mes_vale,
-            recomendacao_regime=rec,
-            confianca=confianca,
-            justificativa=justificativa,
-            amparo_legal=amparo,
-            votos_individuais=votos,
-            alertas_transicao=alertas,
-            trilha_unificada=trilha_unificada,
-            meta={
-                "anos_cronograma_iva": sorted(
-                    {m.competencia[:4] for m in historico.meses}
-                ),
-                "agregacao": "diagnostico_de_regime_apenas",  # D1
-                "aviso_heuristicas": (
-                    "tendencia/sazonalidade são heurísticas diagnósticas — "
-                    "não substituem parecer contábil (D2 + Rail R2)"
-                ),
-                "aviso_lgpd": (
-                    "razao_social fora deste schema — usar "
-                    "DiagnosticoConsolidadoComPII (D3 + LGPD Art. 6º)"
-                ),
-            },
-        )
 
     # ── LGPD ──────────────────────────────────────────────────────────────────
 
