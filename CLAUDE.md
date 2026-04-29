@@ -416,6 +416,8 @@ Os 8 rails são **invioláveis** acima das MAX_FISCAL. Quando uma regra MAX entr
 | **MAX_05** | Toda análise via `/analise/pdf` deve ter os PDFs-fonte cifrados e registrados em `auditoria_documentos` — sem isso o diagnóstico não pode ser usado em defesa jurídica. Ativado por `persistir_auditoria=True`. |
 | **MAX_06** | Crédito B2B de fornecedor do Simples Nacional é **fração do DAS** (não `valor_operacao × alíquota IVA`). Fórmula: `credito = DAS_mensal × _fracao_iva_no_das(anexo, faixa, ano)`. Usar `DISTRIBUICAO_DAS[anexo][faixa]` como fonte única. LC 214/2025 Art. 47 §II + Arts. 344, 353, 356-360. |
 | **MAX_07** | **Anti-alucinação de citação legal** (ERR-017.b — 25/04/2026). Toda menção a Solução de Consulta COSIT, Acórdão CARF, súmula STJ/STF ou ato normativo da Receita Federal **deve passar pelo agente Escrivão** antes do commit. Falha em verificar precedente foi vetor confirmado de erro: SC COSIT 174/2019 foi inventada num código que passou nos testes — só Escrivão validando contra fonte oficial pegou. Adicionar teste regressivo anti-alucinação quando aplicável. |
+| **MAX_08** | **Todo número passa pelo motor — sem exceção.** Não existe "simulação hipotética". Existem inputs hipotéticos — que o motor calcula. O número no doc/agente/plano/comentário/fixture TEM que vir do output real do motor (`pytest -v`, script rodado, log da API). Cálculo mental = BLOQUEIO. Estimativa = BLOQUEIO. "Pra dar ideia" = BLOQUEIO. |
+| **MAX_09** | **Nunca declarar feito o que não foi feito.** É proibido afirmar que um valor foi validado, um teste passou, ou uma execução aconteceu sem evidência real. Inclui: "validado pelo motor" sem rodar, "testes passando" sem executar pytest, "valor conferido" sem comparar saída. Fingir execução é violação máxima — mais grave que erro de cálculo. |
 
 ---
 
@@ -425,7 +427,9 @@ Os 8 rails são **invioláveis** acima das MAX_FISCAL. Quando uma regra MAX entr
 
 Nenhum commit sem PMD aprovar. Vale pra qualquer fase, workstream, hotfix, refactor.
 
-**Regra de ouro — inviolável:** Qualquer número no projeto que o motor é capaz de calcular DEVE ter sido gerado pelo motor rodando. Não importa onde aparece: doc, agente, plano, comentário, fixture, seed de teste. Se o motor calcula aquele valor, o número TEM que vir do motor. Cálculo mental = BLOQUEIO. Valor "estimado" = BLOQUEIO. Sem exceção, sem negociação.
+**MAX_08 + MAX_09 são as travas centrais deste gate.**
+
+Qualquer número que o motor pode calcular DEVE vir do motor. Não existe simulação hipotética — existem inputs hipotéticos que o motor calcula. Nunca declarar feito o que não foi executado.
 
 **Sequência obrigatória:**
 1. Código/doc pronto
