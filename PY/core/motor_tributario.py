@@ -43,7 +43,7 @@ logger = logging.getLogger("motor_conect.motor")
 # Versão do motor — bump a cada mudança de regra fiscal (V-04: rastreabilidade
 # retroativa de diagnósticos persistidos). Formato SemVer. Incrementar MINOR
 # para mudança de cálculo, PATCH para ajustes de citação/formatação.
-MOTOR_VERSAO = "1.2.0"  # 1.1.0 → 1.2.0: ERR-046 cenario_opt_out base única + simetria fator_reducao
+MOTOR_VERSAO = "1.3.0"  # 1.2.0 → 1.3.0: Fase 0a — gerar_diagnostico_consolidado (histórico 6 meses)
 
 
 # Fator R: limiar para migração Anexo V → Anexo III (LC 123/2006, Art. 18, § 24)
@@ -1178,3 +1178,14 @@ class MotorReformaTributaria:
         """Garante purge() no garbage collection caso não tenha sido chamado."""
         if getattr(self, "fornecedora", None) is not None or getattr(self, "compradora", None) is not None:
             self.purge()
+
+    @staticmethod
+    def gerar_diagnostico_consolidado(historico: "Any") -> "Any":
+        """
+        Consolida 6 meses de histórico em DiagnosticoConsolidado.
+        Delega para core.historico_consolidado (import local evita circularidade).
+        Todo número no output vem do motor rodando — MAX_08.
+        LC 123/2006 | LC 214/2025.
+        """
+        from core.historico_consolidado import gerar_diagnostico_consolidado
+        return gerar_diagnostico_consolidado(historico)
