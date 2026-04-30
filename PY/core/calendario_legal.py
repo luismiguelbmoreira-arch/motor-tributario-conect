@@ -23,11 +23,9 @@ Cobre as duas janelas operacionais que o contador precisa monitorar:
      - Resolução CGSN 186/2026 (DOU 17/04/2026, ato 09/04/2026)
 
 JANELAS POSTERIORES (2º sem/2027, 2028+):
-NÃO modeladas neste módulo enquanto Resolução CGSN específica não for publicada.
-Qualquer data inventada violaria Rail R2 (proibição de extrapolação). Quando
-nova Resolução CGSN sair, Migrador adiciona a constante correspondente — o
-schema `JanelaLegal.pendente_regulamentacao` segue disponível mas sem instância
-ativa no momento.
+NÃO modeladas. Quando Resolução CGSN específica for publicada, Migrador
+acrescenta nova constante firme — sem placeholder estrutural.
+Rail R2 (proibição de extrapolação).
 
 Heurísticas internas (não-normativas) marcadas explicitamente.
 """
@@ -42,46 +40,27 @@ TipoJanela = Literal["RENUNCIA_SIMPLES", "OPT_IN_REGULAR_CBS_IBS"]
 
 
 class JanelaLegal(BaseModel):
-    """
-    Janela legal de renúncia ao Simples ou opt-in CBS/IBS.
-
-    Quando `pendente_regulamentacao=True`, datas firmes podem ser None e
-    `janela_aproximada` traz texto descritivo (ex: "Esperada 2º sem/2027").
-    """
+    """Janela legal firme de renúncia ao Simples ou opt-in CBS/IBS."""
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     nome: str = Field(..., description="Nome humano da janela")
     tipo: TipoJanela = Field(..., description="Tipo da janela")
-    pendente_regulamentacao: bool = Field(
-        ...,
-        description="True quando lei prevê a janela mas regulamentação ainda não saiu",
-    )
-    data_inicio: Optional[date] = Field(default=None, description="Início do período de comunicação/opção")
-    data_fim: Optional[date] = Field(default=None, description="Fim do período de comunicação/opção")
-    data_efeitos_inicio: Optional[date] = Field(default=None, description="Quando o efeito da opção começa")
+    data_inicio: date = Field(..., description="Início do período de comunicação/opção")
+    data_fim: date = Field(..., description="Fim do período de comunicação/opção")
+    data_efeitos_inicio: date = Field(..., description="Quando o efeito da opção começa")
     data_efeitos_fim: Optional[date] = Field(default=None, description="Quando o efeito da opção termina (None = indefinido)")
     cancelamento_irrevogavel_ate: Optional[date] = Field(
         default=None,
         description="Última data pra cancelar a opção. None = não aplicável.",
     )
-    janela_aproximada: Optional[str] = Field(
-        default=None,
-        description="Texto descritivo quando pendente_regulamentacao=True",
-    )
     amparo_legal: str = Field(..., description="Citação legal completa (lei + artigo + §)")
 
     @model_validator(mode="after")
     def _validar_consistencia(self) -> "JanelaLegal":
-        if not self.pendente_regulamentacao:
-            if self.data_inicio is None or self.data_fim is None:
-                raise ValueError(
-                    "Janela firme requer data_inicio e data_fim. "
-                    "Se a regulamentação ainda não saiu, use pendente_regulamentacao=True."
-                )
-            if self.data_inicio > self.data_fim:
-                raise ValueError(
-                    f"data_inicio ({self.data_inicio}) deve ser ≤ data_fim ({self.data_fim})."
-                )
+        if self.data_inicio > self.data_fim:
+            raise ValueError(
+                f"data_inicio ({self.data_inicio}) deve ser ≤ data_fim ({self.data_fim})."
+            )
         return self
 
 
@@ -123,7 +102,6 @@ def _janela_renuncia_simples(ano: int) -> JanelaLegal:
     return JanelaLegal(
         nome=f"Renúncia ao Simples Nacional — efeitos {ano}",
         tipo="RENUNCIA_SIMPLES",
-        pendente_regulamentacao=False,
         data_inicio=date(ano, 1, 1),
         data_fim=_ultimo_dia_util_mes(ano, 1),
         data_efeitos_inicio=date(ano, 1, 1),
@@ -138,7 +116,6 @@ def _janela_renuncia_simples(ano: int) -> JanelaLegal:
 JANELA_OPT_IN_CBS_IBS_SET_2026 = JanelaLegal(
     nome="Opt-in Regime Regular CBS/IBS — 1º semestre/2027",
     tipo="OPT_IN_REGULAR_CBS_IBS",
-    pendente_regulamentacao=False,
     data_inicio=date(2026, 9, 1),
     data_fim=date(2026, 9, 30),
     data_efeitos_inicio=date(2027, 1, 1),
@@ -149,13 +126,6 @@ JANELA_OPT_IN_CBS_IBS_SET_2026 = JanelaLegal(
         "Resolução CGSN nº 186/2026, art. 2º"
     ),
 )
-
-
-# Lista vazia até Migrador acrescentar nova Resolução CGSN regulamentando
-# janelas posteriores (2º sem/2027, 2028+). Rail R2 — sem fonte primária,
-# sem instância. O schema `JanelaLegal.pendente_regulamentacao` segue
-# disponível pra quando precisar.
-JANELAS_PENDENTES_REGULAMENTACAO: List[JanelaLegal] = []
 
 
 # ── API pública ──────────────────────────────────────────────────────────────
@@ -172,23 +142,19 @@ def listar_janelas_firmes(hoje: date, anos_futuro: int = 2) -> List[JanelaLegal]
 
     janelas: List[JanelaLegal] = []
 
-    if JANELA_OPT_IN_CBS_IBS_SET_2026.data_fim is not None and JANELA_OPT_IN_CBS_IBS_SET_2026.data_fim >= hoje:
+    if JANELA_OPT_IN_CBS_IBS_SET_2026.data_fim >= hoje:
         janelas.append(JANELA_OPT_IN_CBS_IBS_SET_2026)
 
     for ano in range(hoje.year, hoje.year + anos_futuro + 1):
         renuncia = _janela_renuncia_simples(ano)
-        if renuncia.data_fim is not None and renuncia.data_fim >= hoje:
+        if renuncia.data_fim >= hoje:
             janelas.append(renuncia)
 
-    return sorted(janelas, key=lambda j: j.data_inicio or date.max)
+    return sorted(janelas, key=lambda j: j.data_inicio)
 
 
 def janela_aberta_hoje(hoje: date, janela: JanelaLegal) -> bool:
-    """True se hoje ∈ [data_inicio, data_fim]. Pendentes retornam False."""
-    if janela.pendente_regulamentacao:
-        return False
-    if janela.data_inicio is None or janela.data_fim is None:
-        return False
+    """True se hoje ∈ [data_inicio, data_fim]."""
     return janela.data_inicio <= hoje <= janela.data_fim
 
 
@@ -198,12 +164,8 @@ def dias_restantes_para_janela(hoje: date, janela: JanelaLegal) -> Optional[int]
 
     - Retorna 0 se a janela está aberta hoje (hoje ∈ [inicio, fim]).
     - Retorna inteiro positivo se a janela ainda vai abrir (futuro).
-    - Retorna None se a janela já fechou (passou) OU é pendente.
+    - Retorna None se a janela já fechou (passou).
     """
-    if janela.pendente_regulamentacao:
-        return None
-    if janela.data_inicio is None or janela.data_fim is None:
-        return None
     if hoje > janela.data_fim:
         return None
     if hoje >= janela.data_inicio:

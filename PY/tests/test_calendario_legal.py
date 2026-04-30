@@ -19,7 +19,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from core.calendario_legal import (
     JANELA_OPT_IN_CBS_IBS_SET_2026,
-    JANELAS_PENDENTES_REGULAMENTACAO,
     AlertaJanelaLegal,
     JanelaLegal,
     _janela_renuncia_simples,
@@ -61,38 +60,16 @@ def test_ultimo_dia_util_funciona_em_ano_bissexto():
 
 # ── Schema JanelaLegal ───────────────────────────────────────────────────────
 
-def test_janela_firme_requer_data_inicio_e_fim():
-    with pytest.raises(ValueError, match="Janela firme requer data_inicio e data_fim"):
-        JanelaLegal(
-            nome="Janela inválida",
-            tipo="RENUNCIA_SIMPLES",
-            pendente_regulamentacao=False,
-            amparo_legal="LC 123/2006",
-        )
-
-
-def test_janela_firme_data_inicio_maior_que_fim_falha():
+def test_janela_data_inicio_maior_que_fim_falha():
     with pytest.raises(ValueError, match=r"data_inicio .* deve ser ≤ data_fim"):
         JanelaLegal(
             nome="Inversa",
             tipo="RENUNCIA_SIMPLES",
-            pendente_regulamentacao=False,
             data_inicio=date(2026, 1, 31),
             data_fim=date(2026, 1, 1),
+            data_efeitos_inicio=date(2026, 1, 1),
             amparo_legal="LC 123/2006, Art. 30",
         )
-
-
-def test_janela_pendente_aceita_datas_none():
-    janela = JanelaLegal(
-        nome="Pendente teste",
-        tipo="OPT_IN_REGULAR_CBS_IBS",
-        pendente_regulamentacao=True,
-        janela_aproximada="Esperada 1º trim/2027",
-        amparo_legal="LC 214/2025 — aguardando CGSN",
-    )
-    assert janela.data_inicio is None
-    assert janela.data_fim is None
 
 
 def test_janela_legal_eh_frozen():
@@ -107,7 +84,6 @@ def test_janela_legal_eh_frozen():
 def test_janela_opt_in_cbs_ibs_set_2026_dados_corretos():
     j = JANELA_OPT_IN_CBS_IBS_SET_2026
     assert j.tipo == "OPT_IN_REGULAR_CBS_IBS"
-    assert j.pendente_regulamentacao is False
     assert j.data_inicio == date(2026, 9, 1)
     assert j.data_fim == date(2026, 9, 30)
     assert j.data_efeitos_inicio == date(2027, 1, 1)
@@ -118,15 +94,9 @@ def test_janela_opt_in_cbs_ibs_set_2026_dados_corretos():
     assert "Resolução CGSN nº 186/2026" in j.amparo_legal
 
 
-def test_janelas_pendentes_lista_vazia_por_padrao():
-    """Sem fonte primária, lista é vazia. Migrador acrescenta quando CGSN sair."""
-    assert JANELAS_PENDENTES_REGULAMENTACAO == []
-
-
 def test_renuncia_simples_2027_amparo_correto():
     j = _janela_renuncia_simples(2027)
     assert j.tipo == "RENUNCIA_SIMPLES"
-    assert j.pendente_regulamentacao is False
     assert j.data_inicio == date(2027, 1, 1)
     assert j.data_fim == date(2027, 1, 29)  # último dia útil
     assert j.data_efeitos_inicio == date(2027, 1, 1)
@@ -157,16 +127,6 @@ def test_janela_aberta_hoje_apos_fechamento():
     assert janela_aberta_hoje(date(2026, 10, 1), JANELA_OPT_IN_CBS_IBS_SET_2026) is False
 
 
-def test_janela_aberta_hoje_pendente_sempre_falsa():
-    pendente = JanelaLegal(
-        nome="Pendente",
-        tipo="OPT_IN_REGULAR_CBS_IBS",
-        pendente_regulamentacao=True,
-        amparo_legal="aguardando CGSN",
-    )
-    assert janela_aberta_hoje(date(2026, 9, 15), pendente) is False
-
-
 # ── dias_restantes_para_janela ───────────────────────────────────────────────
 
 def test_dias_restantes_janela_aberta_hoje_zero():
@@ -179,16 +139,6 @@ def test_dias_restantes_janela_futura_positivo():
 
 def test_dias_restantes_janela_passada_none():
     assert dias_restantes_para_janela(date(2026, 10, 1), JANELA_OPT_IN_CBS_IBS_SET_2026) is None
-
-
-def test_dias_restantes_janela_pendente_none():
-    pendente = JanelaLegal(
-        nome="P",
-        tipo="OPT_IN_REGULAR_CBS_IBS",
-        pendente_regulamentacao=True,
-        amparo_legal="x",
-    )
-    assert dias_restantes_para_janela(date(2026, 9, 15), pendente) is None
 
 
 # ── proxima_janela_optout ────────────────────────────────────────────────────
@@ -250,11 +200,12 @@ def test_listar_janelas_anos_futuro_negativo_falha():
         listar_janelas_firmes(date(2026, 1, 1), anos_futuro=-1)
 
 
-def test_listar_janelas_sem_pendentes():
-    """Pendentes nunca devem aparecer no output das funções públicas."""
+def test_listar_janelas_todas_tem_amparo_legal():
+    """Toda janela retornada deve carregar amparo legal não-vazio (MAX_02)."""
     janelas = listar_janelas_firmes(date(2026, 4, 29), anos_futuro=10)
     for j in janelas:
-        assert j.pendente_regulamentacao is False
+        assert j.amparo_legal
+        assert len(j.amparo_legal) > 10
 
 
 # ── alertar_janelas_proximas ─────────────────────────────────────────────────
