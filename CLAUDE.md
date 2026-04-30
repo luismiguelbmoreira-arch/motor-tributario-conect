@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # 🏛️ MOTOR TRIBUTÁRIO CONECT — BÍBLIA DA REFORMA TRIBUTÁRIA
 
-**Status:** 🚀 Produção — 1021 testes passando (100%) | 4 regimes + DIFAL + Cronograma + PDF educativo + Auditoria Documental LGPD + IDOR Guard + Stack front-back sincronizada
-**Âncora Legal:** EC 132/2023 | LC 123/2006 | LC 214/2025 | LC 224/2025 | EC 87/2015 | LGPD 13.709/2018 | CTN Arts. 142 e 173
-**Data Certificação:** 24/04/2026 (entrega plano Front/Backend Fases 1–5 + ERR-018.b IDOR guard)
+**Status:** 🚀 Produção — 1503 testes passando (100%) | 4 regimes + DIFAL + Cronograma + PDF educativo + Auditoria Documental LGPD + IDOR Guard + Stack front-back sincronizada + Fase 0a/0b concluídas (HistoricoSeisMeses + 5 módulos especiais)
+**Âncora Legal:** EC 132/2023 | LC 123/2006 | LC 214/2025 | LC 224/2025 | LC 227/2026 | EC 87/2015 | LGPD 13.709/2018 | CTN Arts. 142 e 173
+**Data Certificação:** 30/04/2026 (Fase 0b encerrada — 5 módulos especiais + Rail R9 Ampla Visão + 3 bugs MAX_07 corrigidos)
 
 ---
 
@@ -470,9 +470,29 @@ Se PMD não foi invocado, commit não acontece. Sem exceção.
 
 ---
 
-## 🗺️ ROADMAP — STATUS ATUAL (25/04/2026 — pausa em WS6 etapa 3)
+## 🗺️ ROADMAP — STATUS ATUAL (30/04/2026 — Fase 0b concluída)
 
-**Suite atual:** **1297 testes verdes** | **0 regressão** | crescimento desde início do refinamento: **1021 → 1297 (+276 testes em 9 commits)**
+**Suite atual:** **1503 testes verdes** | **0 regressão** | crescimento desde início do refinamento: **1021 → 1503 (+482 testes)**
+
+### ✅ Fase 0a (29/04/2026) — Schema HistoricoSeisMeses + DiagnosticoConsolidado
+
+| Commit | Detalhe |
+| --- | --- |
+| `ecfcaf5` | Histórico 6 meses + DiagnosticoConsolidado — MAX_08 compliant (todo número via motor) |
+| `92c6c83` | Regras MAX_08 + MAX_09 (sem simulação hipotética + nunca fingir execução) |
+
+### ✅ Fase 0b (30/04/2026) — 5 módulos especiais + Rail R9
+
+| Commit | Detalhe |
+| --- | --- |
+| `676b04d` | M1 — `core/fator_r_modulo.py` (calcular_serie + projetar + alertar_migracao) + fix bug NameError em historico_consolidado.py |
+| `aecd48b` | M2 — `core/calendario_legal.py` (janelas firmes opt-out + renúncia Simples — LC 123 Art. 30 + LC 214 Art. 348 §§ 3º-4º + LC 227/2026 + Res. CGSN 186/2026) |
+| `ebaf187` | M2 cleanup — schema enxugado retroativamente sob R9 |
+| `020df86` | **R9 — Ampla Visão** adicionada à seção de Rails (Ontem/Amanhã/Hoje antes de mudança arquitetônica) |
+| `4de26bc` | M3 — `core/sublimites_uf.py` (VersionedRule por ano + Portarias CGSN 49/2024 e 54/2025) + correção citação Art. 13§1º → Art. 13-A + Art. 19§4º |
+| `6b0340c` | M4 — `core/profissoes_regulamentadas.py` (Art. 127 LC 214/2025 — 18 incisos taxativos; plano original citava Art. 138 errado) |
+| `4a46f07` | **ERR-056** — citações inventadas Art. 172 II/III pra cigarro/bebida → Art. 409 § 1º + 410 (Imposto Seletivo) |
+| `4d8e121` | M5 — `core/imposto_seletivo.py` (Arts. 409-434, sem alíquotas — Rail R2; vigência 2027 — Art. 544) + UI cronograma corrigida |
 
 ### ✅ Entregue e commitado nesta sessão
 
@@ -521,12 +541,13 @@ Se PMD não foi invocado, commit não acontece. Sem exceção.
 | --- | --- | --- |
 | **ERR-005** (CNAE → Anexo) | 🔴 Crítico | Schema novo aprovado e implementado (`regras_cnae.py` em `f60aa61`); aguarda regeneração do `cnae_completo.json` via CSV CGSN 140/2018 Anexo VI |
 | **ERR-017.b** (citação inventada SC COSIT) | ✅ Resolvido em `cc67199` | Teste regressivo anti-alucinação adicionado; **MAX_07** documentado |
+| **ERR-056** (citações inventadas Art. 172 II/III pra cigarro/bebida) | ✅ Resolvido em `4a46f07` | Cigarro/bebida → Art. 409 § 1º + 410 (Imposto Seletivo); Art. 172 só pra combustíveis. 20 testes regressivos |
 | ERR-012 (purge vs anonimizar LGPD) | 🟡 Pendente | Decisão jurídica — LGPD Art. 19 §1º (15 dias úteis) |
 | ERR-026 (response_model inerte) | 🟡 Pendente | WS4 |
 | ERR-027 (_erros perdido na persistência) | 🟡 Pendente | WS4 |
 | ERR-028 (CPF em campo CNPJ via Vision) | 🟡 Pendente | WS4 |
 
-Recentes fechados: ERR-013, ERR-018.b (IDOR), ERR-049 (JWT sub vs id), ERR-050 (uploaded_by_user_id), ERR-051 (salvar_diagnostico), ERR-054 (load_dotenv override), ERR-055 (CRLF/LF schema), ERR-017.b (citação inventada). Ver `docs/roadmap/LOG_ERROS.md`.
+Recentes fechados: ERR-013, ERR-018.b (IDOR), ERR-049 (JWT sub vs id), ERR-050 (uploaded_by_user_id), ERR-051 (salvar_diagnostico), ERR-054 (load_dotenv override), ERR-055 (CRLF/LF schema), ERR-017.b (citação inventada SC COSIT), ERR-056 (citações inventadas Art. 172 II/III). Ver `docs/roadmap/LOG_ERROS.md`.
 
 ### 🤖 Protocolo de auditoria multi-agente — confirmado em 25/04/2026
 
