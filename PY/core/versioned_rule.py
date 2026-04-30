@@ -108,15 +108,18 @@ TETO_SIMPLES_NACIONAL_VERSIONADO: list[VersionedRule[Decimal]] = [
     ),
 ]
 
-# Sublimite ICMS/ISS (LC 123/2006 Art. 13 § 1º)
+# Sublimite ICMS/ISS (LC 123/2006 Art. 13-A + Art. 19 § 4º)
 # Estados com RBT12 acima do sublimite saem do regime unificado em ICMS/ISS.
+# Validação Escrivão (29/04/2026): citação anterior "Art. 13 § 1º" estava
+# errada — Art. 13-A é o teto padrão e Art. 19 § 4º é o default obrigatório.
+# Para tabela versionada por UF (Portaria CGSN anual), ver core/sublimites_uf.py.
 SUBLIMITE_ICMS_ISS_VERSIONADO: list[VersionedRule[Decimal]] = [
     VersionedRule(
         valor=Decimal("3600000.00"),
         vigencia_inicio=date(2018, 1, 1),
         vigencia_fim=None,
-        lei="LC 123/2006 Art. 13 § 1º (redação LC 155/2016)",
-        url_planalto="https://www.planalto.gov.br/ccivil_03/leis/lcp/lcp155.htm",
+        lei="LC 123/2006 Art. 13-A + Art. 19 § 4º (redação LC 155/2016)",
+        url_planalto="https://www.planalto.gov.br/ccivil_03/leis/lcp/lcp123.htm",
     ),
 ]
 
