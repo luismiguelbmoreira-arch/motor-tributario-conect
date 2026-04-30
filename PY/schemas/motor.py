@@ -161,6 +161,28 @@ class EmpresaFornecedora(BaseModel):
         ),
     )
 
+    # Profissão regulamentada do Art. 127 LC 214/2025 (redução 30% IBS/CBS).
+    # Lista taxativa de 18 incisos (validada Escrivão 30/04/2026). Default None
+    # = sem redução aplicada (conservador). Códigos canônicos definidos em
+    # core.profissoes_regulamentadas.CodigoProfissao.
+    profissao_regulamentada: Optional[
+        Literal[
+            "ADMINISTRADOR", "ADVOGADO", "ARQUITETO_URBANISTA",
+            "ASSISTENTE_SOCIAL", "BIBLIOTECARIO", "BIOLOGO",
+            "CONTABILISTA", "ECONOMISTA", "ECONOMISTA_DOMESTICO",
+            "EDUCADOR_FISICO", "ENGENHEIRO_AGRONOMO", "ESTATISTICO",
+            "MEDICO_VETERINARIO_ZOOTECNISTA", "MUSEOLOGO", "QUIMICO",
+            "RELACOES_PUBLICAS", "TECNICO_INDUSTRIAL", "TECNICO_AGRICOLA",
+        ]
+    ] = Field(
+        default=None,
+        description=(
+            "Profissão do Art. 127 LC 214/2025 (redução 30% IBS/CBS). "
+            "Lista taxativa — médico humano NÃO entra (regime de saúde, Art. 128+). "
+            "None = sem redução por profissão regulamentada."
+        ),
+    )
+
     @model_validator(mode="before")
     @classmethod
     def _expandir_alias_mei(cls, data: Any) -> Any:
