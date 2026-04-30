@@ -18,25 +18,37 @@ logger = logging.getLogger("motor_conect.schemas")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ERR-039 — Bloqueio preventivo de NCMs monofásicas (FROZEN)
+# ERR-039/ERR-056 — Bloqueio preventivo de NCMs em regimes especiais (FROZEN)
 #
-# LC 214/2025 Arts. 172-174 institui regime monofásico específico para
-# combustíveis, cigarros e bebidas alcoólicas — cálculo da CBS/IBS ocorre
-# numa única etapa da cadeia (importador/produtor/distribuidor) e este motor
-# NÃO modela essa dinâmica. Aceitar NCM monofásica no formulário padrão
-# produziria cálculo cumulativo semanticamente errado em cadeia que deveria
-# ser monofásica — MAX_FISCAL_01 + Lei 8.137/1990 Art. 1º II.
+# Este motor NÃO modela duas dinâmicas distintas que incidem uma única vez
+# na cadeia, sem creditamento subsequente:
 #
-# Comparação é feita por PREFIXO de 4 dígitos (capítulo NCM), pois o regime
-# monofásico abrange a posição inteira e não suas subposições específicas.
-# CF/88 Art. 149 §2º III + LC 214/2025 Art. 172-174.
+#   (a) Regime MONOFÁSICO de IBS/CBS (LC 214/2025 Art. 172) — APENAS combustíveis.
+#   (b) IMPOSTO SELETIVO (LC 214/2025 Arts. 409 § 1º + 410) — produtos
+#       fumígenos, bebidas alcoólicas, bebidas açucaradas, veículos,
+#       embarcações, aeronaves, bens minerais, apostas/loterias.
+#
+# Aceitar NCMs desses regimes no formulário padrão B2B produziria cálculo
+# cumulativo semanticamente errado em cadeia que deveria ser de incidência
+# única — MAX_FISCAL_01 + Lei 8.137/1990 Art. 1º II.
+#
+# Comparação é feita por PREFIXO de 4 dígitos (capítulo NCM), pois ambos
+# os regimes abrangem a posição inteira e não suas subposições específicas.
+#
+# Validação Escrivão (30/04/2026): citação anterior atribuía cigarros e
+# bebidas ao Art. 172 (regime monofásico) — INVENTADO. Art. 172 lista
+# APENAS combustíveis. Cigarros e bebidas alcoólicas vão pro Imposto
+# Seletivo Art. 409 § 1º, tributo diferente do regime monofásico.
+#
+# CF/88 Art. 149 §2º III (monofásico) + Art. 153 VIII (Seletivo) +
+# LC 214/2025 Art. 172 (monofásico) + Arts. 409-434 (Imposto Seletivo).
 # ─────────────────────────────────────────────────────────────────────────────
 NCMS_MONOFASICAS_BLOQUEADAS: frozenset[str] = frozenset({
-    # Combustíveis e derivados de petróleo — LC 214/2025 Art. 172 I
+    # Combustíveis e derivados de petróleo — LC 214/2025 Art. 172 (regime monofásico IBS/CBS)
     "2710",
-    # Cigarros e produtos do tabaco — LC 214/2025 Art. 172 II
+    # Cigarros e produtos do tabaco — LC 214/2025 Art. 409 § 1º + Art. 410 (Imposto Seletivo)
     "2402", "2403",
-    # Bebidas alcoólicas — LC 214/2025 Art. 172 III
+    # Bebidas alcoólicas — LC 214/2025 Art. 409 § 1º + Art. 410 (Imposto Seletivo)
     "2203",  # cerveja
     "2204",  # vinho de uva
     "2205",  # vermute
@@ -350,21 +362,23 @@ class OperacaoFiscal(BaseModel):
             raise ValueError(f"NCM Invalido: {', '.join(res.errors)}")
         limpo = re.sub(r'[\s.\-]', '', v.strip())
 
-        # ERR-039 — Bloqueio de NCM de regime monofásico.
-        # LC 214/2025 Arts. 172-174 (regime específico de combustíveis,
-        # tabacos e bebidas alcoólicas) + CF/88 Art. 149 §2º III.
-        # Este motor NÃO modela monofásico — aceitar gera cálculo
-        # semanticamente errado (MAX_FISCAL_01). Falha fechada é
-        # preferível a silenciar o erro no diagnóstico.
+        # ERR-039/ERR-056 — Bloqueio de NCM de regime de incidência única.
+        # Combustíveis (NCM 2710): regime monofásico IBS/CBS — LC 214/2025 Art. 172.
+        # Cigarros (2402-2403) e bebidas alcoólicas (2203-2208): Imposto Seletivo
+        # — LC 214/2025 Arts. 409 § 1º + 410. Tributos diferentes, mesmo gate.
+        # Motor não modela nenhum dos dois — falha fechada é preferível a
+        # silenciar o erro no diagnóstico (MAX_FISCAL_01).
         prefixo_cap = limpo[:4]
         if prefixo_cap in NCMS_MONOFASICAS_BLOQUEADAS:
+            if prefixo_cap == "2710":
+                regime = "regime monofásico de IBS/CBS (LC 214/2025 Art. 172)"
+            else:
+                regime = "Imposto Seletivo (LC 214/2025 Arts. 409 § 1º + 410)"
             raise ValueError(
-                f"NCM {limpo} é de regime monofásico "
-                "(LC 214/2025 Arts. 172-174). "
-                "Este motor não modela cálculo monofásico. "
-                "Consulte regra específica para o setor "
-                "(combustíveis 2710, tabacos 2402/2403, "
-                "bebidas alcoólicas 2203-2208)."
+                f"NCM {limpo} sujeito a {regime}. "
+                "Este motor não modela esse regime. Consulte regra específica do setor "
+                "(combustíveis 2710 — monofásico; tabacos 2402-2403 e bebidas "
+                "alcoólicas 2203-2208 — Imposto Seletivo)."
             )
         return limpo
 
