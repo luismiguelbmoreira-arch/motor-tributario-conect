@@ -25,12 +25,20 @@ logger = logging.getLogger("motor_conect.schemas")
 #
 #   (a) Regime MONOFÁSICO de IBS/CBS (LC 214/2025 Art. 172) — APENAS combustíveis.
 #   (b) IMPOSTO SELETIVO (LC 214/2025 Arts. 409 § 1º + 410) — produtos
-#       fumígenos, bebidas alcoólicas, bebidas açucaradas, veículos,
-#       embarcações, aeronaves, bens minerais, apostas/loterias.
+#       fumígenos e bebidas alcoólicas (capítulos NCM com convergência total
+#       em fonte primária).
 #
 # Aceitar NCMs desses regimes no formulário padrão B2B produziria cálculo
 # cumulativo semanticamente errado em cadeia que deveria ser de incidência
 # única — MAX_FISCAL_01 + Lei 8.137/1990 Art. 1º II.
+#
+# Demais categorias do Imposto Seletivo (bebidas açucaradas 2202, veículos,
+# embarcações, aeronaves, bens minerais, apostas) NÃO são bloqueadas no
+# formulário pra preservar casos B2B legítimos (ex: distribuidor vendendo
+# refrigerante pra lanchonete). DETECÇÃO de exposição vai por camada
+# superior em core/imposto_seletivo.py — Rail R2: critério "açucarada" e
+# critério ambiental de veículos delegados a PLP 42/2026, sem fonte firme
+# pra hardcode no gate.
 #
 # Comparação é feita por PREFIXO de 4 dígitos (capítulo NCM), pois ambos
 # os regimes abrangem a posição inteira e não suas subposições específicas.

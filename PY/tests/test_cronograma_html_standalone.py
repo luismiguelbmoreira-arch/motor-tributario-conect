@@ -119,7 +119,7 @@ class TestBasesLegais:
         assert "Art. 47" in html or "creditamento" in html.lower()
         # Arts. 31-36: split payment
         assert "Split Payment" in html
-        # Arts. 409-422: imposto seletivo
+        # Arts. 409-434: imposto seletivo
         assert "Imposto Seletivo" in html
 
     def test_aviso_resolucao_senado(self, html):
