@@ -402,6 +402,7 @@ Os 8 rails são **invioláveis** acima das MAX_FISCAL. Quando uma regra MAX entr
 | **R6 — Logs refazíveis** | Cada cálculo gera log auto-suficiente: base, deduções, alíquota, valor, fonte normativa. `python PY/scripts/refazer_calculo.py --diagnostico-id N` reconstrói o número apenas do log (gate de WS5). |
 | **R7 — Opt-Out automático ≥ 90% do teto** | RBT12 ≥ 90% do teto Simples (R$ 4,32M de R$ 4,8M) força análise Opt-Out. Sem cenário Opt-Out comparado, PDF não emite. |
 | **R8 — Consistência temporal** | Motor valida se norma usada estava vigente na data da operação. CBS/IBS não aplica em 2025 (entra só em 2026 — LC 214/2025). |
+| **R9 — Ampla Visão** | Antes de qualquer mudança com impacto arquitetônico (módulo novo, schema novo, refactor multi-arquivo), executar análise em ordem cronológica: **Ontem** (olhar pra trás — estado atual, gargalos potenciais, código existente que pode ser reusado, falhas históricas) → **Amanhã** (olhar pra frente — escalabilidade até 200 CNPJs, robustez, manutenibilidade em 6 meses, custo de retrabalho) → **Hoje** (confrontar conclusões e propor versão enxuta, eficiente, limpa). Apresentar pra decisão final respeitando MAX_01-09. Fix pontual e bug isolado isentos. |
 
 ---
 
