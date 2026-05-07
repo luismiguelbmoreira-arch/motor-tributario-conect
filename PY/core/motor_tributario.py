@@ -602,11 +602,17 @@ class MotorReformaTributaria:
 
     def _fracao_iva_no_das(self, anexo: str, faixa: int, ano: int) -> Decimal:
         """
-        Fração CBS+IBS embutida no DAS por ano. LC 214/2025, Art. 47 §II.
+        Fração CBS+IBS embutida no DAS por ano. LC 214/2025, Art. 47 § 9º
+        (crédito em valor equivalente ao DAS recolhido pelo fornecedor Simples).
         2026: 0 (dispensado — Art. 348 III "c").
-        2027-2028: PIS+COFINS → CBS (Arts. 344, 353).
-        2029-2032: CBS + IBS phase-in 10%/ano (Arts. 356-360).
+        2027-2028: PIS+COFINS → CBS (cronograma de transição).
+        2029-2032: CBS + IBS phase-in 10%/ano.
         2033+: CBS + IBS pleno.
+
+        Nota ERR-057 (30/04/2026): citação anterior `Art. 47 §II + Arts. 344,
+        353, 356-360` pra creditamento Simples era ERRADA — Escrivão validou
+        que §II trata de "valor do crédito em geral" e que Arts. 344-360 são
+        cronograma, não creditamento. Corrigido pra § 9º.
         """
         if ano <= 2026:
             return Decimal("0.0000")
@@ -639,7 +645,7 @@ class MotorReformaTributaria:
     def credito_b2b_simples(self) -> Decimal:
         """
         Crédito IBS+CBS apropriável pelo comprador B2B de fornecedor Simples Nacional.
-        LC 214/2025, Art. 47 §II: credito = DAS_mensal × fração_CBS_IBS_no_DAS(anexo, faixa, ano).
+        LC 214/2025, Art. 47 § 9º: credito = DAS_mensal × fração_CBS_IBS_no_DAS(anexo, faixa, ano).
         2026: R$0 (Art. 348 III "c"). 2027+: fração real do DAS por Anexo/Faixa.
         ERR-016: fator_reducao_cbs_ibs (Arts. 258, 262, 264).
         """
@@ -666,7 +672,7 @@ class MotorReformaTributaria:
 
         self._registrar_passo(
             id="CREDITO_B2B_ART_47",
-            titulo=f"Crédito B2B cliente ({ano}) — LC 214/2025 Art. 47 §II",
+            titulo=f"Crédito B2B cliente ({ano}) — LC 214/2025 Art. 47 § 9º",
             base=f"DAS mensal {_fmt_brl(das_mensal_val)}",
             deducoes=(
                 f"Fração CBS+IBS no DAS Anexo {anexo} Faixa {faixa}: "
@@ -675,7 +681,7 @@ class MotorReformaTributaria:
             aliquota=f"Fator redução CBS/IBS: {fator_reducao}",
             valor=_fmt_brl(credito),
             lei=(
-                "LC 214/2025 Art. 47 §II (creditamento proporcional ao devido) | "
+                "LC 214/2025 Art. 47 § 9º (crédito em valor equivalente ao DAS recolhido) | "
                 "Arts. 344 e 353 (CBS substitui PIS/COFINS em 2027) | "
                 "Arts. 356-360 (fase-in IBS 2029-2032)"
             ),
@@ -781,7 +787,7 @@ class MotorReformaTributaria:
             valor=_fmt_brl(custo_total),
             lei=(
                 "LC 214/2025 Arts. 41-44 (dispositivo de opt-out) | "
-                "Art. 47 §II (creditamento proporcional) | "
+                "Art. 47 § 9º (crédito equivalente ao DAS recolhido) | "
                 "Arts. 258-264 (fator redução CBS/IBS — aplicação simétrica) | "
                 "Arts. 344 e 353 (CBS substitui PIS/COFINS 2027) | "
                 "Arts. 356-360 (fase-in IBS 2029-2032) | "
