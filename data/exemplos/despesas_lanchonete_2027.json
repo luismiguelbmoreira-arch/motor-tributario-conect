@@ -1,0 +1,19 @@
+{
+  "_descricao": "Lanchonete fictícia, despesas mensais 2027. Espelha o caso real do test_caso_real_lanchonete em test_calculo_credito_cbs_ibs.py. Crédito esperado: R$ 2843.45 com alíquota 0.265.",
+  "_amparo_legal": "LC 214/2025 Arts. 47 caput + 57 caput",
+  "_competencia": "2027-03",
+  "despesas": [
+    {"categoria": "ENERGIA_ELETRICA",         "valor": "1500.00"},
+    {"categoria": "AGUA_SANEAMENTO",          "valor": "400.00"},
+    {"categoria": "TELEFONE_INTERNET",        "valor": "250.00"},
+    {"categoria": "MATERIAL_ESCRITORIO",      "valor": "180.00"},
+    {"categoria": "LIMPEZA_TERCEIRIZADA",     "valor": "800.00"},
+    {"categoria": "MARKETING_DIGITAL",        "valor": "500.00"},
+    {"categoria": "SALARIOS",                 "valor": "12000.00"},
+    {"categoria": "INSS_PATRONAL_FGTS",       "valor": "3500.00"},
+    {"categoria": "VALE_REFEICAO",            "valor": "2400.00"},
+    {"categoria": "VALE_TRANSPORTE",          "valor": "1200.00"},
+    {"categoria": "ALUGUEL_COMERCIAL",        "valor": "3500.00"},
+    {"categoria": "CARTORIO_MARCA_REGISTRADA","valor": "450.00"}
+  ]
+}
