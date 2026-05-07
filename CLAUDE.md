@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # 🏛️ MOTOR TRIBUTÁRIO CONECT — BÍBLIA DA REFORMA TRIBUTÁRIA
 
-**Status:** 🚀 Produção — 1503 testes passando (100%) | 4 regimes + DIFAL + Cronograma + PDF educativo + Auditoria Documental LGPD + IDOR Guard + Stack front-back sincronizada + Fase 0a/0b concluídas (HistoricoSeisMeses + 5 módulos especiais)
+**Status:** 🚀 Produção — 1579 testes passando (100%) | 4 regimes + DIFAL + Cronograma + PDF educativo + Auditoria Documental LGPD + IDOR Guard + Stack front-back sincronizada + Fase 0a/0b concluídas + Fase 2 subfase 2.2 (mapa-mestre 33 categorias) + Fase 3' subfase 0 (interface FonteCliente)
 **Âncora Legal:** EC 132/2023 | LC 123/2006 | LC 214/2025 | LC 224/2025 | LC 227/2026 | EC 87/2015 | LGPD 13.709/2018 | CTN Arts. 142 e 173
-**Data Certificação:** 30/04/2026 (Fase 0b encerrada — 5 módulos especiais + Rail R9 Ampla Visão + 3 bugs MAX_07 corrigidos)
+**Data Certificação:** 07/05/2026 (Fase 2 subfase 2.2 — desacoplamento Nibo + ERR-057 + mapa-mestre + 4 bugs MAX_07 corrigidos)
 
 ---
 
@@ -503,9 +503,11 @@ Se PMD não foi invocado, commit não acontece. Sem exceção.
 
 ---
 
-## 🗺️ ROADMAP — STATUS ATUAL (30/04/2026 — Fase 0b concluída)
+## 🗺️ ROADMAP — STATUS ATUAL (07/05/2026 — Fase 2 subfase 2.2 concluída)
 
-**Suite atual:** **1503 testes verdes** | **0 regressão** | crescimento desde início do refinamento: **1021 → 1503 (+482 testes)**
+**Suite atual:** **1579 testes verdes** | **0 regressão** | crescimento desde início do refinamento: **1021 → 1579 (+558 testes)**
+
+**Branch ativo:** `fase-2-mapa-mestre` (não mergeado em main).
 
 ### ✅ Fase 0a (29/04/2026) — Schema HistoricoSeisMeses + DiagnosticoConsolidado
 
@@ -527,7 +529,29 @@ Se PMD não foi invocado, commit não acontece. Sem exceção.
 | `4a46f07` | **ERR-056** — citações inventadas Art. 172 II/III pra cigarro/bebida → Art. 409 § 1º + 410 (Imposto Seletivo) |
 | `4d8e121` | M5 — `core/imposto_seletivo.py` (Arts. 409-434, sem alíquotas — Rail R2; vigência 2027 — Art. 544) + UI cronograma corrigida |
 
-### ✅ Entregue e commitado nesta sessão
+### ✅ Pós-Fase 0b (07/05/2026) — Desacoplamento Nibo + ERR-057 + Fase 2 subfase 2.1 + Fase 3' subfase 0
+
+| Commit | Detalhe |
+| --- | --- |
+| `a556c6e` | **Decisão arquitetônica** — desacoplamento Nibo via interface `FonteCliente`. Motor consome interface; fontes implementam (PDF Manual, Nibo futuro, e-CAC futuro, Sistema próprio futuro). Reordenação do plano: Fase 1 sai do caminho crítico. |
+| `35181ec` | **ERR-057** — fix MAX_06 cita "Art. 47 §II + Arts. 344/353/356-360" (errado) → "Art. 47 § 9º" (crédito de fornecedor Simples = fração do DAS). 4º bug MAX_07 detectado pelo Escrivão. |
+| `9c073ab` | ERR-057 cleanup secundário — UI/agents/docs/comentários atualizados. |
+| `5e014a6` | **Fase 2 subfase 2.0** — `core/mapa_categorias_cbs_ibs.py` com 9 categorias-piloto (LC 214/2025 Arts. 47 caput + 57 caput). Schema VersionedRule[Dict[str, ClassificacaoCredito]]. |
+| `9196153` | **Fase 3' subfase 0** — `core/fontes/base.py` Protocol `FonteCliente` + exceções `FonteIndisponivel` e `DadosInsuficientesNaFonte`. Implementações concretas em subfases posteriores quando houver caller. |
+| `f296b71` | **Fase 2 subfase 2.1** — mapa expandido 9 → 25 categorias (16 novas validadas pelo Escrivão em 07/05). 11 INSUMO + 4 USO_PESSOAL + 1 NAO_TRIBUTADO. 11 categorias pendentes documentadas (bens de capital, vales, ANUIDADE_CONSELHO_PJ, COMBUSTIVEL_FROTA, BRINDES). |
+| `(próximo)` | **Fase 2 subfase 2.2** — mapa 25 → 33 categorias. 4 BEM_DE_CAPITAL (Art. 108) + 3 vales (Art. 57 § 3º + LC 227/2026) + 1 NAO_TRIBUTADO (ANUIDADE_CONSELHO_PJ). 3 pendentes restantes exigem refactor/flag schema: COMBUSTIVEL_FROTA (refactor `NCMS_MONOFASICAS_BLOQUEADAS`), PLANO_SAUDE_FUNCIONARIO (flag `existe_acordo_coletivo`), BRINDES_MARKETING (flag `destinatario_brinde`). |
+
+### 🔧 Pendência operacional documentada (07/05/2026)
+
+**Cache local de leis Planalto** — Planalto offline em **3 rodadas consecutivas** do Escrivão (socket-dropping persistente). Sem fonte primária canonicamente citada, protocolo Escrivão fica frágil em fiscalização real (Rail R1 exige fonte primária). Solução proposta:
+
+1. Baixar `lcp214.htm` (e demais LCs relevantes) uma vez e armazenar em `data/fontes_legais/planalto/lcp214_v2026-05.txt` com SHA-256 + URL canônica.
+2. WebFetch Escrivão tenta primeiro o cache local, fallback para `legis.senado.leg.br` ou `camara.leg.br` (mesma força legal).
+3. `data/fontes_legais/HASHES.txt` registra SHA-256 de cada arquivo + data de captura — auditoria pode comparar com Planalto quando voltar.
+
+Sem item 1 ou 2 implementado, validações futuras dependem de fontes secundárias (Mayer Brown, Tauil & Chequer, Conjur, etc.) com convergência ≥ 3 — defensável mas não-canônico.
+
+### ✅ Entregue antes da Fase 0a (refinamento WS12/WS10/WS6)
 
 | Fase | Commit | Detalhe |
 | --- | --- | --- |

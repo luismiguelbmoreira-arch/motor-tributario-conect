@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 mapa_categorias_cbs_ibs.py — Mapa-mestre de classificação de despesas para
-fins de crédito CBS/IBS (LC 214/2025 Arts. 47 + 57).
+fins de crédito CBS/IBS (LC 214/2025 Arts. 47 + 57 + 108).
 
-Catálogo atual em `_mapa_subfase_2_1()` (subfases 2.2-2.5 expandirão).
-Contagem oficial: ver assert no teste `test_mapa_subfase_2_1_tem_N_categorias`.
+Catálogo atual em `_mapa_subfase_2_2()` (subfases 2.3-2.5 expandirão).
+Contagem oficial: ver assert no teste `test_mapa_subfase_2_2_tem_N_categorias`.
 
-Base legal (validada por Escrivão em 30/04/2026 e 07/05/2026):
+Base legal (validada por Escrivão em 30/04/2026, 07/05/2026 e 07/05/2026 rodada 2):
 - LC 214/2025 Art. 47, caput — direito ao crédito (regra geral).
 - LC 214/2025 Art. 47, § 9º — crédito de fornecedor Simples = fração do DAS.
 - LC 214/2025 Arts. 48-56 — apropriação e utilização do crédito.
@@ -14,30 +14,41 @@ Base legal (validada por Escrivão em 30/04/2026 e 07/05/2026):
   (vedação ao crédito): joias, obras de arte, bebidas alcoólicas, derivados
   do tabaco, armas, recreação/esporte/estética, imóveis residenciais e
   veículos pra sócios/funcionários.
-- LC 214/2025 Art. 57, § 3º, IV — exceções: uniformes, EPIs, alimentação,
-  saúde, creche, planos, vales (originalmente exigia previsão em
-  acordo/convenção coletiva).
-- LC 214/2025 Arts. 108-109 — bens de capital (crédito integral e imediato).
+- LC 214/2025 Art. 57, § 3º (com redação da LC 227/2026) — vale-refeição,
+  vale-alimentação, vale-transporte: crédito sem exigência de acordo coletivo.
+  Plano de saúde MANTÉM exigência (LC 227/2026 alterou só os 3 vales).
+- LC 214/2025 Art. 108 — bens de capital: crédito integral e imediato.
+  Art. 109 estabelece rota alternativa (suspensão na entrada via ato CGIBS),
+  não condicionante do crédito ordinário do Art. 108.
+- CF Art. 149 — contribuições parafiscais (anuidade de conselho profissional
+  está fora do escopo CBS/IBS por construção).
 
-Pendências documentadas pra próxima rodada Escrivão (Planalto offline em
-07/05/2026 — refinamento, não erro):
-- LC 227/2026 dispensou requisito de acordo coletivo pra vale-refeição,
-  vale-alimentação e vale-transporte. Texto literal não confirmado.
-- Numeração específica de inciso do Art. 57 caput (I joias, II obras de
-  arte, V armas, VI recreação) — entraram com granularidade caput
-  (idêntica ao piloto ALUGUEL_RESIDENCIAL_FUNCIONARIO da subfase 2.0).
-- ANUIDADE_CONSELHO_PJ — split PJ/sócio + se anuidade é "operação tributada"
-  exige leitura literal não confirmada. Fica fora.
-- Bens de capital (computador, mobiliário, máquina industrial) — Arts. 108-109
-  exigem leitura literal pra confirmar "crédito integral imediato sem
-  condição de ato CGIBS". Ficam fora desta subfase.
-- Arts. 353 e 356-360 — não modelados como base de creditamento; usados
-  apenas como cronograma de transição.
+Pendências documentadas (subfase 2.3 ou tickets separados):
+- COMBUSTIVEL_FROTA_EMPRESARIAL — Escrivão validou que Art. 180 veda crédito
+  apenas pra revenda/comercialização, não pra uso operacional próprio. Mas
+  isso conflita com `NCMS_MONOFASICAS_BLOQUEADAS` em schemas/motor.py:54
+  que bloqueia 2710 inteiro na entrada. Refactor pra distinguir uso próprio
+  de revenda fica em ticket separado — não bloqueia a subfase 2.2.
+- PLANO_SAUDE_FUNCIONARIO — Escrivão validou que LC 227/2026 manteve a
+  exigência de acordo coletivo. Schema atual não tem flag `existe_acordo_coletivo`
+  no input — categoria entra como CASO_DUVIDA quando schema for estendido.
+- BRINDES_MARKETING — depende de flag `destinatario_brinde`
+  (CLIENTE | EMPREGADO_OU_VINCULADO). Schema atual não tem o flag — fica
+  como CASO_DUVIDA quando estendido.
+
+Recomendação Escrivão (operacional, fora desta subfase):
+- Planalto offline em 3 rodadas consecutivas. Implementar cache local de
+  leis em `data/fontes_legais/planalto/lcp214_v2026-05.txt` com SHA-256 +
+  URL canônica. Sem isso o protocolo Escrivão fica frágil em fiscalização
+  real (Rail R1 exige fonte primária citada literalmente). Ticket separado.
 
 Política R2 (proibição de extrapolação):
-- Categorias com confiança ALTA do Escrivão entram firme.
-- Categorias INCONCLUSIVAS por indisponibilidade de fonte ficam FORA até
-  nova rodada — não viram CASO_DUVIDA preditivo.
+- Categorias com confiança ALTA entram firme. Validação cruzada de fontes
+  secundárias (≥3 batendo) é aceita quando Planalto offline E o ponto
+  load-bearing converge entre Mayer Brown / Tauil & Chequer / Mattos Filho /
+  Conjur / etc.
+- Categorias com flag faltando no schema viram CASO_DUVIDA preditivo
+  (caller decide ao integrar) ou ficam fora até schema ser estendido.
 """
 
 from datetime import date
@@ -101,21 +112,27 @@ def _categoria(
     )
 
 
-def _mapa_subfase_2_1() -> Dict[str, ClassificacaoCredito]:
+def _mapa_subfase_2_2() -> Dict[str, ClassificacaoCredito]:
     """
-    Categorias da subfase 2.1 = piloto da 2.0 + 16 novas validadas em 07/05/2026.
+    Categorias da subfase 2.2 = subfase 2.1 + 8 novas validadas em 07/05/2026 (rodada 2).
     Contagem exata e invariantes verificados nos testes (Rail R6 — fonte única).
 
-    Critério estrito: SOMENTE categorias com confiança ALTA do Escrivão entram.
-    Categorias INCONCLUSIVAS (Planalto offline em 07/05) ficam fora desta
-    subfase — refinamento, não erro. Subfase 2.2 acrescenta quando fonte
-    voltar:
-    - ANUIDADE_CONSELHO_PJ
-    - COMPUTADOR_NOTEBOOK_ATIVO, IMPRESSORA_EQUIPAMENTO_ESCRITORIO,
-      MOBILIARIO_ESCRITORIO, MAQUINARIO_INDUSTRIAL (bens de capital — Arts. 108-109)
-    - VALE_REFEICAO, VALE_TRANSPORTE, VALE_ALIMENTACAO, PLANO_SAUDE_FUNCIONARIO
-      (LC 227/2026 dispensou acordo coletivo — texto literal não confirmado)
-    - COMBUSTIVEL_FROTA, BRINDES_MARKETING (confiança BAIXA na rodada anterior)
+    Novas na subfase 2.2 (8):
+    - 4 BEM_DE_CAPITAL (Art. 108) — COMPUTADOR_NOTEBOOK_ATIVO,
+      IMPRESSORA_EQUIPAMENTO_ESCRITORIO, MOBILIARIO_ESCRITORIO,
+      MAQUINARIO_INDUSTRIAL
+    - 3 INSUMO_CREDITAVEL vales (Art. 57 § 3º + LC 227/2026) — VALE_REFEICAO,
+      VALE_ALIMENTACAO, VALE_TRANSPORTE
+    - 1 NAO_TRIBUTADO — ANUIDADE_CONSELHO_PJ (CF Art. 149 — parafiscal)
+
+    Pendências documentadas (FORA desta subfase, não inferir):
+    - COMBUSTIVEL_FROTA_EMPRESARIAL — Escrivão validou ALTA mas exige refactor
+      do `NCMS_MONOFASICAS_BLOQUEADAS` (que hoje bloqueia 2710 inteiro). Art. 180
+      a contrario sensu permite crédito pra uso operacional próprio. Ticket separado.
+    - PLANO_SAUDE_FUNCIONARIO — Escrivão validou MEDIA com flag dependente
+      de `existe_acordo_coletivo`. Schema atual não tem o flag.
+    - BRINDES_MARKETING — Escrivão validou MEDIA com flag `destinatario_brinde`
+      (CLIENTE → INSUMO; EMPREGADO_OU_VINCULADO → USO_PESSOAL). Schema sem flag.
     """
     art_47_caput = "LC 214/2025, Art. 47, caput (direito ao crédito CBS/IBS)"
     art_57_caput = "LC 214/2025, Art. 57, caput (uso ou consumo pessoal — vedação)"
@@ -242,27 +259,97 @@ def _mapa_subfase_2_1() -> Dict[str, ClassificacaoCredito]:
         ),
     }
 
-    return {**base_2_0, **novas_insumo, **novas_uso_pessoal, **novas_nao_tributado}
+    # ── Subfase 2.2: 8 novas (validadas em 07/05/2026 rodada 2) ─────────────
+
+    # Bens de capital — Art. 108 (crédito integral e imediato).
+    art_108 = (
+        "LC 214/2025, Art. 108 (crédito integral e imediato em aquisição "
+        "de bens de capital, na forma dos Arts. 47 a 56)"
+    )
+    novas_bem_capital: Dict[str, ClassificacaoCredito] = {
+        "COMPUTADOR_NOTEBOOK_ATIVO": _categoria(
+            "COMPUTADOR_NOTEBOOK_ATIVO", "BEM_DE_CAPITAL", art_108, "ALTA",
+            "Equipamento de informática destinado ao ativo imobilizado da PJ.",
+        ),
+        "IMPRESSORA_EQUIPAMENTO_ESCRITORIO": _categoria(
+            "IMPRESSORA_EQUIPAMENTO_ESCRITORIO", "BEM_DE_CAPITAL", art_108, "ALTA",
+            "Impressora/scanner/copiadora — ativo imobilizado operacional.",
+        ),
+        "MOBILIARIO_ESCRITORIO": _categoria(
+            "MOBILIARIO_ESCRITORIO", "BEM_DE_CAPITAL", art_108, "ALTA",
+            "Mobiliário registrado no ativo imobilizado (equiparado a CIAP no regime atual).",
+        ),
+        "MAQUINARIO_INDUSTRIAL": _categoria(
+            "MAQUINARIO_INDUSTRIAL", "BEM_DE_CAPITAL", art_108, "ALTA",
+            "Máquina destinada ao processo produtivo — caso paradigmático de bem de capital.",
+        ),
+    }
+
+    # Vales (Art. 57 § 3º com redação da LC 227/2026 — dispensa de acordo coletivo).
+    art_57_par3_lc227 = (
+        "LC 214/2025, Art. 57, § 3º (com redação dada pela LC 227/2026 — "
+        "dispensada exigência de previsão em acordo/convenção coletiva "
+        "para vale-refeição, vale-alimentação e vale-transporte)"
+    )
+    novas_vales: Dict[str, ClassificacaoCredito] = {
+        "VALE_REFEICAO": _categoria(
+            "VALE_REFEICAO", "INSUMO_CREDITAVEL", art_57_par3_lc227, "ALTA",
+            "Crédito assegurado independente de acordo/convenção coletiva (LC 227/2026).",
+        ),
+        "VALE_ALIMENTACAO": _categoria(
+            "VALE_ALIMENTACAO", "INSUMO_CREDITAVEL", art_57_par3_lc227, "ALTA",
+            "Crédito assegurado independente de acordo/convenção coletiva (LC 227/2026).",
+        ),
+        "VALE_TRANSPORTE": _categoria(
+            "VALE_TRANSPORTE", "INSUMO_CREDITAVEL", art_57_par3_lc227, "ALTA",
+            "Crédito assegurado independente de acordo/convenção coletiva (LC 227/2026).",
+        ),
+    }
+
+    # Anuidade de conselho profissional — contribuição parafiscal, fora do escopo.
+    parafiscal_fora_escopo = (
+        "CF Art. 149 (contribuições parafiscais de interesse de categoria "
+        "profissional, Lei 12.514/2011, STF RE 838.284) + LC 214/2025, Art. 1º "
+        "a contrario sensu — anuidade de conselho não é operação com bens ou "
+        "serviços; conselho não emite débito CBS/IBS, logo PJ adquirente "
+        "não tem crédito a apropriar"
+    )
+    novas_anuidade: Dict[str, ClassificacaoCredito] = {
+        "ANUIDADE_CONSELHO_PJ": _categoria(
+            "ANUIDADE_CONSELHO_PJ", "NAO_TRIBUTADO", parafiscal_fora_escopo, "ALTA",
+            "Estrutural (não interpretativa): inexistência de débito na origem.",
+        ),
+    }
+
+    return {
+        **base_2_0,
+        **novas_insumo,
+        **novas_uso_pessoal,
+        **novas_nao_tributado,
+        **novas_bem_capital,
+        **novas_vales,
+        **novas_anuidade,
+    }
 
 
 # Histórico versionado do mapa-mestre. Migrador acrescenta nova entrada
 # quando há alteração legislativa (ex: LC 227/2026 sobre vales).
 MAPA_CATEGORIAS_VERSIONADO: list[VersionedRule[Dict[str, ClassificacaoCredito]]] = [
     VersionedRule(
-        valor=_mapa_subfase_2_1(),
+        valor=_mapa_subfase_2_2(),
         vigencia_inicio=date(2026, 1, 1),
         vigencia_fim=date(2026, 12, 31),
-        lei="LC 214/2025 Arts. 47 + 57 (subfase 2.1 — confiança ALTA)",
+        lei="LC 214/2025 Arts. 47 + 57 + 108 + LC 227/2026 (subfase 2.2 — confiança ALTA)",
         url_planalto="https://www.planalto.gov.br/ccivil_03/leis/lcp/lcp214.htm",
-        observacao="Validado por Escrivão em 30/04/2026 + 07/05/2026.",
+        observacao="Validado por Escrivão em 30/04/2026 + 07/05/2026 (2 rodadas).",
     ),
     VersionedRule(
-        valor=_mapa_subfase_2_1(),
+        valor=_mapa_subfase_2_2(),
         vigencia_inicio=date(2027, 1, 1),
         vigencia_fim=date(2027, 12, 31),
-        lei="LC 214/2025 Arts. 47 + 57 (vigência plena CBS/IBS)",
+        lei="LC 214/2025 Arts. 47 + 57 + 108 + LC 227/2026 (vigência plena CBS/IBS)",
         url_planalto="https://www.planalto.gov.br/ccivil_03/leis/lcp/lcp214.htm",
-        observacao="Mesmo conjunto da subfase 2.1; subfases 2.2-2.5 expandirão.",
+        observacao="Mesmo conjunto da subfase 2.2; subfases 2.3-2.5 expandirão.",
     ),
 ]
 

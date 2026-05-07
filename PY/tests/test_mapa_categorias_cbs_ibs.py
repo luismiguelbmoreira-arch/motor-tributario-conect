@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-test_mapa_categorias_cbs_ibs.py — Cobertura subfase 2.1 do mapa-mestre.
+test_mapa_categorias_cbs_ibs.py — Cobertura subfase 2.2 do mapa-mestre.
 
-LC 214/2025 Arts. 47 + 57. Validado por Escrivão em 30/04/2026 e 07/05/2026.
+LC 214/2025 Arts. 47 + 57 + 108 + LC 227/2026. Validado por Escrivão em
+30/04/2026 e 07/05/2026 (2 rodadas).
 Apenas categorias com confiança ALTA estão no mapa nesta subfase.
 """
 
@@ -17,7 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from core.mapa_categorias_cbs_ibs import (
     MAPA_CATEGORIAS_VERSIONADO,
     ClassificacaoCredito,
-    _mapa_subfase_2_1,
+    _mapa_subfase_2_2,
     classificar,
     gera_credito,
     listar_categorias_creditaveis,
@@ -51,18 +52,18 @@ def test_schema_extra_forbid():
         )
 
 
-# ── Mapa subfase 2.1 — invariantes estruturais ───────────────────────────────
+# ── Mapa subfase 2.2 — invariantes estruturais ───────────────────────────────
 
-def test_mapa_subfase_2_1_tem_25_categorias():
-    """Subfase 2.1 entrega 25 categorias = 9 piloto da 2.0 + 16 novas."""
-    assert len(_mapa_subfase_2_1()) == 25
+def test_mapa_subfase_2_2_tem_33_categorias():
+    """Subfase 2.2 entrega 33 categorias = 25 da subfase 2.1 + 8 novas."""
+    assert len(_mapa_subfase_2_2()) == 33
 
 
-def test_mapa_subfase_2_1_apenas_confianca_alta():
+def test_mapa_subfase_2_2_apenas_confianca_alta():
     """Rail R2 — apenas categorias confirmadas pelo Escrivão entram firmes."""
-    for nome, c in _mapa_subfase_2_1().items():
+    for nome, c in _mapa_subfase_2_2().items():
         assert c.confianca == "ALTA", (
-            f"{nome}: subfase 2.1 só aceita confiança ALTA, veio {c.confianca}"
+            f"{nome}: subfase 2.2 só aceita confiança ALTA, veio {c.confianca}"
         )
 
 
@@ -75,7 +76,7 @@ def test_mapa_categorias_versionado_cobre_2026_e_2027():
 
 def test_categoria_nome_canonico_eh_uppercase():
     """Convenção: nomes canônicos em UPPER_SNAKE_CASE."""
-    for nome in _mapa_subfase_2_1().keys():
+    for nome in _mapa_subfase_2_2().keys():
         assert nome == nome.upper(), f"{nome}: deve ser UPPER_SNAKE_CASE"
 
 
@@ -209,15 +210,17 @@ def test_listar_creditaveis_retorna_apenas_creditaveis():
     creditaveis = listar_categorias_creditaveis(_DATA_2026)
     # Vedadas/não-tributadas ficam fora.
     nao_creditaveis = [
-        "SALARIOS", "INSS_PATRONAL_FGTS",
+        "SALARIOS", "INSS_PATRONAL_FGTS", "ANUIDADE_CONSELHO_PJ",
         "ALUGUEL_RESIDENCIAL_FUNCIONARIO", "JOIAS_METAIS_PRECIOSOS",
         "OBRAS_ARTE_ANTIGUIDADES", "ARMAS_MUNICOES", "RECREACAO_ESPORTE_ESTETICA",
     ]
     for nome in nao_creditaveis:
         assert nome not in creditaveis, f"{nome} não deveria estar em creditáveis"
-    # Insumos creditáveis aparecem.
+    # Insumos / bens de capital creditáveis aparecem.
     assert "ENERGIA_ELETRICA" in creditaveis
     assert "ASSESSORIA_CONTABIL" in creditaveis
+    assert "VALE_REFEICAO" in creditaveis
+    assert "COMPUTADOR_NOTEBOOK_ATIVO" in creditaveis
 
 
 def test_listar_creditaveis_ordem_lexica():
@@ -225,32 +228,73 @@ def test_listar_creditaveis_ordem_lexica():
     assert creditaveis == sorted(creditaveis)
 
 
-def test_listar_creditaveis_subfase_2_1_tem_18_itens():
-    """7 da 2.0 + 11 da 2.1 = 18 categorias creditáveis."""
+def test_listar_creditaveis_subfase_2_2_tem_25_itens():
+    """7 da 2.0 + 11 da 2.1 + 3 vales + 4 bens de capital = 25 creditáveis."""
     creditaveis = listar_categorias_creditaveis(_DATA_2026)
-    assert len(creditaveis) == 18
+    assert len(creditaveis) == 25
 
 
-# ── Pendências documentadas — categorias INCONCLUSIVAS ficam fora ────────────
+# ── Subfase 2.2 — bens de capital (Art. 108) ────────────────────────────────
 
-@pytest.mark.parametrize("categoria_pendente", [
-    "ANUIDADE_CONSELHO_PJ",            # split PJ/sócio sem confirmação
-    "COMPUTADOR_NOTEBOOK_ATIVO",       # bens de capital — Arts. 108-109 sem leitura literal
+@pytest.mark.parametrize("categoria", [
+    "COMPUTADOR_NOTEBOOK_ATIVO",
     "IMPRESSORA_EQUIPAMENTO_ESCRITORIO",
     "MOBILIARIO_ESCRITORIO",
     "MAQUINARIO_INDUSTRIAL",
-    "VALE_REFEICAO",                   # LC 227/2026 sem confirmação
-    "VALE_TRANSPORTE",
+])
+def test_bens_de_capital_subfase_2_2(categoria: str):
+    """Bens de capital — crédito integral e imediato (Art. 108)."""
+    c = classificar(categoria, _DATA_2026)
+    assert c is not None
+    assert c.tipo == "BEM_DE_CAPITAL"
+    assert c.gera_credito is True
+    assert "Art. 108" in c.amparo_legal
+
+
+# ── Subfase 2.2 — vales (Art. 57 § 3º + LC 227/2026) ────────────────────────
+
+@pytest.mark.parametrize("categoria", [
+    "VALE_REFEICAO",
     "VALE_ALIMENTACAO",
-    "PLANO_SAUDE_FUNCIONARIO",
-    "COMBUSTIVEL_FROTA",               # confiança BAIXA na rodada 30/04
-    "BRINDES_MARKETING",
+    "VALE_TRANSPORTE",
+])
+def test_vales_subfase_2_2_creditaveis_sem_acordo_coletivo(categoria: str):
+    """LC 227/2026 dispensou requisito de acordo coletivo pra os 3 vales."""
+    c = classificar(categoria, _DATA_2026)
+    assert c is not None
+    assert c.tipo == "INSUMO_CREDITAVEL"
+    assert c.gera_credito is True
+    assert "LC 227/2026" in c.amparo_legal
+    assert "Art. 57" in c.amparo_legal
+
+
+# ── Subfase 2.2 — anuidade conselho profissional (CF Art. 149) ──────────────
+
+def test_anuidade_conselho_pj_nao_tributada():
+    """
+    Anuidade de conselho profissional é contribuição parafiscal (CF Art. 149),
+    fora do escopo CBS/IBS. Conselho não emite débito → PJ não tem crédito.
+    """
+    c = classificar("ANUIDADE_CONSELHO_PJ", _DATA_2026)
+    assert c is not None
+    assert c.tipo == "NAO_TRIBUTADO"
+    assert c.gera_credito is False
+    assert "CF Art. 149" in c.amparo_legal
+
+
+# ── Pendências documentadas — categorias que dependem de refactor/flag ──────
+
+@pytest.mark.parametrize("categoria_pendente", [
+    # Validadas ALTA mas dependem de refactor/flag schema:
+    "COMBUSTIVEL_FROTA_EMPRESARIAL",   # exige refactor de NCMS_MONOFASICAS_BLOQUEADAS
+    "PLANO_SAUDE_FUNCIONARIO",          # exige flag `existe_acordo_coletivo` no input
+    "BRINDES_MARKETING",                # exige flag `destinatario_brinde` no input
 ])
 def test_categorias_pendentes_ficam_fora_do_mapa(categoria_pendente: str):
     """
-    Rail R2 — categorias inconclusivas por indisponibilidade de fonte primária
-    NÃO entram preditivamente. Subfases posteriores acrescentam quando Escrivão
-    confirmar.
+    Rail R2 — categorias que dependem de extensão de schema ou refactor
+    arquitetônico ficam fora desta subfase. Subfase 2.3+ acrescenta quando
+    o motor tiver os campos necessários.
     """
     assert classificar(categoria_pendente, _DATA_2026) is None
 
@@ -259,7 +303,7 @@ def test_categorias_pendentes_ficam_fora_do_mapa(categoria_pendente: str):
 
 def test_amparo_legal_nao_cita_paragrafo_ii_errado():
     """REGRESSÃO ERR-057: 'Art. 47 §II' como base de creditamento Simples não pode aparecer."""
-    for c in _mapa_subfase_2_1().values():
+    for c in _mapa_subfase_2_2().values():
         assert "§II" not in c.amparo_legal, (
             f"{c.categoria}: amparo legal NÃO pode citar Art. 47 §II "
             f"(citação errada — ver ERR-057). Veio: {c.amparo_legal}"
@@ -268,7 +312,7 @@ def test_amparo_legal_nao_cita_paragrafo_ii_errado():
 
 def test_amparo_legal_nao_cita_arts_inventados():
     """REGRESSÃO: Arts. 344/353/356-360 são CRONOGRAMA, não creditamento."""
-    for c in _mapa_subfase_2_1().values():
+    for c in _mapa_subfase_2_2().values():
         for art_proibido in ["Art. 344", "Art. 353", "Art. 356", "Art. 357",
                              "Art. 358", "Art. 359", "Art. 360"]:
             assert art_proibido not in c.amparo_legal, (
