@@ -16,13 +16,13 @@ Implementações concretas vão pra subfases posteriores quando houver caller.
 """
 
 from core.fontes.base import (
+    DadosInsuficientesNaFonte,
     FonteCliente,
     FonteIndisponivel,
-    DadosInsuficientesNaFonte,
 )
 
 __all__ = [
+    "DadosInsuficientesNaFonte",
     "FonteCliente",
     "FonteIndisponivel",
-    "DadosInsuficientesNaFonte",
 ]
