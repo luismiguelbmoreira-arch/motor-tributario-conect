@@ -52,6 +52,18 @@ FROZEN: dict[str, tuple[str, str]] = {
         "segredos - contem MOTOR_CONECT_MASTER_KEY",
         "Humano (fora do agente)",
     ),
+    "master.key": (
+        "chave raiz AES-256-GCM - perda = PDFs antigos irrecuperaveis (LGPD/CTN)",
+        "Humano (fora do agente)",
+    ),
+    "docker-compose": (
+        "infra compartilhada - mexer aqui afeta deploy do time inteiro",
+        "Humano (fora do agente)",
+    ),
+    ".github/workflows": (
+        "CI/CD - mudanca pode quebrar pipeline ou expor secrets",
+        "Humano (fora do agente)",
+    ),
 }
 
 
