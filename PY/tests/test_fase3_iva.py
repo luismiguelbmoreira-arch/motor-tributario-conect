@@ -171,8 +171,8 @@ class TestCreditoB2B:
         destacadas, o que não acontece para o Simples Nacional neste ano.
 
         A partir de 2027 (primeiro ano de recolhimento efetivo), o crédito
-        passa a existir conforme Art. 47, §II da LC 214/2025 — em montante
-        equivalente ao CBS/IBS pago dentro do DAS.
+        passa a existir conforme Art. 47, § 9º da LC 214/2025 — em valor
+        equivalente ao DAS recolhido pelo fornecedor Simples (ERR-057).
         """
         motor = make_motor(ano=2026, valor="50000.00")
         credito = motor.credito_b2b_simples
@@ -182,7 +182,7 @@ class TestCreditoB2B:
 
     def test_credito_2027_fracao_pis_cofins(self):
         """
-        2027: Crédito = DAS_mensal × fração (PIS+COFINS) — LC 214/2025 Art. 47 §II.
+        2027: Crédito = DAS_mensal × fração (PIS+COFINS) — LC 214/2025 Art. 47 § 9º.
 
         Anexo I Faixa 5 default do make_motor:
           PIS 2,76% + COFINS 12,74% = 15,50% do DAS
@@ -247,14 +247,16 @@ class TestCreditoB2B:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BLOCO 2b — CRÉDITO B2B ART. 47 §II — GOLDEN FINO POR ANEXO × FAIXA × ANO
-# Fonte: LC 214/2025, Art. 47, §II + Arts. 344, 353, 356-360
+# BLOCO 2b — CRÉDITO B2B ART. 47 § 9º — GOLDEN FINO POR ANEXO × FAIXA × ANO
+# Fonte: LC 214/2025, Art. 47, § 9º (crédito em valor equivalente ao DAS recolhido).
+# Cronograma de transição: Arts. 344-353 (CBS 2027), Arts. 356-360 (IBS phase-in 2029-32).
+# Citação anterior "§II + Arts. 344-360" como creditamento foi corrigida em ERR-057.
 # Valida que o cálculo usa fração REAL do DAS (não valor_operação × IVA cheio).
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 class TestCreditoB2BArtigo47:
-    """Validação Art. 47 §II — crédito por fração real do DAS."""
+    """Validação Art. 47 § 9º — crédito por fração real do DAS (ERR-057)."""
 
     @staticmethod
     def _moreira(ano: int) -> MotorReformaTributaria:

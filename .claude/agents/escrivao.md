@@ -96,7 +96,7 @@ Usar como referência rápida — não substituem nova verificação se lei foi 
 | RBT12 = soma 12 meses | LC 123/2006, Art. 3º, § 1º | ✅ Verificado |
 | Alíquota Efetiva = ((RBT12×AN)-PD)/RBT12 | LC 123/2006, Art. 18, caput | ✅ Verificado |
 | Fator R ≥ 0,28 → Anexo III | LC 123/2006, Art. 18, § 24 | ✅ Verificado |
-| Crédito B2B = fração do DAS | LC 214/2025, Art. 47, §II | ✅ Verificado |
+| Crédito B2B = fração do DAS | LC 214/2025, Art. 47, § 9º | ✅ Verificado (corrigido em ERR-057 — antes citava §II errado) |
 | Split Payment 2026: CBS 0,9% + IBS 0,1% | LC 214/2025 + EC 132/2023 | ✅ Verificado |
 | MEI teto R$81.000 | LC 123/2006, Art. 18-A, caput | ✅ Verificado |
 | LGPD retenção 5 anos | CTN, Art. 173 + LGPD Art. 16 | ✅ Verificado |

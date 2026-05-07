@@ -12,7 +12,7 @@ deixaria IVA por fora a 40% mas o DAS expurgaria 100% da fração — viés pró
 
 Fontes legislativas:
   - LC 214/2025 Arts. 41-44 (dispositivo opt-out)
-  - LC 214/2025 Art. 47 §II (creditamento proporcional)
+  - LC 214/2025 Art. 47 § 9º (crédito em valor equivalente ao DAS — ERR-057)
   - LC 214/2025 Arts. 258-264 (fator de redução CBS/IBS — aplicação isonômica)
   - LC 214/2025 Arts. 344, 353, 356-360 (cronograma IVA 2027-2033)
   - LC 214/2025 Art. 348 III 'c' (dispensa 2026)

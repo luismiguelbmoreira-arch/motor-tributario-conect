@@ -515,7 +515,7 @@
                 <h3 class="text-sm font-bold text-slate-900 mb-1">EFD-Contribuições resumida</h3>
                 <p class="text-xs text-slate-600 leading-relaxed">
                   Necessário em 2027+ para detalhar a fração de CBS/IBS dentro do DAS unificado
-                  (LC 214/2025, Art. 47, §II — cálculo do crédito equivalente ao devido).
+                  (LC 214/2025, Art. 47, § 9º — crédito em valor equivalente ao DAS recolhido).
                 </p>
                 <p class="text-xs text-slate-400 italic mt-1">Onde obter: Sistema contábil (Sage, Domínio, Alterdata, etc.)</p>
               </div>
@@ -1026,13 +1026,13 @@
       });
 
       // Linha 4: Crédito B2B — só quando há clientes B2B
-      // Citação legal conforme Art. 47 LC 214/2025:
-      //   Simples Puro: Art. 47 §II — crédito em montante equivalente ao CBS/IBS
-      //                  no DAS (zero em 2026 por Art. 348, III, "c")
+      // Citação legal conforme Art. 47 LC 214/2025 (validada Escrivão 30/04/2026):
+      //   Simples Puro: Art. 47 § 9º — crédito em valor equivalente ao DAS
+      //                  recolhido (zero em 2026 por Art. 348, III, "c")
       //   Opt-Out:      Art. 47 caput + Art. 41 — regime regular, crédito cheio
       if (pctB2B > 0) {
         linhas.push({
-          label: `Crédito aproveitado por clientes B2B <span class="text-xs text-slate-500">(ponderado por ${pctB2B.toFixed(0)}%)</span><br/><span class="text-xs text-slate-400 italic">⚖ LC 214/2025, Art. 47, §II</span>`,
+          label: `Crédito aproveitado por clientes B2B <span class="text-xs text-slate-500">(ponderado por ${pctB2B.toFixed(0)}%)</span><br/><span class="text-xs text-slate-400 italic">⚖ LC 214/2025, Art. 47, § 9º</span>`,
           simples: formatBRL(credEfetivoSimples) + ' <span class="text-slate-400 text-xs">(' + sanitize(simples.percentual_credito_nf || '1%') + ' × ' + pctB2B.toFixed(0) + '% B2B)</span>',
           optout: '<strong class="text-emerald-700">' + formatBRL(credEfetivoOptOut) + ' (' + sanitize(optOut.percentual_credito_nf || '100%') + ' × ' + pctB2B.toFixed(0) + '% B2B)</strong>',
           diff: formatDiferenca(credEfetivoSimples, credEfetivoOptOut, 'beneficio'),
