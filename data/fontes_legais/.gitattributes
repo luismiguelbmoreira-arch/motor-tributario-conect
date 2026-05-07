@@ -1,0 +1,5 @@
+# Snapshots normativos: NÃO converter line endings.
+# SHA-256 registrado em HASHES.txt depende dos bytes exatos do arquivo
+# como baixado do Planalto. Conversão CRLF/LF mudaria o hash e quebraria
+# rastreabilidade fiscal.
+*.html -text

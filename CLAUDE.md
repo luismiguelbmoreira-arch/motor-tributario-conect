@@ -541,15 +541,29 @@ Se PMD não foi invocado, commit não acontece. Sem exceção.
 | `f296b71` | **Fase 2 subfase 2.1** — mapa expandido 9 → 25 categorias (16 novas validadas pelo Escrivão em 07/05). 11 INSUMO + 4 USO_PESSOAL + 1 NAO_TRIBUTADO. 11 categorias pendentes documentadas (bens de capital, vales, ANUIDADE_CONSELHO_PJ, COMBUSTIVEL_FROTA, BRINDES). |
 | `(próximo)` | **Fase 2 subfase 2.2** — mapa 25 → 33 categorias. 4 BEM_DE_CAPITAL (Art. 108) + 3 vales (Art. 57 § 3º + LC 227/2026) + 1 NAO_TRIBUTADO (ANUIDADE_CONSELHO_PJ). 3 pendentes restantes exigem refactor/flag schema: COMBUSTIVEL_FROTA (refactor `NCMS_MONOFASICAS_BLOQUEADAS`), PLANO_SAUDE_FUNCIONARIO (flag `existe_acordo_coletivo`), BRINDES_MARKETING (flag `destinatario_brinde`). |
 
-### 🔧 Pendência operacional documentada (07/05/2026)
+### ✅ Cache local de fontes normativas (07/05/2026 — resolvido)
 
-**Cache local de leis Planalto** — Planalto offline em **3 rodadas consecutivas** do Escrivão (socket-dropping persistente). Sem fonte primária canonicamente citada, protocolo Escrivão fica frágil em fiscalização real (Rail R1 exige fonte primária). Solução proposta:
+**Bloqueio operacional do Escrivão** (WebFetch contra Planalto socket-dropping em 4+ rodadas consecutivas) **resolvido** via cache local em `data/fontes_legais/`.
 
-1. Baixar `lcp214.htm` (e demais LCs relevantes) uma vez e armazenar em `data/fontes_legais/planalto/lcp214_v2026-05.txt` com SHA-256 + URL canônica.
-2. WebFetch Escrivão tenta primeiro o cache local, fallback para `legis.senado.leg.br` ou `camara.leg.br` (mesma força legal).
-3. `data/fontes_legais/HASHES.txt` registra SHA-256 de cada arquivo + data de captura — auditoria pode comparar com Planalto quando voltar.
+Descoberta: WebFetch falha mas `curl` direto funciona (limitação do tool, não do servidor). Captura inicial via curl:
 
-Sem item 1 ou 2 implementado, validações futuras dependem de fontes secundárias (Mayer Brown, Tauil & Chequer, Conjur, etc.) com convergência ≥ 3 — defensável mas não-canônico.
+| Lei | Tamanho | SHA-256 (12 chars) |
+|---|---|---|
+| LC 123/2006 (Simples) | 1.6MB | `de35b5205860...` |
+| LC 214/2025 (IBS/CBS/IS) | 5.2MB | `54d4fe599cbe...` |
+| LC 227/2026 (alterações) | 1.3MB | `84115b788660...` |
+
+Estrutura:
+- `data/fontes_legais/README.md` — protocolo de captura/uso
+- `data/fontes_legais/HASHES.txt` — registro canônico (sha256 | path | url | data | fonte)
+- `data/fontes_legais/planalto/lcpXXX_vYYYY-MM-DD.html` — snapshots HTML
+
+Agente Escrivão atualizado (`.claude/agents/escrivao.md`) com protocolo
+**cache-first**: lê arquivo local antes de tentar WebFetch. Cita URL
+canônica + SHA-256 na resposta pra rastreabilidade fiscal.
+
+Re-captura agendada quando: LC posterior altera dispositivos, Resolução
+CGSN anual sai, ou 6 meses sem refresh (política conservadora).
 
 ### ✅ Entregue antes da Fase 0a (refinamento WS12/WS10/WS6)
 
