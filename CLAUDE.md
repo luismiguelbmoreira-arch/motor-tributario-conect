@@ -144,6 +144,39 @@ tests/                       ← 1021 testes (100% passando)
 
 ---
 
+## 🔌 DECISÃO ARQUITETÔNICA — DESACOPLAMENTO DE FONTE DE DADOS (30/04/2026)
+
+**Contexto:** plano original tratava Nibo como torneira principal de ingestão (Fase 1 sonda → Fase 3 pipeline pivotado em Nibo). Realidade: contrato Nibo demora meses pra firmar — manter Nibo no caminho crítico paralisa motor.
+
+**Decisão:** inverter dependência via interface `FonteCliente`. Motor consome interface; fontes implementam.
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Motor (core/) ──► FonteCliente (interface)                      │
+│                         ▲                                         │
+│                         │ implementam                             │
+│         ┌───────────────┼───────────────────────────────┐         │
+│         │               │                                │         │
+│   FontePDFManual    FonteNibo (futura)         FonteSistemaProprio│
+│   (Claude Vision    (parqueada até             (sistema interno   │
+│    sobre PDF +       contrato fechar)           de notas)         │
+│    upload manual)                                                 │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Consequências práticas:**
+- ❌ **Fase 1** (sonda Nibo) sai do caminho crítico → parqueada como "ativa quando contrato Nibo fechar". Sem `services/cliente_nibo.py` esqueleto até lá (R9 — abstração morta).
+- ✅ **Fase 2** (mapa-mestre CBS/IBS) permanece — não depende de fonte; classifica categorias por LC 214/2025.
+- ✅ **Fase 2.5** (parser XML NF-e/NFS-e) permanece — XML é fonte hoje, independente de Nibo.
+- ✅ **Fase 3'** nova — adapter genérico `FonteCliente` com 1 implementação inicial: `FontePDFManual` reusando `services/extrator_pdfs.py` (Claude Vision) + `POST /analise/pdf` que já existem em produção. Quando Nibo entrar (meses), é 1 arquivo novo (`FonteNibo`) implementando a mesma interface — zero refactor do motor.
+- ✅ **Fase 4, 4.5, 5** inalteradas.
+
+**Princípio Rail R5 estendido (separação rígida):** fonte de dados ≠ motor. Motor não conhece Nibo, e-CAC, sistema próprio nem PDF — só consome `FonteCliente.obter_periodo(cnpj, mes_inicio, mes_fim) -> HistoricoSeisMeses`.
+
+**Reuso máximo:** 80% do que Nibo automatizaria já existe — `extrator_pdfs.py` + auditoria documental cifrada cobrem o pipeline manual. Diferença é UX (upload vs polling automático), não capacidade.
+
+---
+
 ## 🔐 PROTEÇÃO DE REGIME (3 Camadas — NÃO REMOVER)
 
 ```
