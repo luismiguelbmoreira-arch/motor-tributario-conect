@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # 🏛️ MOTOR TRIBUTÁRIO CONECT — BÍBLIA DA REFORMA TRIBUTÁRIA
 
-**Status:** 🚀 Produção — 1579 testes passando (100%) | 4 regimes + DIFAL + Cronograma + PDF educativo + Auditoria Documental LGPD + IDOR Guard + Stack front-back sincronizada + Fase 0a/0b concluídas + Fase 2 subfase 2.2 (mapa-mestre 33 categorias) + Fase 3' subfase 0 (interface FonteCliente)
+**Status:** 🚀 Produção — 1579 testes passando (100%) | 4 regimes + DIFAL + Cronograma + PDF educativo + Auditoria Documental LGPD + IDOR Guard + Stack front-back sincronizada + Fase 0a/0b concluídas + Fase 2 subfase 2.2 (mapa-mestre 34 categorias) + Fase 3' subfase 0 (interface FonteCliente) + Cache local de fontes normativas
 **Âncora Legal:** EC 132/2023 | LC 123/2006 | LC 214/2025 | LC 224/2025 | LC 227/2026 | EC 87/2015 | LGPD 13.709/2018 | CTN Arts. 142 e 173
 **Data Certificação:** 07/05/2026 (Fase 2 subfase 2.2 — desacoplamento Nibo + ERR-057 + mapa-mestre + 4 bugs MAX_07 corrigidos)
 
@@ -539,7 +539,9 @@ Se PMD não foi invocado, commit não acontece. Sem exceção.
 | `5e014a6` | **Fase 2 subfase 2.0** — `core/mapa_categorias_cbs_ibs.py` com 9 categorias-piloto (LC 214/2025 Arts. 47 caput + 57 caput). Schema VersionedRule[Dict[str, ClassificacaoCredito]]. |
 | `9196153` | **Fase 3' subfase 0** — `core/fontes/base.py` Protocol `FonteCliente` + exceções `FonteIndisponivel` e `DadosInsuficientesNaFonte`. Implementações concretas em subfases posteriores quando houver caller. |
 | `f296b71` | **Fase 2 subfase 2.1** — mapa expandido 9 → 25 categorias (16 novas validadas pelo Escrivão em 07/05). 11 INSUMO + 4 USO_PESSOAL + 1 NAO_TRIBUTADO. 11 categorias pendentes documentadas (bens de capital, vales, ANUIDADE_CONSELHO_PJ, COMBUSTIVEL_FROTA, BRINDES). |
-| `(próximo)` | **Fase 2 subfase 2.2** — mapa 25 → 33 categorias. 4 BEM_DE_CAPITAL (Art. 108) + 3 vales (Art. 57 § 3º + LC 227/2026) + 1 NAO_TRIBUTADO (ANUIDADE_CONSELHO_PJ). 3 pendentes restantes exigem refactor/flag schema: COMBUSTIVEL_FROTA (refactor `NCMS_MONOFASICAS_BLOQUEADAS`), PLANO_SAUDE_FUNCIONARIO (flag `existe_acordo_coletivo`), BRINDES_MARKETING (flag `destinatario_brinde`). |
+| `51a92dc` | **Fase 2 subfase 2.2** — mapa 25 → 33 categorias. 4 BEM_DE_CAPITAL (Art. 108) + 3 vales (Art. 57 § 3º + LC 227/2026) + 1 NAO_TRIBUTADO (ANUIDADE_CONSELHO_PJ). |
+| `c1e18f8` | **Cache local de leis** — 3 LCs chave (123/2006, 214/2025, 227/2026) capturadas via curl direto contra Planalto + protocolo Escrivão cache-first. Resolve bloqueio operacional de 4 rodadas WebFetch socket-dropping. |
+| `(próximo)` | **Subfase 2.2 cont.** — COMBUSTIVEL_FROTA_EMPRESARIAL ao mapa (Art. 180 a contrario sensu). Mapa: 33 → 34. R9 análise mostrou que título do ticket "refactor `NCMS_MONOFASICAS_BLOQUEADAS`" estava enganoso — bloqueio em motor.py:54 protege OperacaoFiscal de VENDA; despesa de frota nunca passa por lá. Solução foi adicionar categoria ao mapa, sem refactor. 2 pendentes restantes: PLANO_SAUDE_FUNCIONARIO (flag `existe_acordo_coletivo`), BRINDES_MARKETING (flag `destinatario_brinde`). |
 
 ### ✅ Cache local de fontes normativas (07/05/2026 — resolvido)
 

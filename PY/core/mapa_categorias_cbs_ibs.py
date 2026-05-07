@@ -24,17 +24,19 @@ Base legal (validada por Escrivão em 30/04/2026, 07/05/2026 e 07/05/2026 rodada
   está fora do escopo CBS/IBS por construção).
 
 Pendências documentadas (subfase 2.3 ou tickets separados):
-- COMBUSTIVEL_FROTA_EMPRESARIAL — Escrivão validou que Art. 180 veda crédito
-  apenas pra revenda/comercialização, não pra uso operacional próprio. Mas
-  isso conflita com `NCMS_MONOFASICAS_BLOQUEADAS` em schemas/motor.py:54
-  que bloqueia 2710 inteiro na entrada. Refactor pra distinguir uso próprio
-  de revenda fica em ticket separado — não bloqueia a subfase 2.2.
 - PLANO_SAUDE_FUNCIONARIO — Escrivão validou que LC 227/2026 manteve a
   exigência de acordo coletivo. Schema atual não tem flag `existe_acordo_coletivo`
   no input — categoria entra como CASO_DUVIDA quando schema for estendido.
 - BRINDES_MARKETING — depende de flag `destinatario_brinde`
   (CLIENTE | EMPREGADO_OU_VINCULADO). Schema atual não tem o flag — fica
   como CASO_DUVIDA quando estendido.
+
+Nota arquitetônica (07/05/2026): COMBUSTIVEL_FROTA_EMPRESARIAL entra na
+subfase 2.2 como categoria de DESPESA. NÃO confundir com bloqueio de NCM
+2710 em `schemas/motor.py:54` (`NCMS_MONOFASICAS_BLOQUEADAS`) — aquele
+protege o motor de calcular ERRADO uma operação de VENDA de combustível
+(regime monofásico exige fórmula própria). Despesa de frota nunca passa
+por aquele schema. Bloqueio mantido inalterado.
 
 Recomendação Escrivão (operacional, fora desta subfase):
 - Planalto offline em 3 rodadas consecutivas. Implementar cache local de
@@ -114,21 +116,21 @@ def _categoria(
 
 def _mapa_subfase_2_2() -> Dict[str, ClassificacaoCredito]:
     """
-    Categorias da subfase 2.2 = subfase 2.1 + 8 novas validadas em 07/05/2026 (rodada 2).
+    Categorias da subfase 2.2 = subfase 2.1 + 9 novas validadas em 07/05/2026 (rodada 2).
     Contagem exata e invariantes verificados nos testes (Rail R6 — fonte única).
 
-    Novas na subfase 2.2 (8):
+    Novas na subfase 2.2 (9):
     - 4 BEM_DE_CAPITAL (Art. 108) — COMPUTADOR_NOTEBOOK_ATIVO,
       IMPRESSORA_EQUIPAMENTO_ESCRITORIO, MOBILIARIO_ESCRITORIO,
       MAQUINARIO_INDUSTRIAL
     - 3 INSUMO_CREDITAVEL vales (Art. 57 § 3º + LC 227/2026) — VALE_REFEICAO,
       VALE_ALIMENTACAO, VALE_TRANSPORTE
     - 1 NAO_TRIBUTADO — ANUIDADE_CONSELHO_PJ (CF Art. 149 — parafiscal)
+    - 1 INSUMO_CREDITAVEL — COMBUSTIVEL_FROTA_EMPRESARIAL (Art. 180 a contrario
+      sensu; vedação só pra revenda/distribuição). Categoria de DESPESA, não
+      colide com bloqueio de venda em NCMS_MONOFASICAS_BLOQUEADAS.
 
     Pendências documentadas (FORA desta subfase, não inferir):
-    - COMBUSTIVEL_FROTA_EMPRESARIAL — Escrivão validou ALTA mas exige refactor
-      do `NCMS_MONOFASICAS_BLOQUEADAS` (que hoje bloqueia 2710 inteiro). Art. 180
-      a contrario sensu permite crédito pra uso operacional próprio. Ticket separado.
     - PLANO_SAUDE_FUNCIONARIO — Escrivão validou MEDIA com flag dependente
       de `existe_acordo_coletivo`. Schema atual não tem o flag.
     - BRINDES_MARKETING — Escrivão validou MEDIA com flag `destinatario_brinde`
@@ -321,6 +323,29 @@ def _mapa_subfase_2_2() -> Dict[str, ClassificacaoCredito]:
         ),
     }
 
+    # Combustível pra frota própria empresarial — Art. 180 a contrario sensu.
+    # Vedação só pra revenda/distribuição/comercialização; uso operacional
+    # próprio mantém direito ao crédito (Conjur, ConfEB, Dickel, Cenários
+    # Consultoria — convergência ≥4 fontes secundárias autoritativas).
+    art_180_a_contrario_sensu = (
+        "LC 214/2025, Art. 180 a contrario sensu (vedação aplicável apenas "
+        "a revenda/distribuição/comercialização — combustível para frota "
+        "própria operacional mantém direito ao crédito) + LC 214/2025 Art. 47 caput"
+    )
+    novas_combustivel: Dict[str, ClassificacaoCredito] = {
+        "COMBUSTIVEL_FROTA_EMPRESARIAL": _categoria(
+            "COMBUSTIVEL_FROTA_EMPRESARIAL", "INSUMO_CREDITAVEL",
+            art_180_a_contrario_sensu, "ALTA",
+            (
+                "Categoria de DESPESA (compra). Não confundir com OperacaoFiscal "
+                "de venda — bloqueio NCMS_MONOFASICAS_BLOQUEADAS em schemas/motor.py "
+                "vale pra venda, não pra despesa. Quando integrar com motor de "
+                "cálculo, regime monofásico exige fórmula própria; usar mapa só "
+                "como classificação fiscal, não como base de cálculo direta."
+            ),
+        ),
+    }
+
     return {
         **base_2_0,
         **novas_insumo,
@@ -329,6 +354,7 @@ def _mapa_subfase_2_2() -> Dict[str, ClassificacaoCredito]:
         **novas_bem_capital,
         **novas_vales,
         **novas_anuidade,
+        **novas_combustivel,
     }
 
 

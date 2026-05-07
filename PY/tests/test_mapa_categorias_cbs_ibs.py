@@ -54,9 +54,9 @@ def test_schema_extra_forbid():
 
 # ── Mapa subfase 2.2 — invariantes estruturais ───────────────────────────────
 
-def test_mapa_subfase_2_2_tem_33_categorias():
-    """Subfase 2.2 entrega 33 categorias = 25 da subfase 2.1 + 8 novas."""
-    assert len(_mapa_subfase_2_2()) == 33
+def test_mapa_subfase_2_2_tem_34_categorias():
+    """Subfase 2.2 entrega 34 categorias = 25 da subfase 2.1 + 9 novas."""
+    assert len(_mapa_subfase_2_2()) == 34
 
 
 def test_mapa_subfase_2_2_apenas_confianca_alta():
@@ -221,6 +221,7 @@ def test_listar_creditaveis_retorna_apenas_creditaveis():
     assert "ASSESSORIA_CONTABIL" in creditaveis
     assert "VALE_REFEICAO" in creditaveis
     assert "COMPUTADOR_NOTEBOOK_ATIVO" in creditaveis
+    assert "COMBUSTIVEL_FROTA_EMPRESARIAL" in creditaveis
 
 
 def test_listar_creditaveis_ordem_lexica():
@@ -228,10 +229,10 @@ def test_listar_creditaveis_ordem_lexica():
     assert creditaveis == sorted(creditaveis)
 
 
-def test_listar_creditaveis_subfase_2_2_tem_25_itens():
-    """7 da 2.0 + 11 da 2.1 + 3 vales + 4 bens de capital = 25 creditáveis."""
+def test_listar_creditaveis_subfase_2_2_tem_26_itens():
+    """7 da 2.0 + 11 da 2.1 + 3 vales + 4 bens de capital + 1 combustível = 26."""
     creditaveis = listar_categorias_creditaveis(_DATA_2026)
-    assert len(creditaveis) == 25
+    assert len(creditaveis) == 26
 
 
 # ── Subfase 2.2 — bens de capital (Art. 108) ────────────────────────────────
@@ -282,11 +283,30 @@ def test_anuidade_conselho_pj_nao_tributada():
     assert "CF Art. 149" in c.amparo_legal
 
 
+def test_combustivel_frota_empresarial_creditavel_art_180_a_contrario_sensu():
+    """
+    Combustível pra frota PRÓPRIA da PJ gera crédito (Art. 180 a contrario sensu —
+    vedação só pra revenda/distribuição/comercialização). Fonte: convergência
+    Conjur + ConfEB + Dickel + Cenários Consultoria.
+
+    Categoria de DESPESA — não confunde com bloqueio de NCM 2710 em
+    NCMS_MONOFASICAS_BLOQUEADAS (que é pra OperacaoFiscal de venda).
+    """
+    c = classificar("COMBUSTIVEL_FROTA_EMPRESARIAL", _DATA_2026)
+    assert c is not None
+    assert c.tipo == "INSUMO_CREDITAVEL"
+    assert c.gera_credito is True
+    assert "Art. 180" in c.amparo_legal
+    assert "a contrario sensu" in c.amparo_legal
+    # Observação deve alertar sobre regime monofásico exigir fórmula própria
+    assert c.observacao is not None
+    assert "monofásico" in c.observacao.lower()
+
+
 # ── Pendências documentadas — categorias que dependem de refactor/flag ──────
 
 @pytest.mark.parametrize("categoria_pendente", [
-    # Validadas ALTA mas dependem de refactor/flag schema:
-    "COMBUSTIVEL_FROTA_EMPRESARIAL",   # exige refactor de NCMS_MONOFASICAS_BLOQUEADAS
+    # Validadas ALTA mas dependem de extensão de schema (flag novo):
     "PLANO_SAUDE_FUNCIONARIO",          # exige flag `existe_acordo_coletivo` no input
     "BRINDES_MARKETING",                # exige flag `destinatario_brinde` no input
 ])
