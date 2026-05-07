@@ -69,7 +69,7 @@ Luiz subestimou a gravidade porque assumiu valores reais em `fracao_ibs+cbs`; es
 | Artigo | Aplicação |
 |---|---|
 | LC 214/2025 Arts. 41-44 | Dispositivo de opt-out (regime opcional) |
-| LC 214/2025 Art. 47 §II | Creditamento proporcional IBS/CBS do DAS |
+| LC 214/2025 Art. 47 § 9º | Crédito em valor equivalente ao DAS recolhido (corrigido em ERR-057 — antes citava §II) |
 | LC 214/2025 Arts. 258-264 | Fator de redução CBS/IBS — **aplicação isonômica (simetria)** |
 | LC 214/2025 Arts. 344 e 353 | CBS substitui PIS/COFINS em 2027 |
 | LC 214/2025 Arts. 356-360 | Phase-in IBS 2029-2032 + redução ICMS/ISS simétrica |

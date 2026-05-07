@@ -85,7 +85,9 @@ TABELAS_ANEXOS: dict = {
 # Teto do Simples Nacional (LC 123/2006, Art. 3º, II)
 TETO_SIMPLES_NACIONAL = Decimal("4800000.00")
 
-# Sublimite ICMS/ISS (LC 123/2006, Art. 13, § 1º — estados com RBT12 > 3.6M)
+# Sublimite ICMS/ISS (LC 123/2006 Art. 13-A + Art. 19 § 4º — estados com RBT12 > 3.6M).
+# Citação validada por Escrivão em 29/04/2026 (anterior "Art. 13 § 1º" estava errada).
+# Para versão por UF e ano-calendário (Portarias CGSN), ver core/sublimites_uf.py.
 SUBLIMITE_ICMS_ISS = Decimal("3600000.00")
 
 # Zona de alerta: 90% do teto (planejamento tributário preventivo)

@@ -1,0 +1,11 @@
+# data/fontes_legais/HASHES.txt
+# Registro canônico de snapshots normativos. Uma linha por arquivo.
+# Formato: sha256 | caminho_relativo | url_canonica | data_captura | fonte
+#
+# `fonte` ∈ {planalto, senado, camara, in_gov_br}
+# Prioridade de uso: planalto > senado > camara > in_gov_br
+# Re-captura: ver README.md (LC posterior altera dispositivos / 6 meses sem refresh)
+
+de35b5205860437936674b50317cc75a5246672dfe8deff7b389835657cb454d | planalto/lcp123_v2026-05-07.html | https://www.planalto.gov.br/ccivil_03/leis/lcp/lcp123.htm | 2026-05-07 | planalto
+54d4fe599cbefb460c7879f112396d104d5cd7becbc52ff19d61512cc8db36cf | planalto/lcp214_v2026-05-07.html | https://www.planalto.gov.br/ccivil_03/leis/lcp/lcp214.htm | 2026-05-07 | planalto
+84115b78866029d6f76aace06f12f306228e1bfc8136f8749cca7c86a5941a75 | planalto/lcp227_v2026-05-07.html | https://www.planalto.gov.br/ccivil_03/leis/lcp/lcp227.htm | 2026-05-07 | planalto

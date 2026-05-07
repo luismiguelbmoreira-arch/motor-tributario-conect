@@ -256,3 +256,32 @@ def avaliar_das(das_calculado: Decimal, das_pago: Decimal) -> dict[str, Any]:
         "interpretacao": _INTERPRETACAO_DAS[semaforo],
         "amparo_legal": "LC 123/2006, Art. 21 — apuracao mensal do DAS unificado",
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Validador de profissão regulamentada — LC 214/2025 Art. 127 (redução 30% IVA)
+# Lista taxativa: 18 incisos (I-XVIII). Fora da lista = não recebe redução.
+# ─────────────────────────────────────────────────────────────────────────────
+def validar_profissao_regulamentada(codigo: Optional[str]) -> ValidationResult:
+    """
+    Aceita None ou um dos 18 códigos do Art. 127 da LC 214/2025.
+
+    None = empresa não declara profissão regulamentada (default conservador,
+    sem redução aplicada). Código fora da lista = erro com sugestão da lista.
+    """
+    from core.profissoes_regulamentadas import PROFISSOES_ART_127
+
+    resultado = ValidationResult(ok=True)
+    if codigo is None:
+        return resultado
+    if not isinstance(codigo, str):
+        resultado.adicionar_erro(
+            f"profissao_regulamentada deve ser str ou None, recebido {type(codigo).__name__}."
+        )
+        return resultado
+    if codigo not in PROFISSOES_ART_127:
+        resultado.adicionar_erro(
+            f"Profissão '{codigo}' não consta no Art. 127 da LC 214/2025. "
+            f"Códigos válidos: {sorted(PROFISSOES_ART_127.keys())}."
+        )
+    return resultado

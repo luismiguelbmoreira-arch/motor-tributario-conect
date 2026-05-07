@@ -646,7 +646,7 @@ def _secao_decisao_opt_out(diagnostico: dict) -> str:
       <td style="text-align:right;">{diff_custo_total}</td>
     </tr>
     {'' if not tem_b2b else f'''<tr>
-      <td>Crédito aproveitado por clientes B2B<br/><span style="font-size:9px;color:#9ca3af;">(ponderado por {pct_b2b_dec:.0f}% B2B)</span><br/><span style="font-size:8px;color:#6b7280;font-style:italic;">⚖ LC 214/2025, Art. 47, §II</span></td>
+      <td>Crédito aproveitado por clientes B2B<br/><span style="font-size:9px;color:#9ca3af;">(ponderado por {pct_b2b_dec:.0f}% B2B)</span><br/><span style="font-size:8px;color:#6b7280;font-style:italic;">⚖ LC 214/2025, Art. 47, § 9º</span></td>
       <td style="text-align:right;font-family:monospace;">{credito_simples} <span style="color:#9ca3af;font-size:9px;">({pct_credito_simples})</span></td>
       <td style="text-align:right;font-family:monospace;"><strong style="color:#065f46;">{credito_opt} ({pct_credito_opt})</strong></td>
       <td style="text-align:right;">{diff_credito}</td>
@@ -744,8 +744,9 @@ def _secao_documentos_precisao() -> str:
     no PDF para que o PDF (versão para fiscalização) contenha a mesma
     transparência sobre o que é estimativa vs cálculo real.
 
-    Base legal: LC 214/2025 Art. 47 §II (crédito equivalente ao devido) +
-    CTN Art. 142 (constituição do crédito tributário exige prova documental).
+    Base legal: LC 214/2025 Art. 47 § 9º (crédito em valor equivalente ao DAS
+    recolhido pelo fornecedor Simples) + CTN Art. 142 (constituição do crédito
+    tributário exige prova documental).
     """
     docs = [
         (
@@ -760,8 +761,8 @@ def _secao_documentos_precisao() -> str:
             "2",
             "EFD-Contribuições resumida",
             "Necessário em 2027+ para detalhar a fração de CBS/IBS dentro do DAS "
-            "unificado (LC 214/2025, Art. 47, §II — cálculo do crédito equivalente "
-            "ao devido).",
+            "unificado (LC 214/2025, Art. 47, § 9º — crédito em valor equivalente "
+            "ao DAS recolhido).",
             "Onde obter: Sistema contábil (Sage, Domínio, Alterdata, etc.)",
         ),
         (

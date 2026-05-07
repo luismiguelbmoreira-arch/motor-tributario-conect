@@ -115,7 +115,7 @@ from motor_tributario import MotorReformaTributaria
 
 class TestFracaoIvaNoPass:
     """
-    _fracao_iva_no_das — LC 214/2025 Art. 47 §II
+    _fracao_iva_no_das — LC 214/2025 Art. 47 § 9º (ERR-057)
     Gap: função base do crédito B2B sem nenhum teste direto
     """
 

@@ -50,9 +50,38 @@ Extraio da string `amparo_legal`:
 - **Parágrafo/Inciso** (ex: "§ 24", "§II", "caput")
 - **Conteúdo alegado** (o que o código afirma que a lei diz)
 
-### Passo 2 — Fetch Planalto
+### Passo 2 — Localizar texto da lei (cache-first)
 
-Uso `WebFetch` na URL oficial correspondente.
+**Ordem de consulta obrigatória:**
+
+1. **Cache local** (`data/fontes_legais/`) — sempre primeiro.
+   - Leio `data/fontes_legais/HASHES.txt` pra descobrir versão vigente.
+   - Abro o arquivo `.html` do Planalto via `Read` tool.
+   - Cito URL canônica + SHA-256 do snapshot na resposta (rastreabilidade).
+
+2. **`WebFetch` contra Planalto** — se cache não tem a norma.
+   - URL canônica conforme tabela acima.
+   - Se cair (socket-dropping conhecido), pulo pra etapa 3.
+
+3. **Mirror Senado** (`legis.senado.leg.br/norma/{id}/publicacao/{id}`) —
+   fallback quando Planalto falha. Senado é SPA — `curl` pega só shell,
+   mas WebFetch renderiza JS e extrai texto em Markdown.
+
+4. **Convergência ≥3 fontes secundárias autoritativas** — última opção.
+   Mayer Brown, Tauil & Chequer, Mattos Filho, Conjur, Senado Notícias,
+   biblioteca STF, etc. Marco `fonte_secundaria=True` na resposta —
+   defensável mas não-canônico.
+
+**Captura nova** (quando precisar adicionar lei ao cache):
+
+```bash
+# Tenta Planalto direto via curl (WebFetch falha mas curl funciona, 07/05/2026)
+curl -sS -L -A "Mozilla/5.0" --max-time 120 \
+    "https://www.planalto.gov.br/ccivil_03/leis/lcp/lcpXXX.htm" \
+    -o data/fontes_legais/planalto/lcpXXX_v$(date +%Y-%m-%d).html
+sha256sum data/fontes_legais/planalto/lcpXXX_v$(date +%Y-%m-%d).html
+# adicionar linha em HASHES.txt
+```
 
 Busco no texto retornado:
 - O número do artigo exato
@@ -96,7 +125,7 @@ Usar como referência rápida — não substituem nova verificação se lei foi 
 | RBT12 = soma 12 meses | LC 123/2006, Art. 3º, § 1º | ✅ Verificado |
 | Alíquota Efetiva = ((RBT12×AN)-PD)/RBT12 | LC 123/2006, Art. 18, caput | ✅ Verificado |
 | Fator R ≥ 0,28 → Anexo III | LC 123/2006, Art. 18, § 24 | ✅ Verificado |
-| Crédito B2B = fração do DAS | LC 214/2025, Art. 47, §II | ✅ Verificado |
+| Crédito B2B = fração do DAS | LC 214/2025, Art. 47, § 9º | ✅ Verificado (corrigido em ERR-057 — antes citava §II errado) |
 | Split Payment 2026: CBS 0,9% + IBS 0,1% | LC 214/2025 + EC 132/2023 | ✅ Verificado |
 | MEI teto R$81.000 | LC 123/2006, Art. 18-A, caput | ✅ Verificado |
 | LGPD retenção 5 anos | CTN, Art. 173 + LGPD Art. 16 | ✅ Verificado |
