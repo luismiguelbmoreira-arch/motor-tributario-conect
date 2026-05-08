@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # 🏛️ MOTOR TRIBUTÁRIO CONECT — BÍBLIA DA REFORMA TRIBUTÁRIA
 
-**Status:** 🚀 Produção — 1828 testes passando (100%) | 4 regimes + IMUNE + DIFAL + Cronograma + PDF educativo + Auditoria Documental LGPD + IDOR Guard + Stack front-back sincronizada + Fase 0a/0b + Fase 2 subfase 2.2 (mapa-mestre 34 categorias) + Fase 3' subfase 0 (interface FonteCliente) + WS6 etapas 4/5a/5b/6 (IMUNE + COOPERATIVA + orquestrador) + WS12 (ERR-005 fechado) + WS5 (`refazer_calculo.py` Rail R6) + Cache local de fontes normativas
+**Status:** 🚀 Produção — 1858 testes passando (100%) | 4 regimes + IMUNE + DIFAL + Cronograma + PDF educativo + Auditoria Documental LGPD + IDOR Guard + Stack front-back sincronizada + Fase 0a/0b + Fase 2 subfase 2.2 (mapa-mestre 34 categorias) + Fase 3' subfase 0 (interface FonteCliente) + WS6 etapas 4/5a/5b/6 (IMUNE + COOPERATIVA + orquestrador) + WS12 (ERR-005 fechado) + WS5 (refazer Rail R6) + WS7 (obrigações Simples + alertas) + Cache local de fontes normativas
 **Âncora Legal:** EC 132/2023 | LC 123/2006 | LC 214/2025 | LC 224/2025 | LC 227/2026 | EC 87/2015 | LGPD 13.709/2018 | Lei 5.764/71 | Lei 9.718/98 | CTN Arts. 142 e 173
-**Data Certificação:** 08/05/2026 (WS5 — Rail R6 logs refazíveis: `core/refazer.py` função pura + `scripts/refazer_calculo.py` CLI + parser BR endereçando achado PMD)
+**Data Certificação:** 08/05/2026 (WS7 — obrigações DASN-SIMEI/DEFIS/PGDAS-D + alertas vencimento; multas LC 123 Art. 38/38-A validadas Escrivão)
 
 ---
 
@@ -597,7 +597,8 @@ CGSN anual sai, ou 6 meses sem refresh (política conservadora).
 | WS10 extensão — `TABELAS_ANEXOS` + `CRONOGRAMA_IVA` | 🔵 Pendente | Constantes versionadas com vigência por faixa |
 | ~~WS12 — regenerar `data/cnae_completo.json`~~ | ✅ **Fechado em 08/05/2026** | `gerar_mapa_cnae.py` reescrito consumindo `obter_regra()` (fonte única); JSON regenerado com schema enriquecido `{cnae: {categoria, anexo_padrao, depende_fator_r, base_legal, observacao}}` + metadados (data, SHA-256 IBGE, consumidor canônico); fallback secundário removido em `tabelas_simples.py`; teste anti-drift `test_cnae_json_consistencia.py` (13 testes); ERR-005 oficialmente resolvido. CSV CGSN 140/2018 não existe machine-readable — categorização canônica vive em `core/cnae_excecoes.py` (15 exceções + 48 divisões); CNAEs em divisões fora do mapa caem em fallback Anexo III conservador (Rail R2) |
 | WS6.b — Lucro Real refinado | 🔵 Aguarda Aurora rodar pelo motor | Adições/exclusões extracontábeis + extrator DRE; fixture em `samples/casos_clinicos/lucro_real_aurora_ficticio/` |
-| WS7 — Obrigações acessórias + alerta ativo de multas | 🔵 Pendente | Matriz porte×regime → obrigações+multas |
+| ~~WS7 — Obrigações acessórias + alerta ativo de multas~~ | ✅ **Parcial — fechado em 08/05/2026 para Simples Nacional** | `core/obrigacoes_acessorias.py` (409 LOC) com 3 obrigações cobertas pelo cache LC 123/2006: DASN-SIMEI (Art. 38 § 6º — mín R$ 50), DEFIS (Art. 38 § 3º — mín R$ 200), PGDAS-D (Art. 38-A redação LC 214/2025 — mín R$ 50/mês-ref). Multa máxima 20% (NÃO 10% — bloqueio MAX_07 do plano original prevenido pelo Escrivão). 4 bloqueios MAX_07 prevenidos antes do código. Frequências ANUAL+MENSAL implementadas; SEMESTRAL/TRIMESTRAL pendentes (WS7b). 30 testes |
+| **WS7b — captura de fontes acessórias** | ⏸️ **RETOMAR AQUI** | Cachear: Resolução CGSN 140/2018 (prazos canônicos 31/05, 31/03, dia 20 — hoje declarados com `prazo_amparo_pendente=True`); Lei 9.430/96 (ECF, multa 0,25% LL); Lei 8.218/91 (ECD); Lei 10.426/2002 (DCTFWeb); Lei 12.973/2014 (alterações); Lei 9.532/97 (Imune); IN RFB 2.003-2.005/2021; IN RFB 1.252/2012. Após cache: estender matriz com ECF/ECD/EFD-Contribuições/DCTFWeb. Plus: `relatorio_pdf.py:724-726` cita Lei 9.430/96 Art. 44 I + Lei 14.689/2023 sem cache — revalidar. Plus: caller de produção pra `gerar_alertas_obrigacoes()` (motor.trilha_auditoria ou endpoint `/obrigacoes/{cnpj}`) — sem caller, abstração morta latente |
 | WS2 — Matriz 3×3 cenários 2026-2033 | 🔵 Pendente (depende de WS6+WS10) | Fonte oficial premissas econômicas (BCB Focus, IBGE SIDRA) |
 | WS4 — ERR-026/027/028 | 🟡 Pendente | response_model inerte, _erros perdido, CPF em campo CNPJ |
 | WS3 — PDF refundido dual | 🔵 Pendente | Template genérico Conect (Q5) |
