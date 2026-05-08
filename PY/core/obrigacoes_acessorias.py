@@ -113,6 +113,47 @@ def _ultimo_dia_util(ano: int, mes: int) -> date:
     return d
 
 
+def _n_esimo_dia_util(ano: int, mes: int, n: int) -> date:
+    """
+    N-ésimo dia útil do mês (1-indexed).
+
+    Heurística sem feriados — mesmo critério de `_ultimo_dia_util`.
+    Pra precisão dia-a-dia em obrigações federais, Migrador deve atualizar
+    com tabela de feriados nacionais quando relevante.
+
+    Exemplo: 10º dia útil de junho/2027 — usado em EFD-Contribuições
+    (prazo "10º dia útil do 2º mês seguinte" — IN RFB 1.252/2012).
+    """
+    if n < 1:
+        raise ValueError(f"n deve ser ≥ 1, recebido {n}")
+    d = date(ano, mes, 1)
+    contador = 0
+    ultimo = calendar.monthrange(ano, mes)[1]
+    while d.day <= ultimo:
+        if d.weekday() < 5:  # útil
+            contador += 1
+            if contador == n:
+                return d
+        if d.day == ultimo:
+            break
+        d = date(ano, mes, d.day + 1)
+    raise ValueError(
+        f"Mês {mes:02d}/{ano} não tem {n} dias úteis (máximo {contador})."
+    )
+
+
+def _adicionar_meses(d: date, n: int) -> date:
+    """
+    Soma n meses a uma data, preservando o dia (ou último dia do mês quando
+    o dia original não existe — ex: 31/01 + 1 mês = 28/02 ou 29/02).
+    """
+    mes_total = d.month + n
+    ano = d.year + (mes_total - 1) // 12
+    mes = ((mes_total - 1) % 12) + 1
+    ultimo = calendar.monthrange(ano, mes)[1]
+    return date(ano, mes, min(d.day, ultimo))
+
+
 def calcular_data_vencimento(
     *,
     frequencia: Frequencia,

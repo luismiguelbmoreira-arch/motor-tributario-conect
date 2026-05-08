@@ -188,6 +188,54 @@ class TestCalcularDataVencimento:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# HELPERS INTERNOS — n-ésimo dia útil + somar meses
+# Preparação WS7b: prazos como "10º dia útil do 2º mês seguinte" (EFD-Contribuições)
+# e "dia 15 do 2º mês seguinte" (DCTFWeb) precisam desses helpers.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestHelpersInternos:
+    """Testes diretos dos helpers privados — aritmética sem citação fiscal."""
+
+    def test_n_esimo_dia_util_junho_2027(self):
+        from core.obrigacoes_acessorias import _n_esimo_dia_util
+        # Jun/2027: 1=ter, 2=qua, 3=qui, 4=sex, 7=seg, 8=ter, 9=qua, 10=qui, 11=sex, 14=seg
+        # 10º dia útil de junho/2027 = 14/06 (segunda-feira)
+        assert _n_esimo_dia_util(2027, 6, 1) == date(2027, 6, 1)
+        assert _n_esimo_dia_util(2027, 6, 5) == date(2027, 6, 7)  # 1=ter,2,3,4=sex,7=seg
+        assert _n_esimo_dia_util(2027, 6, 10) == date(2027, 6, 14)
+
+    def test_n_esimo_dia_util_n_zero_levanta(self):
+        from core.obrigacoes_acessorias import _n_esimo_dia_util
+        with pytest.raises(ValueError, match="n deve ser ≥ 1"):
+            _n_esimo_dia_util(2027, 6, 0)
+
+    def test_n_esimo_dia_util_n_alem_do_mes_levanta(self):
+        from core.obrigacoes_acessorias import _n_esimo_dia_util
+        # Junho tem ~22 dias úteis. Pedir 30 levanta.
+        with pytest.raises(ValueError, match="dias úteis"):
+            _n_esimo_dia_util(2027, 6, 30)
+
+    def test_adicionar_meses_simples(self):
+        from core.obrigacoes_acessorias import _adicionar_meses
+        assert _adicionar_meses(date(2027, 3, 15), 2) == date(2027, 5, 15)
+        assert _adicionar_meses(date(2027, 1, 15), 12) == date(2028, 1, 15)
+
+    def test_adicionar_meses_dezembro_rola_ano(self):
+        from core.obrigacoes_acessorias import _adicionar_meses
+        assert _adicionar_meses(date(2027, 11, 10), 3) == date(2028, 2, 10)
+
+    def test_adicionar_meses_31_jan_vira_28_fev_nao_31_fev(self):
+        from core.obrigacoes_acessorias import _adicionar_meses
+        # 31/01/2027 + 1 mês = fevereiro 2027 (28 dias) → 28/02
+        assert _adicionar_meses(date(2027, 1, 31), 1) == date(2027, 2, 28)
+
+    def test_adicionar_meses_31_jan_2028_vira_29_fev_ano_bissexto(self):
+        from core.obrigacoes_acessorias import _adicionar_meses
+        # 2028 é bissexto: fev tem 29 dias
+        assert _adicionar_meses(date(2028, 1, 31), 1) == date(2028, 2, 29)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # OBTER OBRIGAÇÕES POR PORTE × REGIME
 # ─────────────────────────────────────────────────────────────────────────────
 
