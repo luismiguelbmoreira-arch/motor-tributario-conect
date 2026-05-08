@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # 🏛️ MOTOR TRIBUTÁRIO CONECT — BÍBLIA DA REFORMA TRIBUTÁRIA
 
-**Status:** 🚀 Produção — 1798 testes passando (100%) | 4 regimes + IMUNE + DIFAL + Cronograma + PDF educativo + Auditoria Documental LGPD + IDOR Guard + Stack front-back sincronizada + Fase 0a/0b + Fase 2 subfase 2.2 (mapa-mestre 34 categorias) + Fase 3' subfase 0 (interface FonteCliente) + WS6 etapas 4/5a/5b/6 (IMUNE + COOPERATIVA + orquestrador) + WS12 fechado (ERR-005 oficialmente resolvido) + Cache local de fontes normativas
+**Status:** 🚀 Produção — 1828 testes passando (100%) | 4 regimes + IMUNE + DIFAL + Cronograma + PDF educativo + Auditoria Documental LGPD + IDOR Guard + Stack front-back sincronizada + Fase 0a/0b + Fase 2 subfase 2.2 (mapa-mestre 34 categorias) + Fase 3' subfase 0 (interface FonteCliente) + WS6 etapas 4/5a/5b/6 (IMUNE + COOPERATIVA + orquestrador) + WS12 (ERR-005 fechado) + WS5 (`refazer_calculo.py` Rail R6) + Cache local de fontes normativas
 **Âncora Legal:** EC 132/2023 | LC 123/2006 | LC 214/2025 | LC 224/2025 | LC 227/2026 | EC 87/2015 | LGPD 13.709/2018 | Lei 5.764/71 | Lei 9.718/98 | CTN Arts. 142 e 173
-**Data Certificação:** 08/05/2026 (WS12 fechamento — `cnae_completo.json` regenerado com schema enriquecido + fallback obsoleto removido + ERR-005 oficialmente resolvido)
+**Data Certificação:** 08/05/2026 (WS5 — Rail R6 logs refazíveis: `core/refazer.py` função pura + `scripts/refazer_calculo.py` CLI + parser BR endereçando achado PMD)
 
 ---
 
@@ -601,7 +601,8 @@ CGSN anual sai, ou 6 meses sem refresh (política conservadora).
 | WS2 — Matriz 3×3 cenários 2026-2033 | 🔵 Pendente (depende de WS6+WS10) | Fonte oficial premissas econômicas (BCB Focus, IBGE SIDRA) |
 | WS4 — ERR-026/027/028 | 🟡 Pendente | response_model inerte, _erros perdido, CPF em campo CNPJ |
 | WS3 — PDF refundido dual | 🔵 Pendente | Template genérico Conect (Q5) |
-| WS5 — Dossiê integrado + `refazer_calculo.py` | 🔵 Pendente | — |
+| ~~WS5 — `refazer_calculo.py`~~ | ✅ **Fechado em 08/05/2026** | `core/refazer.py::verificar_diagnostico()` (função pura) + `scripts/refazer_calculo.py` (CLI com `--diagnostico-id` ou `--input-file` pra auditoria offline). Verifica: estrutura mínima (MAX_01) + citação legal (MAX_02) + aritmética CALCULO + violações segurança. Parser BR (R$, %, vírgula decimal, milhar) endereça achado PMD: motor real grava memoria narrativa ("R$ 100.000,00", "8.90%"). Tolerância R$ 0,02. NAO_VERIFICAVEL_AUTOMATICO pra eventos não-aritméticos (DECISAO_ANEXO, MAX_FISCAL_03 etc.). Exit codes: 0 consistente, 1 divergência, 2 não-encontrado. Pendência: dossiê integrado fica para etapa futura |
+| WS5b — Dossiê integrado | 🔵 Pendente | Empacotar verificação Rail R6 + dossiê de prova `/auditoria/prova/cnpj/...` num único endpoint/relatório PDF para fiscalização |
 | WS8 — Hook jurisprudência manual | 🔵 Pendente | — |
 | WS11 — CLAUDE.md final + Teste do Legado | 🔵 Pendente | Última peça do refinamento |
 
