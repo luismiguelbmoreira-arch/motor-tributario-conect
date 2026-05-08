@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 from core.difal import calcular_difal
 from core.formatadores import _fmt_brl
 from core.regimes.base import BaseRegimeEngine
+from core.regimes.cooperativa import CooperativaOverlay
 from core.regimes.imune import ImuneEngine
 from core.regimes.lucro_presumido import LucroPresumidoEngine
 from core.regimes.lucro_real import LucroRealEngine
@@ -76,6 +77,7 @@ class MotorReformaTributaria:
     operacao: OperacaoFiscal
     trilha_auditoria: List[Dict[str, Any]]
     _engine_regime: Optional[BaseRegimeEngine]
+    _overlay_cooperativa: Optional[CooperativaOverlay]
     _diagnostico_gerado: bool
     _cnae_fonte: Optional[str]
 
@@ -107,6 +109,9 @@ class MotorReformaTributaria:
         # ERR-037: regime do comprador capturado na trilha (crédito cruzado LC 214/2025 Art. 47 §2º na Fase 4+)
         self._registrar_regime_comprador()
         self._engine_regime: Optional[BaseRegimeEngine] = self._instanciar_engine()
+        # WS6 Etapa 5a — overlay sobrepõe o engine regular quando tipo_societario=COOPERATIVA.
+        # NÃO substitui — convive com Presumido/Real/Simples/MEI/Imune do regime tributário.
+        self._overlay_cooperativa: Optional[CooperativaOverlay] = self._instanciar_overlay_cooperativa()
 
     def _instanciar_engine(self) -> Optional[BaseRegimeEngine]:
         """Instancia o engine de regime correto, passando a trilha unificada."""
@@ -124,9 +129,26 @@ class MotorReformaTributaria:
         # Simples Nacional mono-atividade usa os métodos nativos do MotorReformaTributaria
         return None
 
+    def _instanciar_overlay_cooperativa(self) -> Optional[CooperativaOverlay]:
+        """
+        Instancia CooperativaOverlay quando tipo_societario='COOPERATIVA'.
+        WS6 Etapa 5a — LC 214/2025 Art. 271 + Lei 5.764/71.
+        """
+        if self.fornecedora.tipo_societario == "COOPERATIVA":
+            return CooperativaOverlay(self.fornecedora, self.trilha_auditoria)
+        return None
+
     def obter_engine_regime(self) -> Optional[BaseRegimeEngine]:
         """Retorna o engine de regime instanciado."""
         return self._engine_regime
+
+    def obter_overlay_cooperativa(self) -> Optional[CooperativaOverlay]:
+        """
+        Retorna o overlay COOPERATIVA quando aplicável (None caso contrário).
+        Quando presente, o caller deve aplicá-lo sobre o resultado do engine
+        regular: `overlay.aplicar(resultado_engine, data_emissao=...)`.
+        """
+        return self._overlay_cooperativa
 
     def __enter__(self):  # pragma: no cover
         return self

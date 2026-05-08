@@ -11,3 +11,5 @@ de35b5205860437936674b50317cc75a5246672dfe8deff7b389835657cb454d | planalto/lcp1
 84115b78866029d6f76aace06f12f306228e1bfc8136f8749cca7c86a5941a75 | planalto/lcp227_v2026-05-07.html | https://www.planalto.gov.br/ccivil_03/leis/lcp/lcp227.htm | 2026-05-07 | planalto
 b75f5cbdd6d208c70a0f1f9330bdbb9385093f06c96a6eeddd275e8ffeb154d6 | planalto/cf_v2026-05-07.html | https://www.planalto.gov.br/ccivil_03/Constituicao/Constituicao.htm | 2026-05-07 | planalto
 c74e1afc729a60d8a6d136acdc07723ac4e8a525257b68aac56a55427c091019 | planalto/ctn_v2026-05-07.html | https://www.planalto.gov.br/ccivil_03/leis/l5172compilado.htm | 2026-05-07 | planalto
+a88dc180d94388e648a7ec8b83cebfff574b2aea52b9bc9e8ef5d445b8a5844c | planalto/l5764_v2026-05-08.html | https://www.planalto.gov.br/ccivil_03/leis/l5764.htm | 2026-05-08 | planalto
+517cca32a7646e0a96f0aa6742d1d342ca590f735762fb919796ea32824c9806 | planalto/l9718_v2026-05-08.html | https://www.planalto.gov.br/ccivil_03/leis/l9718.htm | 2026-05-08 | planalto

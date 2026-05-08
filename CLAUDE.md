@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # 🏛️ MOTOR TRIBUTÁRIO CONECT — BÍBLIA DA REFORMA TRIBUTÁRIA
 
-**Status:** 🚀 Produção — 1579 testes passando (100%) | 4 regimes + DIFAL + Cronograma + PDF educativo + Auditoria Documental LGPD + IDOR Guard + Stack front-back sincronizada + Fase 0a/0b concluídas + Fase 2 subfase 2.2 (mapa-mestre 34 categorias) + Fase 3' subfase 0 (interface FonteCliente) + Cache local de fontes normativas
-**Âncora Legal:** EC 132/2023 | LC 123/2006 | LC 214/2025 | LC 224/2025 | LC 227/2026 | EC 87/2015 | LGPD 13.709/2018 | CTN Arts. 142 e 173
-**Data Certificação:** 07/05/2026 (Fase 2 subfase 2.2 — desacoplamento Nibo + ERR-057 + mapa-mestre + 4 bugs MAX_07 corrigidos)
+**Status:** 🚀 Produção — 1735 testes passando (100%) | 4 regimes + IMUNE + DIFAL + Cronograma + PDF educativo + Auditoria Documental LGPD + IDOR Guard + Stack front-back sincronizada + Fase 0a/0b + Fase 2 subfase 2.2 (mapa-mestre 34 categorias) + Fase 3' subfase 0 (interface FonteCliente) + WS6 etapa 4 (engine IMUNE) + WS6 etapa 5a (overlay COOPERATIVA) + Cache local de fontes normativas
+**Âncora Legal:** EC 132/2023 | LC 123/2006 | LC 214/2025 | LC 224/2025 | LC 227/2026 | EC 87/2015 | LGPD 13.709/2018 | Lei 5.764/71 | Lei 9.718/98 | CTN Arts. 142 e 173
+**Data Certificação:** 08/05/2026 (WS6 etapa 5a — overlay COOPERATIVA + Lei 5.764/71 cache + bloqueio MAX_07 do Art. 87 § único inexistente)
 
 ---
 
@@ -92,17 +92,22 @@ Requer: `pip install boto3` + IAM role com permissão `secretsmanager:GetSecretV
 
 ```
 core/motor_tributario.py    ← Orquestrador principal + Dispatcher de regime
-├── EmpresaFornecedora       ← Pydantic V2 — regime: SIMPLES|PRESUMIDO|REAL|MEI
+├── EmpresaFornecedora       ← Pydantic V2 — regime: SIMPLES|PRESUMIDO|REAL|MEI|IMUNE; tipo_societario: ...|COOPERATIVA|...
 ├── EmpresaCompradora        ← tipo: B2B_CONTRIBUINTE|B2C_CONSUMIDOR_FINAL
 ├── OperacaoFiscal           ← data_emissao: date (2026-2033), valor: Decimal
-├── MotorReformaTributaria   ← Engine principal (Fases 2–4)
-│   ├── trilha_auditoria[]   ← TRILHA UNIFICADA — todos os engines escrevem aqui
-│   └── _instanciar_engine() ← Dispatcher → LucroPresumidoEngine | MEIEngine
+├── MotorReformaTributaria   ← Engine principal (Fases 2–4 + WS6)
+│   ├── trilha_auditoria[]   ← TRILHA UNIFICADA — todos os engines + overlays escrevem aqui
+│   ├── _instanciar_engine() ← Dispatcher → LucroPresumido|LucroReal|MEI|Imune|SimplesMulti
+│   └── _instanciar_overlay_cooperativa() ← Overlay quando tipo_societario=COOPERATIVA (WS6 5a)
 │
-regimes/
+core/regimes/
 ├── base.py                  ← BaseRegimeEngine + RegimeMismatchError + registrar_violacao()
 ├── lucro_presumido.py       ← PIS/COFINS/CSLL/IRPJ cumulativo (Guard Clause: PRESUMIDO)
-└── mei.py                   ← DAS fixo por categoria, teto R$81k (Guard Clause: MEI)
+├── lucro_real.py            ← Real obrigatório (Lei 9.430/96 + Lei 9.718/98)
+├── mei.py                   ← DAS fixo por categoria, teto R$81k (Guard Clause: MEI)
+├── simples_multi.py         ← Simples Nacional multi-atividade
+├── imune.py                 ← LC 214/2025 Art. 9º + CF Art. 150 VI b/c (WS6 4)
+└── cooperativa.py           ← Overlay LC 214/2025 Art. 271 + Lei 5.764/71 (WS6 5a; NÃO herda BaseRegimeEngine)
 │
 tabelas_simples.py           ← FROZEN — Anexos I–V, CNAE→Anexo, cronograma IVA 2026-2033
 validadores.py               ← CNPJ Mod.11, CNAE, NCM, UF → retornam ValidationResult
@@ -188,7 +193,7 @@ Camada 3 (pytest)        → se Guard removida = CI quebra, deploy bloqueado
 ```
 
 **Para adicionar novo engine de regime:**
-1. Criar `regimes/novo_regime.py` herdando `BaseRegimeEngine`
+1. Criar `core/regimes/novo_regime.py` herdando `BaseRegimeEngine`
 2. Declarar `REGIME_ACEITO = "NOVO"` na classe
 3. Chamar `super().__init__(fornecedora, trilha)` no `__init__`
 4. Adicionar `if regime == "NOVO": return NovoEngine(...)` no `_instanciar_engine()` de `motor_tributario.py`
@@ -579,14 +584,15 @@ CGSN anual sai, ou 6 meses sem refresh (política conservadora).
 | WS6 etapa 2 v1 — REPROVADA | `b1f2f69` | 4 críticos do Chefe + 4 erros de citação do Luiz |
 | **WS6 etapa 2 v2** — matriz societária 13×4 | `cc67199` | 52 células validadas por Escrivão; **ERR-017.b** (citação inventada SC COSIT 174/2019) bloqueado antes do commit; helpers retornam Elegibilidade completo; MATRIZ frozen via `MappingProxyType`; novos tipos SCP/ESC/CONSORCIO/PRODUTOR_RURAL_PF; aliases EIRELI→SLU; 130 testes |
 | **WS6 etapa 3** — sub-validador MEI | `4da125f` | `validar_mei(...)` valida tipo+teto+CNAE+modalidade; lista parcial conservadora ~30 CNAEs Anexo XI (anti-alucinação: fora da lista → Indeterminado, não False); MEI Caminhoneiro (LC 188/2021) modelado; 25 testes |
+| **WS6 etapa 4** — engine IMUNE | `b7c77fa` | LC 214/2025 Art. 9º + CF Art. 150 VI b/c + CTN Art. 14; split atividade-fim × atividade-meio (Rail R5); 3 ALERTAS obrigatórios (Art. 9º §4º + Art. 49 + Art. 51 §1º); STF RE 325.822 + SV 52 |
+| **WS6 etapa 5a** — overlay COOPERATIVA | (pendente PR) | `CooperativaOverlay` (não herda BaseRegimeEngine — overlay/decorator); 5 ramos OCB (CONSUMO/TRABALHO/PRODUCAO/AGROPECUARIA/TRANSPORTE); split ato_cooperativo × ato_não_cooperativo (Lei 5.764/71 Art. 87 caput); fora-de-incidência Art. 6º VI/X/XI (sempre) + Art. 271 alíquota zero (opt-in com janela § 3º — Rail R8); alertas AGROPECUARIA (§ 1º II — anulação) e TRANSPORTE (Art. 169 § 8º — crédito presumido); cache Lei 5.764/71 + Lei 9.718/98; bloqueio MAX_07: Escrivão pegou citação inventada "Art. 87 § único" antes do código (parágrafo único INEXISTENTE); 79 testes |
 
 ### ⏸️ Próximas etapas (ao retomar)
 
 | Fase | Estado | Próxima ação |
 | --- | --- | --- |
-| **WS6 etapa 4 — `regimes/imune.py`** | ⏸️ **RETOMAR AQUI** | CF Art. 150 VI b/c + CTN Art. 14; distinção atividade-fim (imune) × atividade-meio (tributada); ORG_RELIGIOSA com STF RE 325.822 |
-| WS6 etapa 5 — `regimes/cooperativa.py` | 🔵 Pendente | Lei 5.764/71 Art. 79 (ato cooperativo) + Art. 87/111 (ato não-cooperativo); cooperativa de consumo |
-| WS6 etapa 6 — Orquestrador `validar_combinacao()` | 🔵 Pendente | AND lógico WS6+WS10+WS12 + ligação ao motor; concatena TODAS as falhas |
+| **WS6 etapa 5b — cooperativa CRÉDITO + SAÚDE** | ⏸️ **RETOMAR AQUI** | LC 214/2025 Cap II Tít V (Art. 181+) regime serviços financeiros + Lei 9.718/98 Art. 14 II (Real obrigatório) + Art. 188 (reverter deduções) + Art. 192 § 8º (coop-associado fora da base sempre) + Art. 197 I (LC 227/2026 — associado tomador não credita); SAUDE: regime específico operadora plano de saúde. Schema já bloqueia subtipos CREDITO/SAUDE com mensagem 5b. Pendência registrada PMD: unificar enum `RamosCooperativos5a/5b` × Literal do schema antes de migrar. Caller real (orquestrador `validar_combinacao()`) é WS6 etapa 6 |
+| WS6 etapa 6 — Orquestrador `validar_combinacao()` | 🔵 Pendente | AND lógico WS6+WS10+WS12 + ligação ao motor; concatena TODAS as falhas. Fecha caller produção do `obter_engine_regime()` e `obter_overlay_cooperativa()` |
 | WS10 extensão — `TABELAS_ANEXOS` + `CRONOGRAMA_IVA` | 🔵 Pendente | Constantes versionadas com vigência por faixa |
 | WS12 — regenerar `data/cnae_completo.json` | 🔴 **Pendente** | CSV oficial CGSN 140/2018 Anexo VI; fecha ERR-005 oficialmente |
 | WS6.b — Lucro Real refinado | 🔵 Aguarda Aurora rodar pelo motor | Adições/exclusões extracontábeis + extrator DRE; fixture em `samples/casos_clinicos/lucro_real_aurora_ficticio/` |

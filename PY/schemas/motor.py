@@ -252,6 +252,78 @@ class EmpresaFornecedora(BaseModel):
         ),
     )
 
+    # ── WS6 Etapa 5a — Eixo COOPERATIVA (LC 214/2025 Art. 271 + Lei 5.764/71) ──
+    # Cooperativa NÃO é regime tributário — é tipo societário com regime próprio
+    # de ato cooperativo que SOBREPÕE (overlay) o regime regular SIMPLES/PRESUMIDO/REAL.
+    # Por isso aqui estão CAMPOS de cooperativa, não regime "COOPERATIVA".
+    #
+    # CLASSIFICAÇÃO POR RAMO (validado Escrivão 2026-05-08):
+    # Lei 5.764/71 Art. 10 caput + § 1º — "as cooperativas se classificam também
+    # de acordo com o objeto ou pela natureza das atividades... caberá ao
+    # respectivo órgão controlador apreciar e caracterizar outras modalidades".
+    # Os 5 ramos NÃO estão enumerados literalmente na Lei 5.764/71 — são
+    # modalidades CONSAGRADAS via OCB/CGSN (órgão controlador). Não citar como
+    # se fosse enumeração legal (anti-alucinação MAX_07).
+    #
+    # 5a cobre: CONSUMO, TRABALHO, PRODUCAO, AGROPECUARIA, TRANSPORTE.
+    # 5b (futuro) cobre: CREDITO (regime de serviços financeiros LC 214 Art. 181+
+    # + Lei 9.718/98 Art. 14 II → Real obrigatório) e SAUDE (regime específico de
+    # operadora de plano de saúde LC 214). Schema captura o Literal completo pra
+    # dar mensagem de erro CLARA quando 5b ainda não estiver implementado.
+    subtipo_cooperativa: Optional[
+        Literal[
+            "CONSUMO",        # exceção do Simples — LC 123/2006 Art. 3º § 1º
+            "TRABALHO",       # vedada Simples — LC 123/2006 Art. 3º § 4º VI
+            "PRODUCAO",       # vedada Simples — idem
+            "AGROPECUARIA",   # vedada Simples + Art. 271 § 1º II (anulação crédito)
+            "TRANSPORTE",     # vedada Simples + crédito presumido LC 214 Art. 169 § 8º
+            "CREDITO",        # 5b (BLOQUEADO em 5a)
+            "SAUDE",          # 5b (BLOQUEADO em 5a)
+        ]
+    ] = Field(
+        default=None,
+        description=(
+            "Ramo cooperativo. Obrigatório quando tipo_societario='COOPERATIVA'. "
+            "Base normativa: Lei 5.764/71 Art. 10 caput + § 1º (classificação por "
+            "objeto, modalidades caracterizadas pelo órgão controlador OCB/CGSN — "
+            "NÃO é enumeração legal taxativa). 5a: CONSUMO/TRABALHO/PRODUCAO/"
+            "AGROPECUARIA/TRANSPORTE. 5b (não implementado): CREDITO/SAUDE."
+        ),
+    )
+    optante_art271_cbs_ibs: bool = Field(
+        default=False,
+        description=(
+            "Opção pela alíquota zero do Art. 271 LC 214/2025 sobre receita de "
+            "ato cooperativo. § 3º exige opção declarada no ano-calendário "
+            "anterior. Default conservador: False (motor não zera sem opção)."
+        ),
+    )
+    data_opcao_art271: Optional[date] = Field(
+        default=None,
+        description=(
+            "Data da opção pelo Art. 271. Quando optante_art271_cbs_ibs=True, "
+            "este campo é obrigatório (LC 214/2025 Art. 271 § 3º — ano anterior)."
+        ),
+    )
+    receita_ato_cooperativo: Decimal = Field(
+        default=Decimal("0"),
+        ge=Decimal("0"),
+        description=(
+            "Receita de ato cooperativo (Lei 5.764/71 — operações entre "
+            "cooperativa e seus associados ou entre cooperativas). Quando "
+            "tipo_societario='COOPERATIVA', soma com receita_ato_nao_cooperativo "
+            "deve ser > 0."
+        ),
+    )
+    receita_ato_nao_cooperativo: Decimal = Field(
+        default=Decimal("0"),
+        ge=Decimal("0"),
+        description=(
+            "Receita de ato não-cooperativo (operações com terceiros não "
+            "associados — Lei 5.764/71). Tributada normalmente pelo regime regular."
+        ),
+    )
+
     @model_validator(mode="before")
     @classmethod
     def _expandir_alias_mei(cls, data: Any) -> Any:
@@ -326,6 +398,85 @@ class EmpresaFornecedora(BaseModel):
                 )
         return self
 
+    @model_validator(mode="after")
+    def _validar_consistencia_cooperativa(self) -> "EmpresaFornecedora":
+        """
+        Consistência cruzada quando tipo_societario='COOPERATIVA' (WS6 Etapa 5a).
+
+        Regras:
+          1. tipo_societario='COOPERATIVA' exige subtipo_cooperativa declarado.
+          2. tipo_societario='COOPERATIVA' exige
+             receita_ato_cooperativo + receita_ato_nao_cooperativo > 0.
+          3. subtipo_cooperativa só faz sentido com tipo_societario='COOPERATIVA'.
+          4. Subtipos CREDITO e SAUDE são tratados em WS6 etapa 5b — bloquear em 5a
+             com mensagem específica que cita a próxima etapa.
+          5. Vedação Simples salvo CONSUMO — LC 123/2006 Art. 3º § 4º VI + § 1º.
+          6. Optante do Art. 271 exige data_opcao_art271 declarada (§ 3º).
+
+        Amparo:
+          - LC 214/2025 Art. 271 caput + I, II + § 3º (opção alíquota zero IBS/CBS)
+          - LC 123/2006 Art. 3º § 4º VI (vedação Simples)
+          - LC 123/2006 Art. 3º § 1º (exceção cooperativa de consumo)
+          - Lei 9.718/98 Art. 14 II (cooperativa de crédito = Real obrigatório — 5b)
+        """
+        # 4. CREDITO/SAUDE → bloqueio explícito 5b (cobre antes pra dar mensagem clara
+        # mesmo se outros checks também falhariam)
+        if self.subtipo_cooperativa == "CREDITO":
+            raise ValueError(
+                "subtipo_cooperativa='CREDITO' tratado em WS6 etapa 5b — "
+                "regime de serviços financeiros LC 214/2025 Art. 181+ "
+                "+ Lei 9.718/98 Art. 14 II (Real obrigatório) + "
+                "Art. 188 + Art. 192 § 8º + Art. 197 I (LC 227/2026). "
+                "Não disponível nesta etapa (5a)."
+            )
+        if self.subtipo_cooperativa == "SAUDE":
+            raise ValueError(
+                "subtipo_cooperativa='SAUDE' tratado em WS6 etapa 5b — "
+                "regime específico de operadora de plano de saúde "
+                "(LC 214/2025). Não disponível nesta etapa (5a)."
+            )
+
+        # 3. subtipo_cooperativa em tipo_societario != COOPERATIVA → erro
+        if self.subtipo_cooperativa is not None and self.tipo_societario != "COOPERATIVA":
+            raise ValueError(
+                f"subtipo_cooperativa='{self.subtipo_cooperativa}' só faz sentido "
+                f"com tipo_societario='COOPERATIVA'. Recebido: "
+                f"tipo_societario='{self.tipo_societario}'."
+            )
+
+        if self.tipo_societario == "COOPERATIVA":
+            # 1. exige subtipo
+            if self.subtipo_cooperativa is None:
+                raise ValueError(
+                    "tipo_societario='COOPERATIVA' exige campo 'subtipo_cooperativa' "
+                    "declarado (CONSUMO, TRABALHO, PRODUCAO, AGROPECUARIA ou TRANSPORTE)."
+                )
+            # 2. exige soma de receitas > 0
+            soma = self.receita_ato_cooperativo + self.receita_ato_nao_cooperativo
+            if soma <= Decimal("0"):
+                raise ValueError(
+                    "tipo_societario='COOPERATIVA' exige receita declarada — "
+                    "soma de receita_ato_cooperativo + receita_ato_nao_cooperativo "
+                    "deve ser > 0."
+                )
+            # 5. vedação Simples salvo CONSUMO
+            if self.regime == "SIMPLES" and self.subtipo_cooperativa != "CONSUMO":
+                raise ValueError(
+                    f"Cooperativa de '{self.subtipo_cooperativa}' não pode optar "
+                    f"pelo Simples Nacional. Vedação: LC 123/2006 Art. 3º § 4º VI. "
+                    f"Exceção (cooperativa de consumo) está em LC 123/2006 Art. 3º § 1º."
+                )
+
+        # 6. Optante do Art. 271 exige data declarada
+        if self.optante_art271_cbs_ibs and self.data_opcao_art271 is None:
+            raise ValueError(
+                "optante_art271_cbs_ibs=True exige 'data_opcao_art271' declarada. "
+                "LC 214/2025 Art. 271 § 3º — opção produz efeitos no ano-calendário "
+                "subsequente, exigindo data certa de manifestação."
+            )
+
+        return self
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def tipo_exibicao(self) -> Optional[str]:
@@ -364,7 +515,13 @@ class EmpresaFornecedora(BaseModel):
             raise ValueError(f"UF Invalida: {', '.join(res.errors)}")
         return v.strip().upper()
 
-    @field_validator("faturamento_12m", "folha_salarios_12m", mode="before")
+    @field_validator(
+        "faturamento_12m",
+        "folha_salarios_12m",
+        "receita_ato_cooperativo",
+        "receita_ato_nao_cooperativo",
+        mode="before",
+    )
     @classmethod
     def converter_para_decimal(cls, v: Any) -> Optional[Decimal]:
         if v is None:
