@@ -246,7 +246,15 @@ Impacto: AE I faixa 5 = 9,97% vs AE III faixa 5 = ~18% → diferença brutal
 - `4757100` → Anexo I (CANAVEZI, comércio varejista eletroeletrônicos)
 - `2539001` → Anexo II (ITANGUA, usinagem/tornearia/solda — confirmado por IPI no DAS)
 
-**Status:** ✅ Corrigido — `data/cnae_completo.json` (1.332 entradas geradas por `scripts/gerar_mapa_cnae.py`) já contém `4757100 → I` e `2539001 → II`. `CNAE_PARA_ANEXO` carrega o JSON no boot via `tabelas_simples.py:360`. Verificado em 24/04/2026.
+**Status:** ✅ **Fechado oficialmente em 08/05/2026 (WS12 etapa final).** Histórico:
+- 24/04/2026 — primeira correção: `data/cnae_completo.json` (1.332 entradas via `scripts/gerar_mapa_cnae.py`) com `4757100 → I` e `2539001 → II`. JSON era carregado como `CNAE_PARA_ANEXO` em `tabelas_simples.py:360` e usado como fallback secundário.
+- 25/04/2026 (commit `f60aa61`) — schema novo aprovado por Luiz Moreira: 5 categorias semânticas A_FIXO/B_ANEXO_III/C_FATOR_R/D_ESPECIAL/E_VEDADO em `core/cnae_excecoes.py` + `core/regras_cnae.py::obter_regra()`. JSON antigo virou redundância pendente de regeneração.
+- 08/05/2026 — fechamento oficial:
+  1. `scripts/gerar_mapa_cnae.py` reescrito consumindo `obter_regra()` como fonte única (zero duplicação) — antes tinha `get_anexo_base()` interno que divergia de `DIVISAO_PARA_CATEGORIA` (ex: divisão 56 → "I" no gerador vs C_FATOR_R no schema novo).
+  2. `data/cnae_completo.json` regenerado com schema enriquecido `{cnae: {categoria, anexo_padrao, depende_fator_r, base_legal, observacao}}` + metadados (data_geracao, fonte_ibge_url, fonte_ibge_sha256, fonte_normativa, consumidor_canonico).
+  3. Fallback secundário em `tabelas_simples.py:414-417` removido + import de `json`/`Path` limpo (código morto).
+  4. Teste anti-drift `tests/test_cnae_json_consistencia.py` (13 testes) garante que JSON não saia de sincronia com `obter_regra()`. Edição manual proibida — regenerar via script.
+  5. JSON velho (schema antigo `{cnae: anexo}`) preservado em `.lixeira/cnae_completo_v1_legado_2026-05-08.json` (regra LGPD + soft delete).
 
 ---
 

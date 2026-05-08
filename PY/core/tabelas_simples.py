@@ -9,12 +9,7 @@ Fonte primária: LC 123/2006, Anexos I-V (atualizada LC 214/2025)
 FROZEN: Não alterar sem citação de artigo de lei + aprovação de Luiz.
 """
 
-import json
 from decimal import Decimal
-from pathlib import Path
-
-# Load complete CNAE dataset (1,332 mapped correctly)
-_CNAE_MAP_FILE = Path(__file__).resolve().parent.parent / "data" / "cnae_completo.json"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # TABELAS DE ALÍQUOTAS — SIMPLES NACIONAL
@@ -357,24 +352,22 @@ CNAE_PREFIXO_PARA_ANEXO: dict = {
     "80": "III", "81": "III", "95": "III", "96": "III",
 }
 
-# Exceções Específicas (7 dígitos tem precedência sobre o prefixo)
-try:
-    with open(_CNAE_MAP_FILE, "r", encoding="utf-8") as f:
-        CNAE_PARA_ANEXO: dict = json.load(f)
-except FileNotFoundError:
-    # Se script não tiver rodado, usa fallback vazio
-    CNAE_PARA_ANEXO: dict = {}
-
 def determinar_anexo_por_cnae(cnae_7_digitos: str) -> str:
     """
     Motor de Busca Inteligente de Anexo por CNAE.
     Prioridade: 1. Override cirúrgico (WS12) | 2. Regra por divisão (WS12) |
-                3. Mapa antigo cnae_completo.json | 4. Prefixo 2 dígitos | 5. Anexo III
+                3. Prefixo 2 dígitos | 4. Anexo III (fallback final).
 
     NOTA WS12: para CNAEs C_FATOR_R sem Fator R informado, retorna V
     (conservador — Constraint 6 Luiz Moreira, Rail R2 sem extrapolação).
     Caller que precisa do Anexo correto considerando Fator R deve usar
     `core.regras_cnae.resolve_anexo(cnae, fator_r)`.
+
+    HISTÓRICO: até 08/05/2026 havia um fallback secundário para
+    `data/cnae_completo.json` (schema antigo {cnae: anexo}). Removido com a
+    regeneração do JSON pelo schema novo (WS12 etapa final — ERR-005
+    fechado). O JSON agora é artefato de auditoria — lógica vive em
+    `core.cnae_excecoes` + `core.regras_cnae`.
     """
     anexo, _ = determinar_anexo_por_cnae_com_fonte(cnae_7_digitos)
     return anexo
@@ -411,12 +404,7 @@ def determinar_anexo_por_cnae_com_fonte(cnae_7_digitos: str) -> tuple:
     }:
         return anexo_novo, "EXPLICITO"
 
-    # Fallback secundário: JSON antigo (1332 entradas) — para CNAEs sem regra WS12
-    # Mantido enquanto cnae_completo.json não é regenerado no schema novo (ERR-005).
-    if cnae_7_digitos in CNAE_PARA_ANEXO:
-        return CNAE_PARA_ANEXO[cnae_7_digitos], "EXPLICITO"
-
-    # Fallback terciário: prefixo 2 dígitos (mapa CNAE_PREFIXO_PARA_ANEXO)
+    # Fallback secundário: prefixo 2 dígitos (mapa CNAE_PREFIXO_PARA_ANEXO)
     prefixo = cnae_7_digitos[:2]
     if prefixo in CNAE_PREFIXO_PARA_ANEXO:
         return CNAE_PREFIXO_PARA_ANEXO[prefixo], "PREFIXO"

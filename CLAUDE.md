@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # 🏛️ MOTOR TRIBUTÁRIO CONECT — BÍBLIA DA REFORMA TRIBUTÁRIA
 
-**Status:** 🚀 Produção — 1785 testes passando (100%) | 4 regimes + IMUNE + DIFAL + Cronograma + PDF educativo + Auditoria Documental LGPD + IDOR Guard + Stack front-back sincronizada + Fase 0a/0b + Fase 2 subfase 2.2 (mapa-mestre 34 categorias) + Fase 3' subfase 0 (interface FonteCliente) + WS6 etapa 4 (engine IMUNE) + WS6 etapa 5a (overlay COOPERATIVA) + WS6 etapa 5b (cooperativa CRÉDITO + SAÚDE) + WS6 etapa 6 (orquestrador societário) + Cache local de fontes normativas
+**Status:** 🚀 Produção — 1798 testes passando (100%) | 4 regimes + IMUNE + DIFAL + Cronograma + PDF educativo + Auditoria Documental LGPD + IDOR Guard + Stack front-back sincronizada + Fase 0a/0b + Fase 2 subfase 2.2 (mapa-mestre 34 categorias) + Fase 3' subfase 0 (interface FonteCliente) + WS6 etapas 4/5a/5b/6 (IMUNE + COOPERATIVA + orquestrador) + WS12 fechado (ERR-005 oficialmente resolvido) + Cache local de fontes normativas
 **Âncora Legal:** EC 132/2023 | LC 123/2006 | LC 214/2025 | LC 224/2025 | LC 227/2026 | EC 87/2015 | LGPD 13.709/2018 | Lei 5.764/71 | Lei 9.718/98 | CTN Arts. 142 e 173
-**Data Certificação:** 08/05/2026 (WS6 etapa 5b — cooperativa CRÉDITO + SAÚDE; bloqueios MAX_07 prévios: Art. 182 § 1º III → Art. 183 § 1º III + placeholder Art. ~12049 → Art. 234 III)
+**Data Certificação:** 08/05/2026 (WS12 fechamento — `cnae_completo.json` regenerado com schema enriquecido + fallback obsoleto removido + ERR-005 oficialmente resolvido)
 
 ---
 
@@ -595,7 +595,7 @@ CGSN anual sai, ou 6 meses sem refresh (política conservadora).
 | --- | --- | --- |
 | **WS6 etapa 7? — regimes específicos IBS/CBS** | ⏸️ **RETOMAR AQUI** | Cálculo automático IBS/CBS pra cooperativa de crédito (regime serviços financeiros LC 214 Cap II Tít V, Arts. 181-208) e cooperativa de saúde (Arts. 234-238 — alíquota referência −60%). Hoje motor só registra alertas + engine regular calcula IRPJ/CSLL/PIS/COFINS. Faltam: alíquotas de referência por ano (cronograma 2027-2033), redução 60% para saúde, base específica do Art. 235, vedações de crédito Art. 238. Plan-First obrigatório (mudança de regra fiscal) |
 | WS10 extensão — `TABELAS_ANEXOS` + `CRONOGRAMA_IVA` | 🔵 Pendente | Constantes versionadas com vigência por faixa |
-| WS12 — regenerar `data/cnae_completo.json` | 🔴 **Pendente** | CSV oficial CGSN 140/2018 Anexo VI; fecha ERR-005 oficialmente |
+| ~~WS12 — regenerar `data/cnae_completo.json`~~ | ✅ **Fechado em 08/05/2026** | `gerar_mapa_cnae.py` reescrito consumindo `obter_regra()` (fonte única); JSON regenerado com schema enriquecido `{cnae: {categoria, anexo_padrao, depende_fator_r, base_legal, observacao}}` + metadados (data, SHA-256 IBGE, consumidor canônico); fallback secundário removido em `tabelas_simples.py`; teste anti-drift `test_cnae_json_consistencia.py` (13 testes); ERR-005 oficialmente resolvido. CSV CGSN 140/2018 não existe machine-readable — categorização canônica vive em `core/cnae_excecoes.py` (15 exceções + 48 divisões); CNAEs em divisões fora do mapa caem em fallback Anexo III conservador (Rail R2) |
 | WS6.b — Lucro Real refinado | 🔵 Aguarda Aurora rodar pelo motor | Adições/exclusões extracontábeis + extrator DRE; fixture em `samples/casos_clinicos/lucro_real_aurora_ficticio/` |
 | WS7 — Obrigações acessórias + alerta ativo de multas | 🔵 Pendente | Matriz porte×regime → obrigações+multas |
 | WS2 — Matriz 3×3 cenários 2026-2033 | 🔵 Pendente (depende de WS6+WS10) | Fonte oficial premissas econômicas (BCB Focus, IBGE SIDRA) |
@@ -619,7 +619,7 @@ CGSN anual sai, ou 6 meses sem refresh (política conservadora).
 
 | ID | Severidade | Status |
 | --- | --- | --- |
-| **ERR-005** (CNAE → Anexo) | 🔴 Crítico | Schema novo aprovado e implementado (`regras_cnae.py` em `f60aa61`); aguarda regeneração do `cnae_completo.json` via CSV CGSN 140/2018 Anexo VI |
+| ~~**ERR-005** (CNAE → Anexo)~~ | ✅ **Fechado em 08/05/2026** | WS12 etapa final — `cnae_completo.json` regenerado no schema novo, fallback obsoleto removido, teste anti-drift implementado |
 | **ERR-017.b** (citação inventada SC COSIT) | ✅ Resolvido em `cc67199` | Teste regressivo anti-alucinação adicionado; **MAX_07** documentado |
 | **ERR-056** (citações inventadas Art. 172 II/III pra cigarro/bebida) | ✅ Resolvido em `4a46f07` | Cigarro/bebida → Art. 409 § 1º + 410 (Imposto Seletivo); Art. 172 só pra combustíveis. 20 testes regressivos |
 | ERR-012 (purge vs anonimizar LGPD) | 🟡 Pendente | Decisão jurídica — LGPD Art. 19 §1º (15 dias úteis) |

@@ -1,78 +1,141 @@
+# -*- coding: utf-8 -*-
+"""
+gerar_mapa_cnae.py — WS12: regenera data/cnae_completo.json no schema novo
+
+REESCRITO em 2026-05-08 pra fechar ERR-005 oficialmente.
+
+ANTES (legado):
+  - get_anexo_base() interno duplicava regras por divisão
+  - aplicar_excecoes_conhecidas() tinha 7 overrides hardcoded
+  - Schema do JSON: {cnae: anexo_str}
+  - DIVERGIA de core/cnae_excecoes.py em divisões com Fator R
+    (ex: divisão 56 → "I" no gerador vs C_FATOR_R no schema novo)
+
+AGORA:
+  - Fonte única é core.regras_cnae.obter_regra() (consume CNAE_EXCECOES +
+    DIVISAO_PARA_CATEGORIA do schema WS12 — Luiz Moreira aprovado em
+    25/04/2026, commit f60aa61)
+  - Schema enriquecido: {cnae: {categoria, anexo_padrao, depende_fator_r,
+    base_legal, observacao}}
+  - Metadados versionados: data_geracao, fonte_ibge_url, hash_sha256_ibge
+
+USO:
+  python PY/scripts/gerar_mapa_cnae.py
+
+  Saída: PY/../data/cnae_completo.json (sobrescreve)
+
+INPUT: API IBGE CONCLA https://servicodados.ibge.gov.br/api/v2/cnae/subclasses
+OUTPUT: data/cnae_completo.json
+"""
+from __future__ import annotations
+
+import hashlib
 import json
+import sys
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 
+# Permite rodar como script com `python PY/scripts/gerar_mapa_cnae.py`
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-def get_anexo_base(cnae_id: str) -> str:
+from core.regras_cnae import obter_regra  # noqa: E402
+
+API_IBGE_URL = "https://servicodados.ibge.gov.br/api/v2/cnae/subclasses"
+
+
+def baixar_cnaes_ibge(url: str = API_IBGE_URL, timeout: int = 60) -> tuple[list[dict], str]:
     """
-    Regra geral baseada na Lei Complementar 123/2006.
+    Baixa a lista completa de subclasses CNAE 2.3 do IBGE CONCLA.
+
+    Returns:
+        (subclasses, sha256_hex) — lista de dicts brutos do IBGE +
+        SHA-256 do payload bruto pra rastreabilidade.
     """
-    pref2 = cnae_id[:2]
-    num = int(pref2)
+    req = urllib.request.Request(url, headers={"User-Agent": "motor-tributario-conect/WS12"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 — IBGE oficial
+        raw = resp.read()
+    sha = hashlib.sha256(raw).hexdigest()
+    data = json.loads(raw.decode("utf-8"))
+    return data, sha
 
-    # INDÚSTRIA (Seções B e C) -> Anexo II
-    if 5 <= num <= 33:
-        return "II"
 
-    # CONSTRUÇÃO CIVIL (Seção F) -> Anexo IV
-    if num in (41, 42, 43):
-        return "IV"
+def montar_entrada(cnae: str) -> dict:
+    """
+    Para um CNAE 7 dígitos, consulta a fonte única (core.regras_cnae) e
+    devolve a entrada enriquecida.
 
-    # COMÉRCIO (Seção G) -> Anexo I
-    if num in (45, 46, 47):
-        return "I"
-
-    # ALIMENTAÇÃO (Restaurantes, bares) -> Anexo I (LC 123/2006 Art 18 §4º, I)
-    if num == 56:
-        return "I"
-
-    # SERVIÇOS INTELECTUAIS / Fator R (Exemplos gerais) -> Anexo V (podendo cair pro III)
-    # 62 (TI), 69 (Contábil/Jurídico), 71 (Engenharia), 73 (Publicidade), 86 (Saúde)
-    if num in (62, 63, 69, 70, 71, 72, 73, 74, 85, 86, 87, 88):
-        return "V"
-
-    # SERVIÇOS GERAIS, TRANSPORTE, ALOJAMENTO -> Anexo III
-    return "III"
-
-def aplicar_excecoes_conhecidas(mapa):
-    """Aplica as exceções já mapeadas no projeto original."""
-    excecoes = {
-        # Indústria confundida com Comércio
-        "4721101": "II", # Panificação
-        "1091102": "II", # Biscoitos
-        "2539001": "II", # Usinagem
-        # Comércio específico
-        "4757100": "I",
-        # Serviços especializados que vão para Anexo IV
-        "8011101": "IV", "8121400": "IV", "8129000": "IV",
+    Quando a regra é desconhecida (CNAE não mapeado em CNAE_EXCECOES nem em
+    DIVISAO_PARA_CATEGORIA), entry indica `categoria=None` — caller decide
+    fallback (Rail R2: motor aplica Anexo III conservador no resolve_anexo).
+    """
+    regra = obter_regra(cnae)
+    if regra is None:
+        return {
+            "categoria": None,
+            "anexo_padrao": None,
+            "depende_fator_r": False,
+            "base_legal": "FALLBACK_NAO_MAPEADO",
+            "observacao": (
+                "CNAE não consta em CNAE_EXCECOES nem em DIVISAO_PARA_CATEGORIA. "
+                "Motor aplica Anexo III conservador (Rail R2 — sem extrapolação)."
+            ),
+        }
+    return {
+        "categoria": regra.categoria,
+        "anexo_padrao": regra.anexo_padrao,
+        "depende_fator_r": regra.depende_fator_r,
+        "base_legal": regra.base_legal,
+        "observacao": regra.observacao or "",
     }
-    for cnae, anexo in excecoes.items():
-        if cnae in mapa:
-            mapa[cnae] = anexo
-    return mapa
 
-def main():
-    u = 'https://servicodados.ibge.gov.br/api/v2/cnae/subclasses'
+
+def main() -> None:
     print("Baixando tabela de CNAEs do IBGE (API CONCLA)...")
-    req = urllib.request.urlopen(u)
-    data = json.loads(req.read().decode('utf-8'))
+    subclasses, sha_ibge = baixar_cnaes_ibge()
+    print(f"  {len(subclasses)} subclasses recebidas (SHA-256 IBGE: {sha_ibge[:12]}...).")
 
-    mapa = {}
-    for item in data:
-        cnae = item['id'].replace("-", "").replace("/", "")
-        anexo = get_anexo_base(cnae)
-        mapa[cnae] = anexo
+    entradas: dict[str, dict] = {}
+    for item in subclasses:
+        cnae = item["id"].replace("-", "").replace("/", "")
+        if len(cnae) != 7 or not cnae.isdigit():
+            continue
+        entradas[cnae] = montar_entrada(cnae)
 
-    # Applica as exceções que já existiam no motor
-    mapa = aplicar_excecoes_conhecidas(mapa)
+    # Distribuição por categoria — para o operador conferir o resultado
+    contagem: dict[str, int] = {}
+    for entrada in entradas.values():
+        cat = entrada["categoria"] or "FALLBACK_NAO_MAPEADO"
+        contagem[cat] = contagem.get(cat, 0) + 1
+    print("Distribuição por categoria:")
+    for cat in sorted(contagem):
+        print(f"  {cat:32s} {contagem[cat]:>5d}")
 
-    out_path = Path(__file__).resolve().parent.parent / "data" / "cnae_completo.json"
+    payload = {
+        "_metadata": {
+            "schema_versao": "2.0",
+            "data_geracao": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "fonte_ibge_url": API_IBGE_URL,
+            "fonte_ibge_sha256": sha_ibge,
+            "fonte_normativa": (
+                "LC 123/2006 + Resolução CGSN 140/2018 Anexo VI; categorias "
+                "semânticas A_FIXO/B_ANEXO_III/C_FATOR_R/D_ESPECIAL/E_VEDADO "
+                "definidas em core/cnae_excecoes.py (Luiz Moreira 25/04/2026)"
+            ),
+            "consumidor_canonico": "core.regras_cnae.obter_regra",
+        },
+        "cnaes": entradas,
+    }
+
+    out_path = Path(__file__).resolve().parent.parent.parent / "data" / "cnae_completo.json"
     out_path.parent.mkdir(exist_ok=True)
+    tmp = out_path.with_suffix(out_path.suffix + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, sort_keys=True, ensure_ascii=False)
+    tmp.replace(out_path)
 
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(mapa, f, indent=4, sort_keys=True)
+    print(f"Sucesso! {len(entradas)} CNAEs gravados em {out_path}.")
 
-    print(f"Sucesso! {len(mapa)} CNAEs mapeados e salvos em {out_path}.")
 
 if __name__ == "__main__":
     main()
