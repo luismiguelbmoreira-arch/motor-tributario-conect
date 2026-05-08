@@ -426,33 +426,154 @@ class TestObrigacoesCitacoesLegais:
                     f"diferente de 20%: '{o.multa_descricao}'"
                 )
 
-    def test_nenhuma_obrigacao_cita_lei_sem_cache(self):
-        # Anti-alucinação: até Escrivão capturar Lei 9.430/96, IN RFB 2.004,
-        # Lei 8.218/91, Lei 10.426/2002, NENHUMA obrigação pode citar esses
-        # dispositivos. WS7b registra captura como pendência.
-        leis_proibidas = ("Lei 9.430", "Lei 9430", "Lei 8.218", "Lei 8218",
-                          "Lei 10.426", "Lei 10426", "Lei 12.973",
-                          "IN RFB 2.003", "IN RFB 2.004", "IN RFB 2.005",
-                          "IN RFB 1.252", "IN RFB 1.371", "Lei 4.502",
-                          "Lei 9.532")
+    def test_nenhuma_obrigacao_cita_norma_sem_cache(self):
+        # Anti-alucinação: pendências WS7c — sem cache pra essas normas
+        # ainda. Atualizado após Escrivão capturar (08/05/2026):
+        #   Lei 9.430/96, Lei 8.218/91, Lei 10.426/2002, Lei 12.973/2014,
+        #   Lei 9.532/97, Lei 14.689/2023, Decreto-Lei 1.598/77.
+        # Permanece pendente:
+        #   - INs RFB 2.003-2.005/2021 (ECD/ECF/DCTFWeb prazos)
+        #   - IN RFB 1.252/2012 (EFD-Contribuições prazo+multa)
+        #   - IN RFB 1.371/2013 (EFD-ICMS-IPI)
+        #   - Lei 4.502/64 (IPI)
+        #   - Resolução CGSN 140/2018 (prazos Simples)
+        # Citações dessas normas só com texto literal "(captura pendente)" ou
+        # "(pendente cache)" — nunca como amparo único de número/percentual.
+        normas_sem_cache = ("IN RFB 2.003", "IN RFB 2.004", "IN RFB 2.005",
+                            "IN RFB 1.252", "IN RFB 1.371", "Lei 4.502",
+                            "Lei 4502")
         for porte in ("MEI", "ME", "EPP", "DEMAIS"):
             for regime in ("SIMPLES", "PRESUMIDO", "REAL", "MEI", "IMUNE"):
                 for o in obter_obrigacoes(porte=porte, regime=regime):
-                    for lei in leis_proibidas:
-                        assert lei not in o.base_legal, (
-                            f"Obrigação {o.codigo} cita {lei} sem cache validado "
-                            f"(WS7b registra como pendência)"
-                        )
+                    for norma in normas_sem_cache:
+                        if norma in o.base_legal:
+                            # Cita pode ocorrer SE marcado como pendente
+                            # (ex: "IN RFB 2.004/2021 — captura pendente WS7b")
+                            assert "pendente" in o.base_legal.lower(), (
+                                f"Obrigação {o.codigo} cita {norma} sem marca "
+                                f"de pendência: {o.base_legal!r}"
+                            )
 
-    def test_ecf_ecd_dctf_nao_estao_cadastradas_pendencia_ws7b(self):
-        # Sem cache da Lei 9.430/96 + Lei 8.218/91 + Lei 10.426/2002, essas
-        # obrigações ficam pendentes. Motor não inventa.
-        for porte in ("DEMAIS",):
-            for regime in ("PRESUMIDO", "REAL"):
-                obrigs = obter_obrigacoes(porte=porte, regime=regime)
-                codigos = {o.codigo for o in obrigs}
-                # Ainda NÃO devem aparecer
-                assert "ECF" not in codigos
-                assert "ECD" not in codigos
-                assert "DCTFWEB" not in codigos
-                assert "EFD_CONTRIBUICOES" not in codigos
+    def test_ecd_efd_contribuicoes_ainda_pendentes(self):
+        # ECD e EFD-Contribuições ainda pendentes — multa específica vem
+        # de IN RFB (não-Planalto, captura agendada em WS7c).
+        for regime in ("PRESUMIDO", "REAL"):
+            obrigs = obter_obrigacoes(porte="DEMAIS", regime=regime)
+            codigos = {o.codigo for o in obrigs}
+            assert "ECD" not in codigos
+            assert "EFD_CONTRIBUICOES" not in codigos
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# WS7b — Lucro Presumido + Real (ECF + DCTFWeb validadas Escrivão 2026-05-08)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestObrigacoesPresumidoReal:
+    """Obrigações ECF + DCTFWeb pra regimes regulares."""
+
+    @pytest.mark.parametrize("regime", ["PRESUMIDO", "REAL"])
+    def test_inclui_ecf_e_dctfweb(self, regime):
+        obrigs = obter_obrigacoes(porte="DEMAIS", regime=regime)
+        codigos = {o.codigo for o in obrigs}
+        assert "ECF" in codigos
+        assert "DCTFWEB" in codigos
+
+    def test_imune_inclui_ecf_apenas(self):
+        # IMUNE declara ECF como requisito de imunidade (Lei 9.532/97 Art. 12 § 2º)
+        obrigs = obter_obrigacoes(porte="DEMAIS", regime="IMUNE")
+        codigos = {o.codigo for o in obrigs}
+        assert "ECF" in codigos
+
+
+class TestObrigacoesECFCitacao:
+    """ECF cita Decreto-Lei 1.598/77 Art. 8º-A — não Lei 9.430/96 Art. 8º-A."""
+
+    def test_ecf_cita_decreto_lei_1598_77(self):
+        # Bloqueio MAX_07 ERR-058: Art. 8º-A NÃO está na Lei 9.430/96 — está
+        # no Decreto-Lei 1.598/77 (incluído pela Lei 12.973/2014 Art. 2º).
+        obrigs = obter_obrigacoes(porte="DEMAIS", regime="REAL")
+        ecf = next((o for o in obrigs if o.codigo == "ECF"), None)
+        assert ecf is not None
+        assert "Decreto-Lei 1.598" in ecf.base_legal
+        assert "Art. 8º-A" in ecf.base_legal or "Art. 8o-A" in ecf.base_legal
+
+    def test_ecf_nao_cita_lei_9430_art_8a(self):
+        # ANTI-ALUCINAÇÃO MAX_07: nunca atribuir Art. 8º-A à Lei 9.430/96
+        obrigs = obter_obrigacoes(porte="DEMAIS", regime="REAL")
+        ecf = next((o for o in obrigs if o.codigo == "ECF"), None)
+        assert "Lei 9.430" not in ecf.base_legal or "Art. 8º-A" not in ecf.base_legal.split("Lei 9.430")[1] if "Lei 9.430" in ecf.base_legal else True
+        # Mais robusto: garantir que "Lei 9.430" não aparece nada pra ECF
+        # (Art. 44 I é citado em outro contexto — relatorio_pdf.py)
+        assert "Lei 9.430" not in ecf.base_legal
+
+    def test_ecf_multa_max_10_porcento(self):
+        obrigs = obter_obrigacoes(porte="DEMAIS", regime="REAL")
+        ecf = next((o for o in obrigs if o.codigo == "ECF"), None)
+        assert "10%" in ecf.multa_descricao or "10 %" in ecf.multa_descricao
+        assert "0,25%" in ecf.multa_descricao or "0,25 %" in ecf.multa_descricao
+
+    def test_ecf_cita_lei_12973_como_inclusora(self):
+        obrigs = obter_obrigacoes(porte="DEMAIS", regime="REAL")
+        ecf = next((o for o in obrigs if o.codigo == "ECF"), None)
+        assert "Lei 12.973" in ecf.base_legal
+        assert "12.973/2014" in ecf.base_legal
+
+
+class TestObrigacoesDCTFWebCitacao:
+    """DCTFWeb cita Lei 10.426/2002 Art. 7º — pisos diferentes por regime."""
+
+    def test_dctfweb_cita_lei_10426_art_7(self):
+        obrigs = obter_obrigacoes(porte="DEMAIS", regime="REAL")
+        dctf = next((o for o in obrigs if o.codigo == "DCTFWEB"), None)
+        assert dctf is not None
+        assert "Lei 10.426" in dctf.base_legal
+        assert "Art. 7" in dctf.base_legal
+
+    def test_dctfweb_demais_regime_minimo_500(self):
+        # Escrivão validou: § 3º da Lei 10.426 traz pisos diferentes —
+        # R$ 200 (Simples) vs R$ 500 (demais). DCTFWeb aplica a regimes
+        # NÃO-Simples, então piso R$ 500.
+        obrigs = obter_obrigacoes(porte="DEMAIS", regime="REAL")
+        dctf = next((o for o in obrigs if o.codigo == "DCTFWEB"), None)
+        assert "R$ 500" in dctf.multa_descricao or "500,00" in dctf.multa_descricao
+
+    def test_dctfweb_offset_2_meses(self):
+        # IN RFB 2.005/2021 — "dia 15 do segundo mês seguinte". Schema
+        # tem prazo_offset_meses=2 pra esse caso.
+        obrigs = obter_obrigacoes(porte="DEMAIS", regime="REAL")
+        dctf = next((o for o in obrigs if o.codigo == "DCTFWEB"), None)
+        assert dctf.prazo_offset_meses == 2
+
+
+class TestAlertasObrigacoesPresumidoReal:
+    """Alertas de vencimento pra obrigações Presumido+Real."""
+
+    def test_dctfweb_offset_2_calcula_vencimento_no_segundo_mes(self):
+        # Competência marco/2027 → DCTFWeb vence dia 15 de maio/2027
+        # (segundo mês seguinte, não abril).
+        alertas = gerar_alertas_obrigacoes(
+            porte="DEMAIS",
+            regime="REAL",
+            hoje=date(2027, 5, 14),  # 1 dia antes do vencimento
+            competencia_atual=date(2027, 3, 31),
+            dias_antecedencia=30,
+        )
+        dctf_alerta = next((a for a in alertas if a.obrigacao.codigo == "DCTFWEB"), None)
+        assert dctf_alerta is not None
+        assert dctf_alerta.data_vencimento == date(2027, 5, 15)
+        assert dctf_alerta.dias_restantes == 1
+        assert dctf_alerta.nivel == "CRITICO"
+
+    def test_ecf_vence_ultimo_dia_util_julho(self):
+        # ECF: anual, último dia útil de julho do ano seguinte. 31/07/2027 é
+        # sábado, então 30/07/2027 (sexta).
+        alertas = gerar_alertas_obrigacoes(
+            porte="DEMAIS",
+            regime="REAL",
+            hoje=date(2027, 7, 1),  # 29 dias até 30/07
+            competencia_atual=date(2026, 12, 31),
+            dias_antecedencia=30,
+        )
+        ecf_alerta = next((a for a in alertas if a.obrigacao.codigo == "ECF"), None)
+        assert ecf_alerta is not None
+        assert ecf_alerta.data_vencimento == date(2027, 7, 30)

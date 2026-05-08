@@ -13,3 +13,10 @@ b75f5cbdd6d208c70a0f1f9330bdbb9385093f06c96a6eeddd275e8ffeb154d6 | planalto/cf_v
 c74e1afc729a60d8a6d136acdc07723ac4e8a525257b68aac56a55427c091019 | planalto/ctn_v2026-05-07.html | https://www.planalto.gov.br/ccivil_03/leis/l5172compilado.htm | 2026-05-07 | planalto
 a88dc180d94388e648a7ec8b83cebfff574b2aea52b9bc9e8ef5d445b8a5844c | planalto/l5764_v2026-05-08.html | https://www.planalto.gov.br/ccivil_03/leis/l5764.htm | 2026-05-08 | planalto
 517cca32a7646e0a96f0aa6742d1d342ca590f735762fb919796ea32824c9806 | planalto/l9718_v2026-05-08.html | https://www.planalto.gov.br/ccivil_03/leis/l9718.htm | 2026-05-08 | planalto
+a7324db51194d80800c3503f64340f585962c37e26aa055ebb312c2b4c880eee | planalto/l9430_v2026-05-08.html | https://www.planalto.gov.br/ccivil_03/leis/l9430.htm | 2026-05-08 | planalto
+b6f6b3e2f808efc06f9872f9842ab0abc0a70b6d783602711548e5ed1ee972f0 | planalto/l8218_v2026-05-08.html | https://www.planalto.gov.br/ccivil_03/leis/l8218.htm | 2026-05-08 | planalto
+534e03b4d6606f07f75ac44fa4de0e3023f8209d885686cdcc6396aceba55719 | planalto/l10426_v2026-05-08.html | https://www.planalto.gov.br/ccivil_03/leis/2002/l10426.htm | 2026-05-08 | planalto
+3c374ee2a2af71d2a580e666ba3a079c23b2197c6ea7765390cd8364f28005bf | planalto/l12973_v2026-05-08.html | https://www.planalto.gov.br/ccivil_03/_ato2011-2014/2014/lei/l12973.htm | 2026-05-08 | planalto
+0175a9573cc7dd747a3b971c6f4684b3c5d88f51c0fc6ea9b04aefb2ea7fe5d6 | planalto/l9532_v2026-05-08.html | https://www.planalto.gov.br/ccivil_03/leis/l9532.htm | 2026-05-08 | planalto
+b1f463850721d2684b4741dcf97e441adae631c7d4083cb2c6da73c6eb16b0a0 | planalto/l14689_v2026-05-08.html | https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2023/lei/l14689.htm | 2026-05-08 | planalto
+7b563429311f0a966e54300f3a32b964126fb700141a51fd9c947899fa716284 | planalto/del1598_v2026-05-08.html | https://www.planalto.gov.br/ccivil_03/Decreto-Lei/Del1598.htm | 2026-05-08 | planalto

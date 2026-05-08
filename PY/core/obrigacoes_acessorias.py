@@ -78,6 +78,21 @@ class Obrigacao(BaseModel):
         default=False,
         description="True quando vencimento é último dia útil do mês.",
     )
+    prazo_offset_meses: int = Field(
+        default=1,
+        description=(
+            "Para frequência MENSAL: número de meses entre a competência e o "
+            "mês de vencimento (default 1 = mês seguinte). DCTFWeb usa 2 "
+            "('segundo mês seguinte' — IN RFB 2.005/2021)."
+        ),
+    )
+    prazo_n_dia_util: Optional[int] = Field(
+        default=None,
+        description=(
+            "Para frequência MENSAL: K-ésimo dia útil do mês alvo. None desativa. "
+            "EFD-Contribuições usa 10 ('10º dia útil do 2º mês seguinte')."
+        ),
+    )
     prazo_amparo_pendente: bool = Field(
         default=False,
         description=(
@@ -161,6 +176,8 @@ def calcular_data_vencimento(
     mes: Optional[int],
     competencia: date,
     ultimo_dia_util: bool = False,
+    offset_meses: int = 1,
+    n_dia_util: Optional[int] = None,
 ) -> date:
     """
     Calcula data de vencimento a partir da competência.
@@ -168,15 +185,21 @@ def calcular_data_vencimento(
     Casos:
       - ANUAL + dia + mes: vence no `dia/mes` do ano seguinte ao da competência.
       - ANUAL + ultimo_dia_util=True: último dia útil de `mes` no ano seguinte.
-      - MENSAL + dia (mes=None): vence no `dia` do mês seguinte ao da competência.
-      - SEMESTRAL/TRIMESTRAL: caller passa `mes` apropriado (delegado pra futuro).
+      - MENSAL + dia + offset_meses=N: vence no `dia` do N-ésimo mês após
+        a competência (default N=1 = mês seguinte).
+      - MENSAL + n_dia_util=K + offset_meses=N: vence no K-ésimo dia útil
+        do N-ésimo mês após a competência (ex: EFD-Contribuições — 10º dia
+        útil do 2º mês seguinte).
+      - SEMESTRAL/TRIMESTRAL: pendentes (delegados pra etapa futura).
 
     Args:
         frequencia: ANUAL | MENSAL | TRIMESTRAL | SEMESTRAL
-        dia: dia do vencimento (1-31), ou None se ultimo_dia_util=True
+        dia: dia do vencimento (1-31), ou None se usar ultimo_dia_util / n_dia_util
         mes: mês do vencimento (1-12) — None pra MENSAL
         competencia: data-base da competência fiscal
         ultimo_dia_util: True quando "último dia útil de [mes]"
+        offset_meses: deslocamento de meses (apenas MENSAL — default 1)
+        n_dia_util: K-ésimo dia útil do mês alvo (apenas MENSAL — None desativa)
 
     Returns:
         data de vencimento.
@@ -190,14 +213,21 @@ def calcular_data_vencimento(
         return date(ano_alvo, mes, dia)
 
     if frequencia == "MENSAL":
-        assert dia is not None, "MENSAL exige dia"
-        # Próximo mês após competência
-        ano_alvo = competencia.year + (1 if competencia.month == 12 else 0)
-        mes_alvo = 1 if competencia.month == 12 else competencia.month + 1
-        return date(ano_alvo, mes_alvo, dia)
+        # Mês alvo é offset_meses depois da competência
+        assert offset_meses >= 1, "offset_meses deve ser ≥ 1 (mês seguinte ou posterior)"
+        d_alvo = _adicionar_meses(competencia.replace(day=1), offset_meses)
+        ano_alvo, mes_alvo = d_alvo.year, d_alvo.month
+        if n_dia_util is not None:
+            return _n_esimo_dia_util(ano_alvo, mes_alvo, n_dia_util)
+        if ultimo_dia_util:
+            return _ultimo_dia_util(ano_alvo, mes_alvo)
+        assert dia is not None, "MENSAL exige dia (ou n_dia_util / ultimo_dia_util)"
+        # Quando dia > último-dia-do-mês-alvo, usa último dia disponível
+        ultimo = calendar.monthrange(ano_alvo, mes_alvo)[1]
+        return date(ano_alvo, mes_alvo, min(dia, ultimo))
 
     # TRIMESTRAL e SEMESTRAL ficam pra etapa futura quando obrigações
-    # com essas frequências entrarem na matriz (DCTFWeb, etc.)
+    # com essas frequências entrarem na matriz.
     raise NotImplementedError(
         f"Frequência {frequencia!r} ainda não implementada. Pendência WS7b."
     )
@@ -255,6 +285,26 @@ _AMPARO_PGDAS_D: str = (
     "Prazo conforme Resolução CGSN 140/2018 (Art. 18 § 15-A LC 123 delega ao CGSN)"
 )
 
+# WS7b — extensões com cache validado por Escrivão 2026-05-08
+_AMPARO_ECF: str = (
+    "Decreto-Lei 1.598/77 Art. 8º-A (incluído pela Lei 12.973/2014 Art. 2º — "
+    "multa pela falta/atraso de apresentação do livro fiscal: 0,25% por mês "
+    "ou fração sobre o lucro líquido antes do IRPJ/CSLL, limitada a 10%; "
+    "II — 3% sobre valor omitido/inexato, mín R$ 100,00). "
+    "Prazo conforme IN RFB 2.004/2021 (captura pendente WS7b)"
+)
+
+_AMPARO_DCTFWEB_DEMAIS: str = (
+    "Lei 10.426/2002 Art. 7º (multa por atraso DCTFWeb: 2% ao mês limitado "
+    "a 20%; § 3º — mín R$ 500,00 para regime regular não-Simples). "
+    "Prazo conforme IN RFB 2.005/2021 (captura pendente WS7b)"
+)
+
+# Pendências WS7c (cache de IN RFB ainda não capturável):
+# - ECD multa específica: Lei 8.218/91 Art. 11 (escrituração genérica) + Art. 12
+#   (percentuais sobre receita; sem piso fixo em reais — pisos em IN RFB pendente)
+# - EFD-Contribuições multa específica: idem Art. 12 + IN RFB 1.252/2012 pendente
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # OBRIGAÇÕES CADASTRADAS (Simples Nacional — apenas multas validadas)
@@ -296,6 +346,36 @@ _PGDAS_D = Obrigacao(
     prazo_amparo_pendente=True,
 )
 
+# WS7b — Lucro Presumido / Real / Imune
+_ECF = Obrigacao(
+    codigo="ECF",
+    nome="ECF — Escrituração Contábil Fiscal",
+    frequencia="ANUAL",
+    prazo_descricao="último dia útil de julho do ano seguinte (IN RFB 2.004/2021 — pendente cache)",
+    multa_descricao=(
+        "0,25% sobre lucro líquido antes do IRPJ/CSLL por mês ou fração, "
+        "limitada a 10%; ou 3% sobre valor omitido/inexato, mín R$ 100,00"
+    ),
+    base_legal=_AMPARO_ECF,
+    prazo_dia=None,
+    prazo_mes=7,
+    prazo_ultimo_dia_util=True,
+    prazo_amparo_pendente=True,
+)
+
+_DCTFWEB_DEMAIS = Obrigacao(
+    codigo="DCTFWEB",
+    nome="DCTFWeb — Declaração de Débitos e Créditos Tributários Federais",
+    frequencia="MENSAL",
+    prazo_descricao="dia 15 do segundo mês seguinte (IN RFB 2.005/2021 — pendente cache)",
+    multa_descricao="2% ao mês sobre os tributos declarados, limitado a 20%; mín R$ 500,00",
+    base_legal=_AMPARO_DCTFWEB_DEMAIS,
+    prazo_dia=15,
+    prazo_mes=None,
+    prazo_offset_meses=2,  # "segundo mês seguinte" — IN RFB 2.005/2021
+    prazo_amparo_pendente=True,
+)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MATRIZ porte × regime → obrigações
@@ -309,9 +389,14 @@ _MATRIZ: dict[tuple[NivelPorte, Regime], tuple[Obrigacao, ...]] = {
     # ME e EPP no Simples
     ("ME", "SIMPLES"): (_DEFIS, _PGDAS_D),
     ("EPP", "SIMPLES"): (_DEFIS, _PGDAS_D),
-    # PRESUMIDO/REAL/IMUNE — pendência WS7b (cache adicional necessário)
-    # Quando Lei 9.430/96 + Lei 8.218/91 + Lei 10.426/2002 entrarem no cache,
-    # adicionar ECF/ECD/EFD-Contribuições/DCTFWeb aqui.
+    # WS7b — Lucro Presumido + Real (cache validado: ECF + DCTFWeb)
+    # ECD/EFD-Contribuições pendentes (sem cache de IN RFB de prazo+multa específica)
+    ("DEMAIS", "PRESUMIDO"): (_ECF, _DCTFWEB_DEMAIS),
+    ("DEMAIS", "REAL"): (_ECF, _DCTFWEB_DEMAIS),
+    # IMUNE: declaração de ECF é obrigação Lei 9.532/97 Art. 12 § 2º (escrituração
+    # como requisito de imunidade). Sem cache de IN RFB pra prazo específico, mantém
+    # mesma estrutura ECF.
+    ("DEMAIS", "IMUNE"): (_ECF,),
 }
 
 
@@ -444,6 +529,8 @@ def gerar_alertas_obrigacoes(
                 mes=o.prazo_mes,
                 competencia=comp_efetiva,
                 ultimo_dia_util=o.prazo_ultimo_dia_util,
+                offset_meses=o.prazo_offset_meses,
+                n_dia_util=o.prazo_n_dia_util,
             )
         except (NotImplementedError, AssertionError):
             # Frequência não-implementada pula sem inventar alerta
