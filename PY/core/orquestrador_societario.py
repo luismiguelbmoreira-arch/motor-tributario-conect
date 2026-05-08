@@ -42,7 +42,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import Any, Literal, Optional
+from typing import TYPE_CHECKING, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -58,6 +58,11 @@ from core.versioned_rule import (
     TETO_SIMPLES_NACIONAL_VERSIONADO,
     valor_em,
 )
+
+# TYPE_CHECKING evita ciclo runtime — schemas.motor não importa este módulo,
+# então a forward reference resolve em type-check sem custo de import real.
+if TYPE_CHECKING:
+    from schemas.motor import EmpresaFornecedora
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ORIGEM DOS BLOQUEIOS / ALERTAS — taxonomia para rastreabilidade
@@ -144,7 +149,7 @@ def _regime_para_matriz(regime: str) -> Optional[str]:
 
 
 def _consultar_matriz_societaria(
-    fornecedora: Any,
+    fornecedora: "EmpresaFornecedora",
     bloqueios: list[Bloqueio],
     leis: list[str],
 ) -> None:
@@ -181,7 +186,7 @@ def _consultar_matriz_societaria(
 
 
 def _consultar_validador_mei(
-    fornecedora: Any,
+    fornecedora: "EmpresaFornecedora",
     data_emissao: date,
     bloqueios: list[Bloqueio],
     pendencias: list[str],
@@ -209,7 +214,7 @@ def _consultar_validador_mei(
 
 
 def _consultar_validador_cooperativa(
-    fornecedora: Any,
+    fornecedora: "EmpresaFornecedora",
     data_emissao: date,
     bloqueios: list[Bloqueio],
     pendencias: list[str],
@@ -243,7 +248,7 @@ def _consultar_validador_cooperativa(
 
 
 def _consultar_regras_cnae(
-    fornecedora: Any,
+    fornecedora: "EmpresaFornecedora",
     fator_r_calculado: Optional[Decimal],
     bloqueios: list[Bloqueio],
     leis: list[str],
@@ -278,7 +283,7 @@ def _consultar_regras_cnae(
 
 
 def _consultar_limites_versionados(
-    fornecedora: Any,
+    fornecedora: "EmpresaFornecedora",
     data_emissao: date,
     bloqueios: list[Bloqueio],
     alertas: list[Alerta],
@@ -336,7 +341,7 @@ def _consultar_limites_versionados(
             ))
 
 
-def _engine_recomendado(fornecedora: Any) -> str:
+def _engine_recomendado(fornecedora: "EmpresaFornecedora") -> str:
     """Mapeia regime do schema para nome do engine."""
     r = fornecedora.regime
     if r in ("SIMPLES", "PRESUMIDO", "REAL", "MEI", "IMUNE"):
@@ -350,7 +355,7 @@ def _engine_recomendado(fornecedora: Any) -> str:
 
 def validar_combinacao(
     *,
-    fornecedora: Any,  # EmpresaFornecedora — Any para evitar ciclo de import
+    fornecedora: "EmpresaFornecedora",
     data_emissao: date,
     fator_r_calculado: Optional[Decimal] = None,
 ) -> ResultadoOrquestracaoSocietaria:
