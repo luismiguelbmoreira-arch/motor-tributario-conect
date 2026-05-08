@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 from core.difal import calcular_difal
 from core.formatadores import _fmt_brl
 from core.regimes.base import BaseRegimeEngine
+from core.regimes.imune import ImuneEngine
 from core.regimes.lucro_presumido import LucroPresumidoEngine
 from core.regimes.lucro_real import LucroRealEngine
 from core.regimes.mei import MEIEngine
@@ -116,6 +117,8 @@ class MotorReformaTributaria:
             return MEIEngine(self.fornecedora, self.trilha_auditoria)
         if regime == "REAL":
             return LucroRealEngine(self.fornecedora, self.trilha_auditoria)
+        if regime == "IMUNE":
+            return ImuneEngine(self.fornecedora, self.trilha_auditoria)
         if regime == "SIMPLES" and self.fornecedora.atividades:
             return SimplesMultiAtividadeEngine(self.fornecedora, self.trilha_auditoria)
         # Simples Nacional mono-atividade usa os métodos nativos do MotorReformaTributaria
