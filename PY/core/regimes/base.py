@@ -100,7 +100,7 @@ class BaseRegimeEngine:
         class LucroPresumidoEngine(BaseRegimeEngine):
             REGIME_ACEITO = "PRESUMIDO"
     """
-    REGIME_ACEITO: Literal["SIMPLES", "PRESUMIDO", "REAL", "MEI"] = NotImplemented  # type: ignore
+    REGIME_ACEITO: Literal["SIMPLES", "PRESUMIDO", "REAL", "MEI", "IMUNE"] = NotImplemented  # type: ignore
 
     def __init__(self, fornecedora: Any, trilha: List[Dict[str, Any]]) -> None:
         self.fornecedora = fornecedora

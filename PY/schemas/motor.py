@@ -111,7 +111,7 @@ class EmpresaFornecedora(BaseModel):
 
     cnpj: str = Field(..., description="CNPJ com ou sem pontuação")
     razao_social: str = Field(..., min_length=2, description="Razão social completa")
-    regime: Literal["SIMPLES", "PRESUMIDO", "REAL", "MEI"] = Field(..., description="Regime tributário")
+    regime: Literal["SIMPLES", "PRESUMIDO", "REAL", "MEI", "IMUNE"] = Field(..., description="Regime tributário")
     cnae_principal: str = Field(..., description="CNAE principal (7 dígitos)")
     uf_origem: str = Field(..., description="UF de origem (2 letras)")
     faturamento_12m: Decimal = Field(..., ge=Decimal("0"), description="RBT12 em R$")
@@ -203,6 +203,55 @@ class EmpresaFornecedora(BaseModel):
         ),
     )
 
+    # ── WS6 Etapa 4 — Eixo IMUNIDADE (LC 214/2025 Art. 9º + CF Art. 150 VI b/c) ──
+    # Campos só fazem sentido quando regime="IMUNE". model_validator cruzado abaixo
+    # garante consistência (subtipo obrigatório, tipo societário compatível, CTN 14).
+    subtipo_imune: Optional[
+        Literal[
+            "TEMPLO_RELIGIOSO",                          # LC 214 Art. 9º caput, II
+            "PARTIDO_POLITICO",                          # LC 214 Art. 9º caput, III
+            "SINDICATO_TRABALHADOR",                     # LC 214 Art. 9º caput, III
+            "ENTIDADE_EDUCACIONAL_SEM_FINS_LUCRATIVOS",  # LC 214 Art. 9º caput, III
+            "ENTIDADE_ASSISTENCIAL",                     # II ou III conforme flag
+        ]
+    ] = Field(
+        default=None,
+        description=(
+            "Subtipo de imunidade. Obrigatório quando regime='IMUNE'. "
+            "TEMPLO_RELIGIOSO cai no inciso II (LC 214 Art. 9º — não exige CTN 14). "
+            "Demais caem no inciso III (LC 214 Art. 9º §3º — exige CTN 14 cumulativo)."
+        ),
+    )
+    vinculada_a_entidade_religiosa: bool = Field(
+        default=False,
+        description=(
+            "ENTIDADE_ASSISTENCIAL vinculada a templo cai no inciso II "
+            "(dispensa CTN 14). Autônoma cai no inciso III (exige CTN 14)."
+        ),
+    )
+    requisitos_ctn14_atendidos: Optional[tuple[bool, bool, bool]] = Field(
+        default=None,
+        description=(
+            "(I, II, III) do CTN Art. 14: I=sem distribuição patrimônio/rendas; "
+            "II=aplicação integral no País; III=escrituração regular. "
+            "Obrigatório se subtipo cair no inciso III. Qualquer False ou None "
+            "= ImunidadeNaoConfiguradaError."
+        ),
+    )
+    receita_amparada: Optional[Decimal] = Field(
+        default=None,
+        ge=Decimal("0"),
+        description="Receita de atividade-fim (amparada pela imunidade). IBS+CBS = 0.",
+    )
+    receita_nao_amparada: Optional[Decimal] = Field(
+        default=None,
+        ge=Decimal("0"),
+        description=(
+            "Receita de atividade-meio (não amparada pela imunidade). Engine "
+            "IMUNE não calcula — Rail R5: operador escolhe regime externo."
+        ),
+    )
+
     @model_validator(mode="before")
     @classmethod
     def _expandir_alias_mei(cls, data: Any) -> Any:
@@ -230,6 +279,52 @@ class EmpresaFornecedora(BaseModel):
         elif tipo == "EIRELI":
             data["tipo_societario"] = "SLU"
         return data
+
+    @model_validator(mode="after")
+    def _validar_consistencia_imune(self) -> "EmpresaFornecedora":
+        """
+        Consistência cruzada quando regime='IMUNE' (WS6 Etapa 4).
+
+        Regras:
+          1. regime='IMUNE' exige subtipo_imune declarado.
+          2. regime='IMUNE' exige tipo_societario que a MATRIZ canônica de
+             elegibilidade_societaria reconheça como `valido=True` para IMUNE.
+             Hoje: {ASSOCIACAO, FUNDACAO, ORGANIZACAO_RELIGIOSA}.
+             Lei nova entrar (ex: alguma cooperativa social ganhar imunidade
+             parcial) → MATRIZ é a fonte única; este validator herda automático.
+          3. Campos de imunidade só fazem sentido com regime='IMUNE' — caso
+             contrário, motor aceita mas não usa (engine ignora).
+
+        Não valida CTN 14 aqui (responsabilidade do engine — só na execução).
+
+        Amparo: LC 214/2025 Art. 9º caput + §3º; CF/88 Art. 150 VI b/c.
+        Rail R1 (fonte normativa única): MATRIZ é a verdade — não duplicar.
+        """
+        # Import local evita ciclo no carregamento (elegibilidade_societaria
+        # é puro, schemas/motor.py é importado por muita gente).
+        from core.elegibilidade_societaria import MATRIZ as _MATRIZ_ELEG
+
+        if self.regime == "IMUNE":
+            if self.subtipo_imune is None:
+                raise ValueError(
+                    "regime='IMUNE' exige campo 'subtipo_imune' declarado "
+                    "(TEMPLO_RELIGIOSO, PARTIDO_POLITICO, SINDICATO_TRABALHADOR, "
+                    "ENTIDADE_EDUCACIONAL_SEM_FINS_LUCRATIVOS ou ENTIDADE_ASSISTENCIAL). "
+                    "LC 214/2025 Art. 9º caput, II/III."
+                )
+            tipos_compativeis = frozenset(
+                tipo for (tipo, regime), eleg in _MATRIZ_ELEG.items()
+                if regime == "IMUNE" and eleg.valido
+            )
+            if self.tipo_societario is not None and self.tipo_societario not in tipos_compativeis:
+                raise ValueError(
+                    f"tipo_societario='{self.tipo_societario}' incompatível com "
+                    f"regime='IMUNE'. Tipos aceitos (MATRIZ canônica): "
+                    f"{sorted(tipos_compativeis)}. Empresarial (LTDA, SA, SLU, EI "
+                    "etc.) tem finalidade lucrativa — fora do escopo da imunidade "
+                    "(CF Art. 150 VI c)."
+                )
+        return self
 
     @computed_field  # type: ignore[prop-decorator]
     @property
