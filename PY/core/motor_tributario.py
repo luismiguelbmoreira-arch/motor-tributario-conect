@@ -15,6 +15,10 @@ from typing import Any, Dict, List, Optional
 
 from core.difal import calcular_difal
 from core.formatadores import _fmt_brl
+from core.orquestrador_societario import (
+    ResultadoOrquestracaoSocietaria,
+    validar_combinacao,
+)
 from core.regimes.base import BaseRegimeEngine
 from core.regimes.cooperativa import CooperativaOverlay
 from core.regimes.imune import ImuneEngine
@@ -78,6 +82,7 @@ class MotorReformaTributaria:
     trilha_auditoria: List[Dict[str, Any]]
     _engine_regime: Optional[BaseRegimeEngine]
     _overlay_cooperativa: Optional[CooperativaOverlay]
+    _validacao_societaria: ResultadoOrquestracaoSocietaria
     _diagnostico_gerado: bool
     _cnae_fonte: Optional[str]
 
@@ -108,6 +113,14 @@ class MotorReformaTributaria:
         self._validar_timeline()
         # ERR-037: regime do comprador capturado na trilha (crédito cruzado LC 214/2025 Art. 47 §2º na Fase 4+)
         self._registrar_regime_comprador()
+        # WS6 Etapa 6 — validação societária consolidada (matriz + sub-validadores
+        # + CNAE + limites versionados). Concatena TODAS as falhas. Não levanta —
+        # caller decide tratamento (HTTP 422, alerta UI, bloqueio diagnóstico).
+        self._validacao_societaria: ResultadoOrquestracaoSocietaria = validar_combinacao(
+            fornecedora=self.fornecedora,
+            data_emissao=self.operacao.data_emissao,
+        )
+        self._registrar_validacao_societaria_na_trilha()
         self._engine_regime: Optional[BaseRegimeEngine] = self._instanciar_engine()
         # WS6 Etapa 5a — overlay sobrepõe o engine regular quando tipo_societario=COOPERATIVA.
         # NÃO substitui — convive com Presumido/Real/Simples/MEI/Imune do regime tributário.
@@ -149,6 +162,44 @@ class MotorReformaTributaria:
         regular: `overlay.aplicar(resultado_engine, data_emissao=...)`.
         """
         return self._overlay_cooperativa
+
+    def obter_validacao_societaria(self) -> ResultadoOrquestracaoSocietaria:
+        """
+        Retorna o resultado consolidado do orquestrador societário (WS6 etapa 6).
+        Concatena TODAS as falhas detectadas na combinação tipo×regime×CNAE×
+        limite versionado. Não levanta — caller decide tratamento.
+        """
+        return self._validacao_societaria
+
+    def _registrar_validacao_societaria_na_trilha(self) -> None:
+        """
+        Registra resumo do resultado do orquestrador na trilha unificada.
+        Bloqueios viram eventos `ALERTA_VALIDACAO_SOCIETARIA_BLOQUEIO`;
+        alertas Rail R7 entram como `ALERTA_VALIDACAO_SOCIETARIA_*`.
+        """
+        validacao = self._validacao_societaria
+        for bloqueio in validacao.bloqueios:
+            self.trilha_auditoria.append({
+                "tipo": "ALERTA_VALIDACAO_SOCIETARIA",
+                "id": f"ALERTA_VALIDACAO_SOCIETARIA_BLOQUEIO_{bloqueio.origem}",
+                "titulo": f"Validação societária — bloqueio em {bloqueio.origem}",
+                "formula": "AND(matriz, MEI, COOPERATIVA, CNAE, limite_versionado)",
+                "memoria": {"origem": bloqueio.origem, "mensagem": bloqueio.mensagem},
+                "amparo_legal": bloqueio.base_legal or "WS6 etapa 6 — orquestrador",
+                "detalhe": bloqueio.mensagem,
+                "timestamp": str(datetime.now()),
+            })
+        for alerta in validacao.alertas:
+            self.trilha_auditoria.append({
+                "tipo": "ALERTA_VALIDACAO_SOCIETARIA",
+                "id": alerta.id,
+                "titulo": alerta.titulo,
+                "formula": "",
+                "memoria": {},
+                "amparo_legal": alerta.base_legal,
+                "detalhe": alerta.detalhe,
+                "timestamp": str(datetime.now()),
+            })
 
     def __enter__(self):  # pragma: no cover
         return self
