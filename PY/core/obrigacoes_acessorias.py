@@ -261,9 +261,10 @@ _PGDAS_D = Obrigacao(
 # ─────────────────────────────────────────────────────────────────────────────
 
 _MATRIZ: dict[tuple[NivelPorte, Regime], tuple[Obrigacao, ...]] = {
-    # MEI sob Simples (regime="MEI" mapeia pra "SIMPLES" funcional)
+    # MEI é sub-regime do Simples (LC 123/2006 Art. 18-A) — chave canônica
+    # única é ("MEI", "SIMPLES"). Caller que passar regime="MEI" é
+    # normalizado em obter_obrigacoes() abaixo (regime="MEI" → "SIMPLES").
     ("MEI", "SIMPLES"): (_DASN_SIMEI, _PGDAS_D),
-    ("MEI", "MEI"): (_DASN_SIMEI, _PGDAS_D),
     # ME e EPP no Simples
     ("ME", "SIMPLES"): (_DEFIS, _PGDAS_D),
     ("EPP", "SIMPLES"): (_DEFIS, _PGDAS_D),
@@ -273,6 +274,22 @@ _MATRIZ: dict[tuple[NivelPorte, Regime], tuple[Obrigacao, ...]] = {
 }
 
 
+def _normalizar_regime(regime: str) -> str:
+    """
+    MEI é sub-regime do Simples (LC 123/2006 Art. 18-A — "tratamento
+    diferenciado dentro do Simples"), não regime tributário próprio.
+
+    O schema do motor (`EmpresaFornecedora.regime`) mantém "MEI" como
+    valor distinto pra ter MEIEngine isolado com Guard Clause (Camada 2).
+    Aqui em obrigações, normalizamos pra evitar duplicação de chave da
+    matriz. Combinações absurdas (porte=MEI + regime=PRESUMIDO/REAL/IMUNE)
+    NÃO são normalizadas — caem em fallback `()` (Rail R2).
+    """
+    if regime == "MEI":
+        return "SIMPLES"
+    return regime
+
+
 def obter_obrigacoes(*, porte: NivelPorte, regime: str) -> tuple[Obrigacao, ...]:
     """
     Retorna tupla imutável de obrigações aplicáveis ao par (porte, regime).
@@ -280,8 +297,14 @@ def obter_obrigacoes(*, porte: NivelPorte, regime: str) -> tuple[Obrigacao, ...]
     Quando combinação não está mapeada, devolve tupla vazia (Rail R2 — sem
     extrapolação). Eventos de "obrigação faltante" são responsabilidade
     do caller, não desta camada.
+
+    Normalização: regime="MEI" é tratado como regime="SIMPLES" (MEI é
+    sub-regime do Simples — LC 123/2006 Art. 18-A). Validação de
+    coerência porte×regime (ex: MEI×PRESUMIDO é absurdo) vive no
+    orquestrador WS6 etapa 6 — não duplicada aqui.
     """
-    return _MATRIZ.get((porte, regime), ())
+    regime_normalizado = _normalizar_regime(regime)
+    return _MATRIZ.get((porte, regime_normalizado), ())
 
 
 # ─────────────────────────────────────────────────────────────────────────────

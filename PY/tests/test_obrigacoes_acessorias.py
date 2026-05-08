@@ -211,6 +211,29 @@ class TestObterObrigacoes:
         assert "DEFIS" in codigos
         assert "PGDAS_D" in codigos
 
+    def test_porte_mei_com_regime_mei_normalizado_para_simples(self):
+        # Limpeza pós-PMD: regime="MEI" é normalizado para "SIMPLES" antes
+        # de consultar a matriz. Evita chave duplicada ("MEI","MEI") +
+        # ("MEI","SIMPLES") com o mesmo conteúdo. MEI é sub-regime do
+        # Simples (LC 123/2006 Art. 18-A), não regime próprio.
+        obrigs_simples = obter_obrigacoes(porte="MEI", regime="SIMPLES")
+        obrigs_mei = obter_obrigacoes(porte="MEI", regime="MEI")
+        assert obrigs_simples == obrigs_mei, (
+            "porte=MEI + regime=MEI deve resolver pra mesmas obrigações "
+            "que porte=MEI + regime=SIMPLES (MEI é sub-regime do Simples)"
+        )
+
+    def test_porte_mei_com_regime_absurdo_retorna_tupla_vazia(self):
+        # Combinação absurda (porte=MEI mas regime=PRESUMIDO/REAL/IMUNE):
+        # NÃO é normalizada — cai em fallback () conservador.
+        # Validação de coerência porte×regime vive no orquestrador WS6.6.
+        for regime_invalido in ("PRESUMIDO", "REAL", "IMUNE"):
+            obrigs = obter_obrigacoes(porte="MEI", regime=regime_invalido)
+            assert obrigs == (), (
+                f"porte=MEI + regime={regime_invalido} deveria devolver () "
+                f"(Rail R2), recebeu {obrigs}"
+            )
+
     def test_combinacao_sem_obrigacao_mapeada_retorna_tupla_vazia(self):
         # PRESUMIDO/REAL/IMUNE — pendentes WS7b (cache RFB adicional)
         # Função retorna () quando não há cache validado, NÃO inventa.
