@@ -375,6 +375,154 @@ class TestCooperativaOverlayTransporte:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# 5b CREDITO — Arts. 188, 192 § 8º, 197 I
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestCooperativaOverlayCredito:
+    """Cooperativa de CRÉDITO — alertas específicos do regime financeiro."""
+
+    def test_credito_alerta_operacoes_associado_fora_base_sempre(
+        self, trilha, data_op,
+    ):
+        # Art. 192 § 8º — operações coop-associado fora da base SEMPRE,
+        # independente do opt-in Art. 271
+        emp = _coop(
+            ramo="CREDITO",
+            regime="REAL",
+            optante=False,
+            cnae="6422100",
+        )
+        overlay = CooperativaOverlay(emp, trilha)
+        overlay.aplicar(_resultado_engine_fake(), data_emissao=data_op)
+        ids = {e["id"] for e in trilha}
+        assert "ALERTA_COOPERATIVA_CREDITO_OPERACOES_ASSOCIADO_FORA_BASE" in ids
+        evento = next(
+            e for e in trilha
+            if e["id"] == "ALERTA_COOPERATIVA_CREDITO_OPERACOES_ASSOCIADO_FORA_BASE"
+        )
+        amparo = evento["amparo_legal"]
+        assert "Art. 192" in amparo
+        assert "§ 8" in amparo or "§8" in amparo
+
+    def test_credito_optin_alerta_reversao_deducoes_art_188(
+        self, trilha, data_op, data_op_anterior,
+    ):
+        emp = _coop(
+            ramo="CREDITO",
+            regime="REAL",
+            optante=True,
+            data_opcao=data_op_anterior,
+            cnae="6422100",
+        )
+        overlay = CooperativaOverlay(emp, trilha)
+        overlay.aplicar(_resultado_engine_fake(), data_emissao=data_op)
+        ids = {e["id"] for e in trilha}
+        assert "ALERTA_COOPERATIVA_CREDITO_REVERSAO_DEDUCOES_ART188" in ids
+        evento = next(
+            e for e in trilha
+            if e["id"] == "ALERTA_COOPERATIVA_CREDITO_REVERSAO_DEDUCOES_ART188"
+        )
+        assert "Art. 188" in evento["amparo_legal"]
+
+    def test_credito_optin_alerta_associado_tomador_nao_credita_art197(
+        self, trilha, data_op, data_op_anterior,
+    ):
+        emp = _coop(
+            ramo="CREDITO",
+            regime="REAL",
+            optante=True,
+            data_opcao=data_op_anterior,
+            cnae="6422100",
+        )
+        overlay = CooperativaOverlay(emp, trilha)
+        overlay.aplicar(_resultado_engine_fake(), data_emissao=data_op)
+        ids = {e["id"] for e in trilha}
+        assert "ALERTA_COOPERATIVA_CREDITO_ASSOCIADO_TOMADOR_SEM_CREDITO" in ids
+        evento = next(
+            e for e in trilha
+            if e["id"] == "ALERTA_COOPERATIVA_CREDITO_ASSOCIADO_TOMADOR_SEM_CREDITO"
+        )
+        amparo = evento["amparo_legal"]
+        assert "Art. 197" in amparo
+        assert "227" in amparo  # LC 227/2026
+
+    def test_credito_cita_art_183_par_1_iii_nao_182(self, trilha, data_op):
+        # Bloqueio MAX_07: rascunho original do Luiz citava Art. 182 § 1º III
+        # (errado). Correto: Art. 183 § 1º III (entidade supervisionada SFN).
+        emp = _coop(
+            ramo="CREDITO",
+            regime="REAL",
+            optante=False,
+            cnae="6422100",
+        )
+        overlay = CooperativaOverlay(emp, trilha)
+        r = overlay.aplicar(_resultado_engine_fake(), data_emissao=data_op)
+        leis_breakdown = " ".join(r.get("base_legal_aplicavel", ()))
+        leis_trilha = " ".join(e.get("amparo_legal", "") for e in trilha)
+        leis = leis_breakdown + " " + leis_trilha
+        assert "Art. 183" in leis
+        # Art. 182 § 1º não existe nesse contexto — bloqueio anti-alucinação
+        assert "Art. 182 § 1" not in leis
+        assert "Art. 182, § 1" not in leis
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5b SAUDE — regime Cap III Tít V (Arts. 234-238)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestCooperativaOverlaySaude:
+    """Cooperativa operadora de plano de saúde — regime próprio."""
+
+    def test_saude_alerta_regime_especifico_sempre(self, trilha, data_op):
+        emp = _coop(
+            ramo="SAUDE",
+            regime="PRESUMIDO",
+            optante=False,
+            cnae="8650099",
+        )
+        overlay = CooperativaOverlay(emp, trilha)
+        overlay.aplicar(_resultado_engine_fake(), data_emissao=data_op)
+        ids = {e["id"] for e in trilha}
+        assert "ALERTA_COOPERATIVA_SAUDE_REGIME_ESPECIFICO" in ids
+
+    def test_saude_alerta_cita_arts_234_237_238(self, trilha, data_op):
+        emp = _coop(
+            ramo="SAUDE",
+            regime="PRESUMIDO",
+            optante=False,
+            cnae="8650099",
+        )
+        overlay = CooperativaOverlay(emp, trilha)
+        overlay.aplicar(_resultado_engine_fake(), data_emissao=data_op)
+        evento = next(
+            e for e in trilha
+            if e["id"] == "ALERTA_COOPERATIVA_SAUDE_REGIME_ESPECIFICO"
+        )
+        amparo = evento["amparo_legal"]
+        assert "Art. 234" in amparo
+        assert "Art. 237" in amparo
+        assert "Art. 238" in amparo
+        # 60% redução referenciada
+        assert "60" in amparo
+
+    def test_saude_nao_zera_ibs_cbs_sobre_ato_cooperativo(
+        self, trilha, data_op,
+    ):
+        # SAUDE não tem opt-in Art. 271 — IBS/CBS do regular fica
+        emp = _coop(
+            ramo="SAUDE",
+            regime="PRESUMIDO",
+            optante=False,
+            cnae="8650099",
+        )
+        overlay = CooperativaOverlay(emp, trilha)
+        r = overlay.aplicar(_resultado_engine_fake(), data_emissao=data_op)
+        # Engine regular calculou IBS/CBS proporcionais ao split — SAUDE não zera
+        assert r["ibs_ato_cooperativo"] > Decimal("0")
+        assert r["cbs_ato_cooperativo"] > Decimal("0")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # CITAÇÕES LEGAIS — anti-alucinação MAX_07
 # ─────────────────────────────────────────────────────────────────────────────
 

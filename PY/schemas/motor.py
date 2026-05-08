@@ -12,6 +12,7 @@ from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
+from core.cooperativa_ramos import RamoCooperativo
 from validadores import validar_cnae, validar_cnpj, validar_ncm, validar_uf
 
 logger = logging.getLogger("motor_conect.schemas")
@@ -270,17 +271,16 @@ class EmpresaFornecedora(BaseModel):
     # + Lei 9.718/98 Art. 14 II → Real obrigatório) e SAUDE (regime específico de
     # operadora de plano de saúde LC 214). Schema captura o Literal completo pra
     # dar mensagem de erro CLARA quando 5b ainda não estiver implementado.
-    subtipo_cooperativa: Optional[
-        Literal[
-            "CONSUMO",        # exceção do Simples — LC 123/2006 Art. 3º § 1º
-            "TRABALHO",       # vedada Simples — LC 123/2006 Art. 3º § 4º VI
-            "PRODUCAO",       # vedada Simples — idem
-            "AGROPECUARIA",   # vedada Simples + Art. 271 § 1º II (anulação crédito)
-            "TRANSPORTE",     # vedada Simples + crédito presumido LC 214 Art. 169 § 8º
-            "CREDITO",        # 5b (BLOQUEADO em 5a)
-            "SAUDE",          # 5b (BLOQUEADO em 5a)
-        ]
-    ] = Field(
+    # Fonte única em core.cooperativa_ramos.RamoCooperativo (PMD #1 — etapa 5b).
+    # Comentário fiscal por ramo:
+    #   CONSUMO       — exceção do Simples (LC 123/2006 Art. 3º § 1º)
+    #   TRABALHO      — vedada no Simples (LC 123/2006 Art. 3º § 4º VI)
+    #   PRODUCAO      — vedada no Simples (idem)
+    #   AGROPECUARIA  — vedada no Simples + Art. 271 § 1º II (anulação crédito)
+    #   TRANSPORTE    — vedada no Simples + crédito presumido LC 214 Art. 169 § 8º
+    #   CREDITO       — Real obrigatório (Lei 9.718/98 Art. 14 II); regime LC 214 Art. 181+ (5b)
+    #   SAUDE         — operadora de plano de saúde com regime específico LC 214 (5b)
+    subtipo_cooperativa: Optional[RamoCooperativo] = Field(
         default=None,
         description=(
             "Ramo cooperativo. Obrigatório quando tipo_societario='COOPERATIVA'. "
@@ -419,21 +419,31 @@ class EmpresaFornecedora(BaseModel):
           - LC 123/2006 Art. 3º § 1º (exceção cooperativa de consumo)
           - Lei 9.718/98 Art. 14 II (cooperativa de crédito = Real obrigatório — 5b)
         """
-        # 4. CREDITO/SAUDE → bloqueio explícito 5b (cobre antes pra dar mensagem clara
-        # mesmo se outros checks também falhariam)
-        if self.subtipo_cooperativa == "CREDITO":
+        # 4a. CREDITO — Real obrigatório (Lei 9.718/98 Art. 14 II)
+        # Cooperativas de crédito estão entre as instituições obrigadas ao
+        # Lucro Real. Schema bloqueia outro regime antes do diagnóstico.
+        if self.subtipo_cooperativa == "CREDITO" and self.regime != "REAL":
             raise ValueError(
-                "subtipo_cooperativa='CREDITO' tratado em WS6 etapa 5b — "
-                "regime de serviços financeiros LC 214/2025 Art. 181+ "
-                "+ Lei 9.718/98 Art. 14 II (Real obrigatório) + "
-                "Art. 188 + Art. 192 § 8º + Art. 197 I (LC 227/2026). "
-                "Não disponível nesta etapa (5a)."
+                f"Cooperativa de CRÉDITO obrigada ao Lucro Real — "
+                f"recebido regime='{self.regime}'. Lei 9.718/98 Art. 14 II "
+                f"lista cooperativas de crédito entre as instituições obrigadas "
+                f"ao Lucro Real. Regime tributário deve ser 'REAL'."
             )
-        if self.subtipo_cooperativa == "SAUDE":
+
+        # 4b. SAUDE — opt-in Art. 271 INAPLICÁVEL
+        # Cooperativas operadoras de plano de saúde caem no regime específico
+        # de planos de assistência à saúde (LC 214/2025 Art. 234 III + Arts.
+        # 235-238 — alíquota de referência reduzida em 60% pelo Art. 237). O
+        # Art. 271 (alíquota zero IBS/CBS sobre ato cooperativo) não cobre o
+        # Cap III Tít V — bloqueio explícito.
+        if self.subtipo_cooperativa == "SAUDE" and self.optante_art271_cbs_ibs:
             raise ValueError(
-                "subtipo_cooperativa='SAUDE' tratado em WS6 etapa 5b — "
-                "regime específico de operadora de plano de saúde "
-                "(LC 214/2025). Não disponível nesta etapa (5a)."
+                "Cooperativa de SAÚDE (operadora de plano) cai no regime "
+                "específico LC 214/2025 Art. 234, caput + inciso III, c/c "
+                "Arts. 235-238 (alíquota de referência reduzida em 60% pelo "
+                "Art. 237; vedado crédito ao adquirente — Art. 238). "
+                "Art. 271 (alíquota zero IBS/CBS) NÃO se aplica — opt-in "
+                "deve ser False."
             )
 
         # 3. subtipo_cooperativa em tipo_societario != COOPERATIVA → erro

@@ -205,13 +205,13 @@ class TestValidadorCooperativaArt271Janela:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5b — CREDITO/SAUDE bloqueados nesta etapa
+# 5b CREDITO — Real obrigatório (Lei 9.718/98 Art. 14 II)
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestValidadorCooperativa5bBloqueado:
-    """Subtipos de 5b retornam bloqueio com mensagem específica."""
+class TestValidadorCooperativa5bCredito:
+    """Cooperativa de CRÉDITO — validação fiscal específica."""
 
-    def test_credito_bloqueado_cita_5b(self):
+    def test_credito_real_passa(self):
         r = validar_cooperativa(
             tipo_societario="COOPERATIVA",
             subtipo_cooperativa="CREDITO",
@@ -221,11 +221,67 @@ class TestValidadorCooperativa5bBloqueado:
             data_emissao=date(2027, 6, 15),
             data_opcao_art271=None,
         )
-        assert r.valido is False
-        msg = " ".join(r.motivos_bloqueio)
-        assert "5b" in msg.lower()
+        assert r.aplicavel is True
+        assert r.valido is True
+        assert r.ramo == "CREDITO"
 
-    def test_saude_bloqueado_cita_5b(self):
+    def test_credito_real_cita_lei_9718_art_14_ii(self):
+        r = validar_cooperativa(
+            tipo_societario="COOPERATIVA",
+            subtipo_cooperativa="CREDITO",
+            regime="REAL",
+            cnae_principal="6422100",
+            optante_art271=False,
+            data_emissao=date(2027, 6, 15),
+            data_opcao_art271=None,
+        )
+        leis = " ".join(r.base_legal_aplicavel)
+        assert "9.718" in leis or "9718" in leis
+        assert "Art. 14" in leis or "art. 14" in leis.lower()
+
+    def test_credito_cita_art_183_par_1_iii_nao_182(self):
+        # Bloqueio MAX_07: Escrivão pegou citação errada "Art. 182 § 1º III"
+        # no rascunho — o correto é Art. 183 § 1º III (cooperativas de crédito
+        # como entidade supervisionada do SFN).
+        r = validar_cooperativa(
+            tipo_societario="COOPERATIVA",
+            subtipo_cooperativa="CREDITO",
+            regime="REAL",
+            cnae_principal="6422100",
+            optante_art271=False,
+            data_emissao=date(2027, 6, 15),
+            data_opcao_art271=None,
+        )
+        leis = " ".join(r.base_legal_aplicavel)
+        assert "Art. 183" in leis
+        # Não confundir com Art. 182 (regulou OPERAÇÕES, não ENTIDADES)
+        assert "Art. 182 § 1" not in leis
+        assert "Art. 182, § 1" not in leis
+
+    def test_credito_cita_art_192_par_8(self):
+        # Operações coop-associado fora da base, sempre (independe Art. 271)
+        r = validar_cooperativa(
+            tipo_societario="COOPERATIVA",
+            subtipo_cooperativa="CREDITO",
+            regime="REAL",
+            cnae_principal="6422100",
+            optante_art271=False,
+            data_emissao=date(2027, 6, 15),
+            data_opcao_art271=None,
+        )
+        leis = " ".join(r.base_legal_aplicavel)
+        assert "Art. 192" in leis
+        assert "§ 8" in leis or "§8" in leis
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5b SAUDE — regime específico Cap III Tít V (Arts. 234-238)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestValidadorCooperativa5bSaude:
+    """Cooperativa operadora de plano de saúde — regime Art. 234+."""
+
+    def test_saude_sem_optin_passa(self):
         r = validar_cooperativa(
             tipo_societario="COOPERATIVA",
             subtipo_cooperativa="SAUDE",
@@ -235,9 +291,39 @@ class TestValidadorCooperativa5bBloqueado:
             data_emissao=date(2027, 6, 15),
             data_opcao_art271=None,
         )
-        assert r.valido is False
-        msg = " ".join(r.motivos_bloqueio)
-        assert "5b" in msg.lower()
+        assert r.aplicavel is True
+        assert r.valido is True
+        assert r.ramo == "SAUDE"
+
+    def test_saude_cita_art_234_iii(self):
+        r = validar_cooperativa(
+            tipo_societario="COOPERATIVA",
+            subtipo_cooperativa="SAUDE",
+            regime="PRESUMIDO",
+            cnae_principal="8650099",
+            optante_art271=False,
+            data_emissao=date(2027, 6, 15),
+            data_opcao_art271=None,
+        )
+        leis = " ".join(r.base_legal_aplicavel)
+        assert "Art. 234" in leis
+        # Bloqueio MAX_07: nunca usar placeholder "Art. ~12049" do rascunho original
+        assert "12049" not in leis
+        assert "~Art" not in leis
+
+    def test_saude_cita_aliquota_referencia_reduzida_60(self):
+        r = validar_cooperativa(
+            tipo_societario="COOPERATIVA",
+            subtipo_cooperativa="SAUDE",
+            regime="PRESUMIDO",
+            cnae_principal="8650099",
+            optante_art271=False,
+            data_emissao=date(2027, 6, 15),
+            data_opcao_art271=None,
+        )
+        leis = " ".join(r.base_legal_aplicavel)
+        assert "Art. 237" in leis
+        assert "60" in leis  # 60% de redução
 
 
 # ─────────────────────────────────────────────────────────────────────────────

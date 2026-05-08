@@ -111,32 +111,93 @@ class TestSchemaCooperativaCamposNovos:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# REJEIÇÃO — subtipos 5b (CREDITO, SAUDE) bloqueados nesta etapa
+# 5b CREDITO — Real obrigatório (Lei 9.718/98 Art. 14 II)
 # ─────────────────────────────────────────────────────────────────────────────
 
-class TestSchemaCooperativa5bRejeitado:
-    """CREDITO e SAUDE são tratados em WS6 Etapa 5b — rejeição explícita."""
+class TestSchemaCooperativa5bCredito:
+    """
+    Cooperativa de CRÉDITO obrigada ao Lucro Real (Lei 9.718/98 Art. 14 II).
+    Schema bloqueia regime != REAL com mensagem citando a lei.
+    """
 
-    def test_subtipo_credito_rejeitado_com_mensagem_clara(self):
-        with pytest.raises(ValueError, match="5b"):
-            _coop(subtipo="CREDITO")
+    def test_credito_no_real_aceita(self):
+        emp = _coop(subtipo="CREDITO", regime="REAL", cnae="6422100",
+                    receita_ato_coop=Decimal("8000000"),
+                    receita_ato_nao_coop=Decimal("2000000"))
+        assert emp.subtipo_cooperativa == "CREDITO"
+        assert emp.regime == "REAL"
 
-    def test_subtipo_saude_rejeitado_com_mensagem_clara(self):
-        with pytest.raises(ValueError, match="5b"):
-            _coop(subtipo="SAUDE")
+    @pytest.mark.parametrize("regime_invalido", ["SIMPLES", "PRESUMIDO", "MEI"])
+    def test_credito_fora_do_real_bloqueia(self, regime_invalido):
+        # IMUNE não entra no parametrize — combinação cooperativa+IMUNE roda
+        # antes o validator de IMUNE (subtipo_imune obrigatório), produzindo
+        # mensagem diferente. Caso real é coberto por outras camadas.
+        with pytest.raises(ValueError, match="9.?718"):
+            _coop(subtipo="CREDITO", regime=regime_invalido,
+                  receita_ato_coop=Decimal("8000000"),
+                  receita_ato_nao_coop=Decimal("2000000"))
 
-    def test_subtipo_credito_mensagem_cita_lei_9718(self):
+    def test_credito_mensagem_cita_lei_9718_art_14_ii(self):
         with pytest.raises(ValueError) as exc:
-            _coop(subtipo="CREDITO")
+            _coop(subtipo="CREDITO", regime="PRESUMIDO",
+                  receita_ato_coop=Decimal("8000000"),
+                  receita_ato_nao_coop=Decimal("2000000"))
         msg = str(exc.value)
-        assert "9.718" in msg or "9718" in msg
+        assert "Lei 9.718" in msg or "9718" in msg
+        assert "Art. 14" in msg or "art. 14" in msg.lower()
 
-    def test_subtipo_saude_mensagem_cita_regime_especifico(self):
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5b SAUDE — regime específico LC 214 Art. 234+ (sem opt-in Art. 271)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestSchemaCooperativa5bSaude:
+    """
+    Cooperativa operadora de plano de saúde (UNIMED) cai no regime específico
+    Cap III Tít V LC 214 — Arts. 234-238. Art. 271 é INAPLICÁVEL: opt-in
+    pelo Art. 271 com SAUDE → bloqueio.
+    """
+
+    def test_saude_sem_optin_aceita(self):
+        emp = _coop(subtipo="SAUDE", regime="PRESUMIDO", cnae="8650099",
+                    receita_ato_coop=Decimal("3000000"),
+                    receita_ato_nao_coop=Decimal("500000"))
+        assert emp.subtipo_cooperativa == "SAUDE"
+
+    def test_saude_no_real_aceita(self):
+        emp = _coop(subtipo="SAUDE", regime="REAL", cnae="8650099",
+                    receita_ato_coop=Decimal("100000000"),
+                    receita_ato_nao_coop=Decimal("5000000"))
+        assert emp.regime == "REAL"
+
+    def test_saude_com_optin_art271_bloqueia(self):
+        # Art. 271 não cobre Art. 234+ (regime específico de planos de saúde)
+        with pytest.raises(ValueError, match="234|271"):
+            _coop(
+                subtipo="SAUDE",
+                regime="PRESUMIDO",
+                cnae="8650099",
+                optante_art271=True,
+                data_opcao=date(2026, 12, 1),
+                receita_ato_coop=Decimal("3000000"),
+                receita_ato_nao_coop=Decimal("500000"),
+            )
+
+    def test_saude_optin_mensagem_cita_art_234(self):
         with pytest.raises(ValueError) as exc:
-            _coop(subtipo="SAUDE")
+            _coop(
+                subtipo="SAUDE",
+                regime="PRESUMIDO",
+                cnae="8650099",
+                optante_art271=True,
+                data_opcao=date(2026, 12, 1),
+                receita_ato_coop=Decimal("3000000"),
+                receita_ato_nao_coop=Decimal("500000"),
+            )
         msg = str(exc.value)
-        # Regime específico de saúde está na LC 214 (planos de saúde)
-        assert "saúde" in msg.lower() or "saude" in msg.lower()
+        assert "Art. 234" in msg
+        # Não confundir com placeholder antigo "Art. ~12049"
+        assert "12049" not in msg
 
 
 # ─────────────────────────────────────────────────────────────────────────────

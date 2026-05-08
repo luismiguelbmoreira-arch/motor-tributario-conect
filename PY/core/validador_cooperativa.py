@@ -50,19 +50,12 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# ─────────────────────────────────────────────────────────────────────────────
-# TIPO DE RAMO ACEITO EM 5a (sincronizado com schemas/motor.py)
-# ─────────────────────────────────────────────────────────────────────────────
+# WS6 etapa 5b — fonte única de ramos cooperativos (PMD #1: unificar
+# Literal × frozenset). Aliases preservados pra compat com chamadas legadas.
+from core.cooperativa_ramos import RAMOS_5A, RAMOS_5B
 
-RamosCooperativos5a = frozenset({
-    "CONSUMO",
-    "TRABALHO",
-    "PRODUCAO",
-    "AGROPECUARIA",
-    "TRANSPORTE",
-})
-
-RamosCooperativos5b = frozenset({"CREDITO", "SAUDE"})
+RamosCooperativos5a = RAMOS_5A
+RamosCooperativos5b = RAMOS_5B
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -156,23 +149,63 @@ def validar_cooperativa(
         "Lei 5.764/71 Art. 10 caput + § 1º (classificação por objeto/natureza; modalidades via OCB/CGSN)",
     ]
 
-    # 1. SUBTIPO 5b → bloqueio com mensagem específica
-    if subtipo_cooperativa in RamosCooperativos5b:
-        if subtipo_cooperativa == "CREDITO":
+    # 1a. CREDITO — Real obrigatório + alertas regime serviços financeiros
+    if subtipo_cooperativa == "CREDITO":
+        leis.append(
+            "Lei 9.718/98 Art. 14 II (cooperativas de crédito obrigadas ao Lucro Real)"
+        )
+        leis.append(
+            "LC 214/2025 Art. 181 caput (regime específico de serviços financeiros)"
+        )
+        leis.append(
+            "LC 214/2025 Art. 183 § 1º III "
+            "(cooperativas de crédito como entidade supervisionada do SFN)"
+        )
+        leis.append(
+            "LC 214/2025 Art. 192 § 8º "
+            "(operações coop-associado fora da base — independe do Art. 271)"
+        )
+        leis.append(
+            "LC 214/2025 Art. 188 (cooperativa financeira optante reverte deduções "
+            "proporcionais)"
+        )
+        leis.append(
+            "LC 214/2025 Art. 197 I, redação dada pela LC 227/2026 "
+            "(associado tomador NÃO apropria créditos)"
+        )
+        if regime != "REAL":
             motivos.append(
-                "Cooperativa de CRÉDITO tratada em WS6 etapa 5b — regime de "
-                "serviços financeiros (LC 214/2025 Art. 181+) com Real "
-                "obrigatório por Lei 9.718/98 Art. 14 II. Não disponível em 5a."
+                f"Cooperativa de CRÉDITO obrigada ao Lucro Real — recebido "
+                f"regime='{regime}'. Lei 9.718/98 Art. 14 II lista cooperativas "
+                f"de crédito entre as instituições obrigadas ao Real."
             )
-            leis.append("LC 214/2025 Art. 181+ (regime de serviços financeiros)")
-            leis.append("Lei 9.718/98 Art. 14 II (instituições financeiras → Real)")
-        else:  # SAUDE
+
+    # 1b. SAUDE — regime específico Cap III Tít V (Arts. 234-238)
+    elif subtipo_cooperativa == "SAUDE":
+        leis.append(
+            "LC 214/2025 Art. 234, caput + inciso III "
+            "(cooperativas operadoras de planos de saúde no regime específico)"
+        )
+        leis.append(
+            "LC 214/2025 Art. 235 (base de cálculo: prêmios/contraprestações "
+            "menos indenizações, cancelamentos, intermediação e taxa de adm.)"
+        )
+        leis.append(
+            "LC 214/2025 Art. 237 "
+            "(alíquota IBS/CBS = alíquota de referência reduzida em 60%)"
+        )
+        leis.append(
+            "LC 214/2025 Art. 238 (vedado crédito ao adquirente de planos de saúde)"
+        )
+        if optante_art271:
+            # Schema também bloqueia, mas validador é defensivo (caller pode
+            # construir entrada bypassando o schema em testes/admin tools).
             motivos.append(
-                "Cooperativa de SAÚDE (operadora de plano) tratada em WS6 "
-                "etapa 5b — regime específico de operadora de plano de saúde "
-                "(LC 214/2025). Não disponível em 5a."
+                "Cooperativa de SAÚDE não pode optar pelo Art. 271. Cap III "
+                "Tít V (Arts. 234-238) define regime próprio com alíquota de "
+                "referência reduzida em 60% (Art. 237) — Art. 271 é restrito "
+                "ao Tít VII (Cooperativas) e não cobre planos de saúde."
             )
-            leis.append("LC 214/2025 (regime específico de operadora de plano de saúde)")
 
     # 2. SUBTIPO ausente — não validamos nada além disso
     elif subtipo_cooperativa is None:

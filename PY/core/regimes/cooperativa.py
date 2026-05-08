@@ -124,6 +124,48 @@ AMPARO_VEDACAO_SIMPLES: str = (
     "cooperativa de consumo)"
 )
 
+# ── 5b CRÉDITO (validadas Escrivão 2026-05-08) ───────────────────────────────
+AMPARO_CREDITO_REAL_OBRIGATORIO: str = (
+    "Lei 9.718/98 Art. 14 II (cooperativas de crédito obrigadas ao Lucro Real)"
+)
+
+AMPARO_CREDITO_REGIME_FINANCEIRO: str = (
+    "LC 214/2025 Art. 181 caput (regime específico de serviços financeiros) | "
+    "Art. 183 § 1º III (cooperativas de crédito como entidade supervisionada "
+    "do Sistema Financeiro Nacional). Validado por Escrivão 2026-05-08 contra "
+    "cache local (lcp214_v2026-05-07.html linhas 9986-9988)."
+)
+
+AMPARO_CREDITO_OPERACOES_ASSOCIADO_FORA_BASE: str = (
+    "LC 214/2025 Art. 192 § 8º (operações de crédito coop-associado fora da "
+    "base — independem do opt-in Art. 271; aplica-se sempre, por exclusão "
+    "do conceito de receita do serviço financeiro)"
+)
+
+AMPARO_CREDITO_REVERSAO_DEDUCOES_ART188: str = (
+    "LC 214/2025 Art. 188 (cooperativa que fornece serviços financeiros e "
+    "exerce a opção do Art. 271 deve reverter o efeito das deduções "
+    "proporcionalmente ao valor das operações com alíquota zero)"
+)
+
+AMPARO_CREDITO_ASSOCIADO_TOMADOR_SEM_CREDITO: str = (
+    "LC 214/2025 Art. 197 I (redação dada pela LC 227/2026 — associados "
+    "tomadores de operações de crédito com cooperativas optantes do Art. 271 "
+    "NÃO podem apropriar créditos pelos Arts. 194 a 196)"
+)
+
+# ── 5b SAÚDE (validadas Escrivão 2026-05-08) ─────────────────────────────────
+AMPARO_SAUDE_REGIME_ESPECIFICO: str = (
+    "LC 214/2025 Art. 234, caput + inciso III (cooperativas operadoras de "
+    "planos de saúde sob regime específico do Cap. III Tít. V) | "
+    "Art. 235 (base = prêmios/contraprestações - indenizações, cancelamentos, "
+    "intermediação e taxa de adm.) | "
+    "Art. 237 (alíquotas IBS/CBS = referência reduzida em 60%) | "
+    "Art. 238 (vedado crédito ao adquirente, salvo PJ contratante — § único, "
+    "redação dada pela LC 227/2026) | "
+    "Art. 271 NÃO se aplica (Cap. III Tít. V isolado do Tít. VII Cooperativas)"
+)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # HELPER — timestamp ISO (isolado para facilitar mock em testes)
@@ -387,6 +429,92 @@ class CooperativaOverlay:
                     "do insumo antes de aplicar o crédito."
                 ),
                 memoria={"ramo": ramo, "optante": True},
+            )
+
+        # 4b. CREDITO → alertas específicos do regime financeiro
+        if ramo == "CREDITO":
+            self._registrar(
+                tipo="ALERTA_COOPERATIVA",
+                id="ALERTA_COOPERATIVA_CREDITO_REGIME_FINANCEIRO",
+                titulo="Cooperativa de crédito — regime específico de serviços financeiros",
+                amparo=(
+                    f"{AMPARO_CREDITO_REAL_OBRIGATORIO} | "
+                    f"{AMPARO_CREDITO_REGIME_FINANCEIRO}"
+                ),
+                detalhe=(
+                    "Cooperativa de crédito é instituição obrigada ao Lucro Real "
+                    "(Lei 9.718/98 Art. 14 II) e cai no regime específico de "
+                    "serviços financeiros do Cap. II Tít. V da LC 214/2025 "
+                    "(Art. 181). A entidade aparece nominalmente como entidade "
+                    "supervisionada do SFN no Art. 183 § 1º III. Engine regular "
+                    "calcula PIS/COFINS/IRPJ/CSLL pelo Real; IBS/CBS do regime "
+                    "financeiro tem base e alíquota próprias (Cap. II Tít. V) — "
+                    "cálculo automático fica para etapa específica (Rail R2)."
+                ),
+                memoria={"ramo": ramo, "regime": self.fornecedora.regime},
+            )
+            self._registrar(
+                tipo="ALERTA_COOPERATIVA",
+                id="ALERTA_COOPERATIVA_CREDITO_OPERACOES_ASSOCIADO_FORA_BASE",
+                titulo="Operações de crédito coop-associado fora da base IBS/CBS",
+                amparo=AMPARO_CREDITO_OPERACOES_ASSOCIADO_FORA_BASE,
+                detalhe=(
+                    "LC 214/2025 Art. 192 § 8º exclui as operações de crédito "
+                    "entre cooperativa e associado da base do regime de serviços "
+                    "financeiros, com recursos próprios da cooperativa/associados "
+                    "ou recursos públicos/equalizados. Aplicação independe do "
+                    "opt-in pelo Art. 271 — é regra de não-incidência da base."
+                ),
+                memoria={"ramo": ramo},
+            )
+            if optante and janela_ok:
+                self._registrar(
+                    tipo="ALERTA_COOPERATIVA",
+                    id="ALERTA_COOPERATIVA_CREDITO_REVERSAO_DEDUCOES_ART188",
+                    titulo="Cooperativa de crédito optante reverte deduções",
+                    amparo=AMPARO_CREDITO_REVERSAO_DEDUCOES_ART188,
+                    detalhe=(
+                        "Optante do Art. 271: reverter o efeito das deduções de "
+                        "base de cálculo (Cap. II Tít. V) proporcionalmente ao "
+                        "valor das operações beneficiadas com alíquota zero. "
+                        "Cálculo automático fica para etapa específica do regime "
+                        "de serviços financeiros (Rail R2)."
+                    ),
+                    memoria={"ramo": ramo, "optante": True},
+                )
+                self._registrar(
+                    tipo="ALERTA_COOPERATIVA",
+                    id="ALERTA_COOPERATIVA_CREDITO_ASSOCIADO_TOMADOR_SEM_CREDITO",
+                    titulo="Associado tomador NÃO apropria créditos (LC 227/2026)",
+                    amparo=AMPARO_CREDITO_ASSOCIADO_TOMADOR_SEM_CREDITO,
+                    detalhe=(
+                        "Associados tomadores de operações de crédito com "
+                        "cooperativa optante pelo Art. 271 NÃO podem apropriar "
+                        "créditos previstos nos Arts. 194 a 196 (LC 214/2025 "
+                        "Art. 197 I, redação LC 227/2026). Repassar a regra ao "
+                        "associado contratante na nota fiscal."
+                    ),
+                    memoria={"ramo": ramo, "optante": True},
+                )
+
+        # 4c. SAUDE → alerta regime específico Art. 234+
+        if ramo == "SAUDE":
+            self._registrar(
+                tipo="ALERTA_COOPERATIVA",
+                id="ALERTA_COOPERATIVA_SAUDE_REGIME_ESPECIFICO",
+                titulo="Cooperativa de saúde — regime específico Cap. III Tít. V",
+                amparo=AMPARO_SAUDE_REGIME_ESPECIFICO,
+                detalhe=(
+                    "Operadora cooperativa de plano de saúde está sujeita ao "
+                    "regime específico de planos de assistência à saúde (LC "
+                    "214/2025 Arts. 234-238). Engine regular (Presumido/Real) "
+                    "calcula apenas IRPJ/CSLL/PIS/COFINS — IBS/CBS de saúde "
+                    "tem base e alíquota próprias (Art. 235 + Art. 237: "
+                    "alíquota de referência reduzida em 60%). Cálculo IBS/CBS "
+                    "automático fica para etapa específica de regime de saúde "
+                    "(Rail R2). Art. 271 (alíquota zero IBS/CBS) NÃO se aplica."
+                ),
+                memoria={"ramo": ramo},
             )
 
         # 5. TRANSPORTE → alerta crédito presumido Art. 169 § 8º
