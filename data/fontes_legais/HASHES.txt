@@ -9,3 +9,5 @@
 de35b5205860437936674b50317cc75a5246672dfe8deff7b389835657cb454d | planalto/lcp123_v2026-05-07.html | https://www.planalto.gov.br/ccivil_03/leis/lcp/lcp123.htm | 2026-05-07 | planalto
 54d4fe599cbefb460c7879f112396d104d5cd7becbc52ff19d61512cc8db36cf | planalto/lcp214_v2026-05-07.html | https://www.planalto.gov.br/ccivil_03/leis/lcp/lcp214.htm | 2026-05-07 | planalto
 84115b78866029d6f76aace06f12f306228e1bfc8136f8749cca7c86a5941a75 | planalto/lcp227_v2026-05-07.html | https://www.planalto.gov.br/ccivil_03/leis/lcp/lcp227.htm | 2026-05-07 | planalto
+b75f5cbdd6d208c70a0f1f9330bdbb9385093f06c96a6eeddd275e8ffeb154d6 | planalto/cf_v2026-05-07.html | https://www.planalto.gov.br/ccivil_03/Constituicao/Constituicao.htm | 2026-05-07 | planalto
+c74e1afc729a60d8a6d136acdc07723ac4e8a525257b68aac56a55427c091019 | planalto/ctn_v2026-05-07.html | https://www.planalto.gov.br/ccivil_03/leis/l5172compilado.htm | 2026-05-07 | planalto
