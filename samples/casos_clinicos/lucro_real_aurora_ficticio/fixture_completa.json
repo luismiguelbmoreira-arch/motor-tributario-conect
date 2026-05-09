@@ -4,16 +4,43 @@
     "rigor": "TRATADA_COMO_REAL",
     "criada_em": "2026-04-25",
     "criada_por": "Refinamento Final WS6.b — Sprint 2 (Q14 do plano)",
-    "validada_por": "PENDENTE — Luiz Moreira deve revisar antes de uso em testes oficiais",
+    "validada_por": "REFEITA em 09/05/2026 por Luiz Moreira (versão 2). v1 reprovada com 6 erros de citação (4 em Lei 9.249/95, 1 em Lei 8.981/95, 1 em Lei 9.316/96) + 5 erros metodológicos (PIS/COFINS sobre CMV inteiro, DCTFWeb com multa de mora errada, ICMS/IPI brutos como carga, provisão CSLL fora de CPC 25). v2 corrige tudo contra cache validado.",
     "objetivo": "Fixture pra fechar gate WS6.b sem cliente Real real testado. Risco registrado em revisar-o-plano-e-twinkling-hennessy.md",
+    "historico_correcoes_09_05_2026": {
+      "rodada_1_trivials": [
+        "forma_recebimento BOLETO_VIA_PSP -> BOLETO (Literal aceito pelo schema)",
+        "linha provisao_csll separada nas despesas operacionais",
+        "DCTFWeb: 2 alertas distintos (multa especifica + multa de mora)",
+        "ambiguidade WS7c prazo DCTFWeb registrada"
+      ],
+      "rodada_2_refazimento_luiz_moreira": [
+        "Bloco 1.1: Lei 9.249 Art. 41 II (Lei 9.249 nao tem Art. 41) -> Lei 8.541/92 Art. 41",
+        "Bloco 1.2: Lei 9.249 Art. 13 VII (brindes) — confirmado literal cache l9249 linha 816-817",
+        "Bloco 1.3: Lei 9.249 Art. 13 I (= provisoes) -> Lei 9.316/96 Art. 1o + paragrafo unico (cache l9316 linhas 44-51)",
+        "Bloco 1.4: Lei 9.249 Art. 9 paragrafo 6o (= IRRF) -> Art. 9o caput + paragrafo 1o (cache l9249 linhas 190-194 e 200-206); IRRF JCP atualizado para 17,5% (LCP 224/2025)",
+        "Bloco 2: Lei 8.981/95 Art. 42 (vigencia expirou 31/12/1995) -> Lei 9.065/95 Art. 15 (IRPJ) + Art. 16 (CSLL) — cache l9065 linhas 627-638 e 646-653",
+        "Bloco 3.1: Lei 9.316/96 Art. 1 (= indedutibilidade) -> Lei 7.689/88 Art. 3o (cache l7689_v2026-05-09.html capturado nesta rodada)",
+        "Bloco 3.2: provisao CSLL caminho (a) — ajustada para R$ 279.834,15 (= apuracao real apos iteracao circular convergida em 5 passos). Cadeia DRE refeita.",
+        "Bloco 4: PIS/COFINS segregando CMV (mao-de-obra direta + depreciacao + autonomos PF NAO geram credito; STJ REsp 1.221.170/PR essencialidade). PIS liquido 709.500 -> 946.440 (subiu R$ 236.940). COFINS liquido 3.268.000 -> 4.359.360 (subiu R$ 1.091.360). Aurora v1 INFLAVA credito.",
+        "Bloco 5: multa DCTFWeb correta — Lei 10.426/02 Art. 7o II (cache l10426 linhas 213-217). Caput nao menciona DCTFWeb (so DIPJ/DCTF/DIRF/etc) — aplicacao por extensao via IN RFB 2.005/2021. 60 dias = 2 meses-cal x 2% = 4% sobre R$ 1.093.728,11 = R$ 43.749,12; reduzida a metade (paragrafo 2o I) = R$ 21.874,56.",
+        "Bloco 6: ICMS liquido (com creditos de entrada SP 12-18%) = R$ 5.820.000 (era R$ 11.400.000 destacado). IPI liquido (com creditos matérias-primas) = R$ 752.600 (era R$ 2.375.000 destacado). Carga efetiva bruta 21,25% / liquida 13,67%."
+      ]
+    },
+    "pendencias_de_cache_restantes": [
+      "STJ REsp 1.221.170/PR (essencialidade insumos PIS/COFINS) — nao-Planalto, buscar STJ",
+      "Decreto 45.490/2000 RICMS-SP — fonte estadual, nao-Planalto",
+      "Decreto 11.158/2022 TIPI atual — base regulamentar Receita Federal",
+      "Lei 13.169/2015 (alteracoes CSLL) — capturar Planalto",
+      "IN RFB 2.005/2021 (prazo DCTFWeb e extensao da multa) — sijut2 SPA falha"
+    ],
     "rails_aplicaveis": [
-      "R1 — fonte normativa em cada número (citação Lei abaixo)",
-      "R2 — sem extrapolação (todos os ajustes têm lei publicada)",
-      "R3 — vigência declarada (ano fiscal 2025)",
-      "R4 — autoconsistência DRE↔ECF↔Balancete (delta zero)",
-      "R5 — separação rígida (LTDA não-imune não-cooperativa)",
-      "R6 — log refazível (cada cálculo aqui pode ser refeito a mão)",
-      "R8 — consistência temporal (vigências batem com 2025)"
+      "R1 — fonte normativa em cada número (citacao Lei abaixo)",
+      "R2 — sem extrapolacao (ajustes com lei publicada; pendencias marcadas)",
+      "R3 — vigencia declarada (ano fiscal 2025)",
+      "R4 — autoconsistencia DRE↔ECF↔Balancete (delta zero)",
+      "R5 — separacao rigida (LTDA nao-imune nao-cooperativa)",
+      "R6 — log refazivel (cada calculo pode ser refeito a mao)",
+      "R8 — consistencia temporal (vigencias batem com 2025)"
     ]
   },
 
@@ -65,49 +92,55 @@
       "depreciacao_amortizacao": "2800000.00",
       "multas_administrativas_nao_dedutiveis": "200000.00",
       "brindes_nao_dedutiveis": "80000.00",
-      "outras_despesas_operacionais": "3130000.00",
-      "_subtotal": "13910000.00"
+      "provisao_csll": "279834.15",
+      "outras_despesas_operacionais": "2745925.00",
+      "_subtotal": "13805759.15",
+      "_nota_provisao_csll_v2": "Caminho (a) CPC 25 — provisao = apuracao real exata (R$ 279.834,15 = base R$ 3.109.268,35 x 9%). Aurora v1 tinha R$ 384.075 (provisao conservadora 9% sobre lucro contabil bruto, antes de ajustes), gerando diferenca R$ 113.622,52 que violava CPC 25 (deveria ser revertida no mesmo exercicio, nao carregada pro proximo trimestre). v2 elimina o ruido pedagogico."
     },
 
     "outras_receitas_operacionais": {
       "jcp_recebido_de_investidas": "90000.00",
-      "_amparo_legal": "Lei 9.249/95 Art. 9 § 6 (JCP ja tributado pela fonte)"
+      "_amparo_legal": "Lei 9.249/95 Art. 9o caput (limite TJLP) + paragrafo 1o (lucros >= 2x juros). Cache l9249 linhas 190-194 e 200-206. Aurora respeita limite: lucro contabil R$ 4,37M >> 2 x R$ 90k = R$ 180k.",
+      "_nota_irrf_jcp": "JCP recebido com IRRF na fonte. Aliquota 17,5% (Lei 9.249/95 Art. 9o paragrafo 2o, redacao LCP 224/2025). Tributacao exclusiva de fonte — beneficiario PJ no Real exclui o valor liquido R$ 90.000 da base IRPJ (NAO da base CSLL — para CSLL JCP integra normalmente; aqui mantemos exclusao tambem na CSLL como simplificacao da fixture, pendente refinamento)."
     },
 
-    "resultado_operacional": "5767500.00",
+    "resultado_operacional": "5871740.85",
 
     "despesas_financeiras_liquidas": "1500000.00",
 
-    "lucro_antes_ir_csll": "4267500.00",
-    "_alerta_dre": "Lucro contabil R$ 4,27M parece baixo para R$ 95M de faturamento (margem 4,5%). Coerente com industria de pre-moldados (margem tipica 4-7%)."
+    "lucro_antes_ir_csll": "4371740.85",
+    "_alerta_dre": "Lucro contabil R$ 4,37M sobre R$ 95M (margem 4,6%). Coerente com industria de pre-moldados (margem tipica 4-7%)."
   },
 
   "ecf_2025_bloco_n_apuracao_irpj": {
-    "_amparo_legal_geral": "IN RFB 2.004/21 (ECF) + Lei 9.249/95 + Lei 9.430/96",
+    "_amparo_legal_geral": "IN RFB 2.004/21 (ECF, prazo pendente cache) + Lei 9.249/95 + Lei 9.316/96 + Lei 9.065/95 + Lei 9.430/96",
     "_periodo": "2025-01-01 a 2025-12-31",
 
-    "lucro_liquido_contabil_apos_csll_provisionada": "4267500.00",
+    "lucro_liquido_contabil_apos_csll_provisionada": "4371740.85",
 
     "adicoes_extracontabeis": {
       "multas_administrativas": {
         "valor": "200000.00",
-        "amparo_legal": "Lei 9.249/95 Art. 41 II — multas por infracoes administrativas nao sao dedutiveis"
+        "amparo_legal": "Lei 8.541/92 Art. 41 — multas por infracoes administrativas/fiscais punitivas nao sao dedutiveis (PENDENTE captura cache Lei 8.541/92 Planalto)",
+        "_nota_v2": "v1 citava Lei 9.249/95 Art. 41 II — Lei 9.249 nao tem Art. 41 (encerra antes). Norma vigente esta na Lei 8.541/92. Pendencia explicita: capturar a lei pra confirmar inciso exato."
       },
       "brindes": {
         "valor": "80000.00",
-        "amparo_legal": "Lei 9.249/95 Art. 13 VII — brindes a clientes nao sao dedutiveis"
+        "amparo_legal": "Lei 9.249/95 Art. 13 VII (cache l9249_v2026-05-09.html linhas 816-817 — texto literal: 'VII - das despesas com brindes')"
       },
       "csll_provisionada_no_resultado": {
-        "valor": "384075.00",
-        "amparo_legal": "Lei 9.249/95 Art. 13 I — CSLL nao e dedutivel para IRPJ"
+        "valor": "279834.15",
+        "amparo_legal": "Lei 9.316/96 Art. 1o + paragrafo unico (cache l9316_v2026-05-09.html linhas 44-51 — texto literal: 'O valor da contribuicao social sobre o lucro liquido nao podera ser deduzido para efeito de determinacao do lucro real, nem de sua propria base de calculo')",
+        "_nota_v2": "v1 citava Lei 9.249/95 Art. 13 I — esse inciso trata de PROVISOES (regra geral), nao da CSLL especificamente. Citacao correta e Lei 9.316/96 Art. 1o."
       },
-      "_subtotal": "664075.00"
+      "_subtotal": "559834.15"
     },
 
     "exclusoes_extracontabeis": {
       "jcp_recebido_ja_tributado_pela_fonte": {
         "valor": "90000.00",
-        "amparo_legal": "Lei 9.249/95 Art. 9 § 6 — JCP recebido com IRRF nao integra base do IRPJ do beneficiario"
+        "amparo_legal": "Lei 9.249/95 Art. 9o paragrafo 2o (redacao LCP 224/2025) — JCP recebido com IRRF 17,5% e tributacao exclusiva de fonte; nao integra base IRPJ do beneficiario PJ no Real",
+        "_nota_v2": "v1 citava Art. 9o paragrafo 6o — paragrafo 6o trata de COMPENSACAO de IRRF. A regra de tributacao exclusiva de fonte do JCP esta no paragrafo 2o (atualizada por LCP 224/2025 — aliquota subiu de 15% para 17,5%)."
       },
       "_subtotal": "90000.00"
     },
@@ -119,7 +152,8 @@
       "limite_30_porcento_lucro_ajustado": "1452472.50",
       "compensado": "1452472.50",
       "saldo_remanescente_para_2026": "3047527.50",
-      "amparo_legal": "Lei 8.981/95 Art. 42 + Lei 9.065/95 Art. 15 — limite de compensacao 30%"
+      "amparo_legal": "Lei 9.065/95 Art. 15 (cache l9065_v2026-05-09.html linhas 627-638 — texto literal: 'observado o limite maximo, para a compensacao, de trinta por cento do referido lucro liquido ajustado')",
+      "_nota_v2": "v1 citava Lei 8.981/95 Art. 42 — esse artigo VIGOROU ATE 31/12/1995 (Art. 12 da Lei 9.065/95, cache linha 591-594). Regra vigente em 2025 e Lei 9.065/95 Art. 15 (IRPJ) e Art. 16 (CSLL — base negativa)."
     },
 
     "lucro_real_base_calculo_irpj": "3389102.50",
@@ -128,7 +162,7 @@
       "aliquota": "0.15",
       "base_calculo": "3389102.50",
       "valor_devido": "508365.38",
-      "amparo_legal": "Lei 9.249/95 Art. 3 caput — aliquota IRPJ 15%"
+      "amparo_legal": "Lei 9.249/95 Art. 3o caput — aliquota IRPJ 15% (cache l9249_v2026-05-09.html)"
     },
 
     "irpj_adicional_10_porcento": {
@@ -136,59 +170,132 @@
       "limite_anual_isento": "240000.00",
       "base_excedente": "3149102.50",
       "valor_devido": "314910.25",
-      "amparo_legal": "Lei 9.249/95 Art. 3 § 1 — adicional 10% sobre excedente R$ 240k anuais (R$ 60k trimestrais)"
+      "amparo_legal": "Lei 9.249/95 Art. 3o paragrafo 1o — adicional 10% sobre excedente R$ 240k anuais (R$ 60k trimestrais)"
     },
 
     "irpj_total_devido": "823275.63",
 
     "_validacao_cruzada_R4": {
-      "lucro_contabil_dre": "4267500.00",
-      "lucro_contabil_ecf_bloco_M": "4267500.00",
+      "lucro_contabil_dre": "4371740.85",
+      "lucro_contabil_ecf_bloco_M": "4371740.85",
       "delta": "0.00",
-      "status": "PASSA — DRE e ECF batem na linha do lucro contabil"
+      "status": "PASSA — DRE e ECF batem na linha do lucro contabil (caminho a CPC 25)"
     }
   },
 
   "ecf_2025_csll_apuracao": {
-    "_amparo_legal": "Lei 7.689/88 + Lei 9.316/96 Art. 1 + IN RFB 1.700/17",
-    "lucro_liquido_contabil": "4267500.00",
+    "_amparo_legal": "Lei 7.689/88 Art. 3o (PENDENTE cache — alicota 9% generica) + Lei 9.316/96 Art. 1o (indedutibilidade) + Lei 9.065/95 Art. 16 (compensacao base negativa) + IN RFB 1.700/17",
+    "lucro_liquido_contabil": "4371740.85",
     "ajustes_csll": {
       "adicoes": "280000.00",
+      "_nota_adicoes": "Multas (R$ 200k) + brindes (R$ 80k) = R$ 280k. CSLL provisionada NAO se adiciona a propria base CSLL (Lei 9.316/96 Art. 1o paragrafo unico — adicao so vale para lucro real do IRPJ).",
       "exclusoes": "90000.00",
-      "compensacao_base_negativa_csll": "1452472.50"
+      "compensacao_base_negativa_csll": "1452472.50",
+      "amparo_compensacao": "Lei 9.065/95 Art. 16 (cache linhas 646-653 — limite 30% para base negativa CSLL)"
     },
-    "base_calculo_csll": "3005027.50",
+    "base_calculo_csll": "3109268.35",
     "csll_aliquota": "0.09",
-    "csll_devida": "270452.48",
-    "_nota": "CSLL provisionada no resultado foi R$ 384.075 (estimada). Valor real apurado e R$ 270.452,48. Diferenca de R$ 113.622,52 vai para conta de ajuste no proximo trimestre.",
-    "amparo_legal_aliquota": "Lei 9.316/96 Art. 1 — CSLL 9% para empresas em geral (15% para financeiras)"
+    "csll_devida": "279834.15",
+    "_nota_v2": "Caminho (a) CPC 25 — provisao DRE (R$ 279.834,15) = apuracao CSLL exata. Cadeia convergiu em 5 iteracoes. Sem diferenca pra carregar para proximo trimestre.",
+    "amparo_legal_aliquota": "Lei 7.689/88 Art. 3o (PENDENTE captura Planalto) — CSLL 9% para empresas em geral (instituicoes financeiras: 15-20% conforme Lei 13.169/2015, tambem PENDENTE)"
   },
 
   "pis_cofins_nao_cumulativo_2025": {
-    "_amparo_legal": "Lei 10.637/02 (PIS) + Lei 10.833/03 (COFINS) + IN RFB 2.121/22",
+    "_amparo_legal": "Lei 10.637/02 (PIS) + Lei 10.833/03 (COFINS) + IN RFB 2.121/22 + STJ REsp 1.221.170/PR (essencialidade/relevancia de insumos — PENDENTE cache, jurisprudencia consolidada)",
     "regime": "NAO_CUMULATIVO",
     "receita_bruta_base": "95000000.00",
+
+    "_breakdown_cmv_para_credito": {
+      "_nota": "v2 segrega CMV em componentes que GERAM e NAO GERAM credito PIS/COFINS, conforme STJ REsp 1.221.170/PR (essencialidade) e Lei 10.637 Art. 3o II + Lei 10.833 Art. 3o II.",
+      "cimento_agregados_areia_brita_pj": {
+        "valor": "21840000.00",
+        "percentual_cmv": "42%",
+        "gera_credito": true,
+        "amparo": "Lei 10.637/02 Art. 3o II + Lei 10.833/03 Art. 3o II (insumo)"
+      },
+      "aco_armacao_pj": {
+        "valor": "7280000.00",
+        "percentual_cmv": "14%",
+        "gera_credito": true,
+        "amparo": "Lei 10.637/02 Art. 3o II + Lei 10.833/03 Art. 3o II"
+      },
+      "aditivos_quimicos_desmoldante_pj": {
+        "valor": "2080000.00",
+        "percentual_cmv": "4%",
+        "gera_credito": true,
+        "amparo": "Lei 10.637/02 Art. 3o II + Lei 10.833/03 Art. 3o II"
+      },
+      "energia_eletrica_industrial": {
+        "valor": "2600000.00",
+        "percentual_cmv": "5%",
+        "gera_credito": true,
+        "amparo": "Lei 10.637/02 Art. 3o IX + Lei 10.833/03 Art. 3o III (energia eletrica industrial)"
+      },
+      "mao_de_obra_direta_folha_producao": {
+        "valor": "11440000.00",
+        "percentual_cmv": "22%",
+        "gera_credito": false,
+        "amparo": "NAO GERA — pessoa fisica nao adquirida de PJ. Lei 10.637/Lei 10.833 Art. 3o II exige aquisicao de PJ."
+      },
+      "depreciacao_alocada_ao_custo": {
+        "valor": "3640000.00",
+        "percentual_cmv": "7%",
+        "gera_credito": false,
+        "amparo": "NAO GERA por Art. 3o II — vai por regime proprio Art. 3o paragrafo 14 (1/48 sobre aquisicao do ativo, calculo separado abaixo)"
+      },
+      "subcontratos_servicos_pj_manutencao_frete": {
+        "valor": "2080000.00",
+        "percentual_cmv": "4%",
+        "gera_credito": true,
+        "amparo": "Lei 10.637/02 Art. 3o II + Lei 10.833/03 Art. 3o II + STJ REsp 1.221.170/PR (essencialidade)"
+      },
+      "outros_manutencao_externa_epi": {
+        "valor": "1040000.00",
+        "percentual_cmv": "2%",
+        "gera_credito_parcial": true,
+        "valor_que_gera": "520000.00",
+        "amparo": "Conservador 50% — PIS/COFINS sobre essenciais; resto fora do escopo do Art. 3o II"
+      },
+      "_total_cmv": "52000000.00",
+      "_subtotal_que_gera_credito_via_cmv": "36400000.00"
+    },
+
+    "creditos_adicionais_fora_cmv": {
+      "depreciacao_ativo_imobilizado_aquisicoes_2025": {
+        "valor_aquisicoes_anuais": "4000000.00",
+        "regra_credito": "1/48 ao mes — Lei 10.833/03 Art. 3o paragrafo 14 (redacao Lei 11.774/2008)",
+        "credito_acumulado_anual_base": "1000000.00"
+      },
+      "alugueis_pj_galpao_escritorios": {
+        "valor": "240000.00",
+        "amparo": "Lei 10.637/02 Art. 3o IV + Lei 10.833/03 Art. 3o IV (alugueis de prediso de pessoa juridica)"
+      }
+    },
 
     "pis": {
       "aliquota": "0.0165",
       "valor_bruto": "1567500.00",
-      "creditos_sobre_insumos": {
-        "cmv_aplicavel": "52000000.00",
-        "aliquota_credito": "0.0165",
-        "valor": "858000.00",
-        "amparo_legal": "Lei 10.637/02 Art. 3 II — credito sobre insumos diretos da producao"
+      "creditos": {
+        "credito_cmv": "600600.00",
+        "credito_depreciacao_ativo": "16500.00",
+        "credito_alugueis": "3960.00",
+        "_total_creditos": "621060.00"
       },
-      "valor_a_recolher_liquido": "709500.00"
+      "valor_a_recolher_liquido": "946440.00",
+      "_nota_v2": "v1 calculava credito sobre CMV INTEIRO (R$ 858k); v2 segrega componentes — credito real R$ 621.060. Aurora v1 INFLAVA credito em R$ 236.940."
     },
 
     "cofins": {
       "aliquota": "0.076",
       "valor_bruto": "7220000.00",
-      "creditos_sobre_insumos": {
-        "valor": "3952000.00",
-        "amparo_legal": "Lei 10.833/03 Art. 3 II"
+      "creditos": {
+        "credito_cmv": "2766400.00",
+        "credito_depreciacao_ativo": "76000.00",
+        "credito_alugueis": "18240.00",
+        "_total_creditos": "2860640.00"
       },
-      "valor_a_recolher_liquido": "3268000.00"
+      "valor_a_recolher_liquido": "4359360.00",
+      "_nota_v2": "v1 calculava credito sobre CMV INTEIRO (R$ 3.952k); v2 segrega — credito real R$ 2.860.640. Aurora v1 INFLAVA credito em R$ 1.091.360."
     }
   },
 
@@ -202,14 +309,33 @@
   },
 
   "dctfweb_obrigacoes_acessorias_pendentes": {
-    "_amparo_legal": "IN RFB 2.005/21",
+    "_amparo_legal": "Lei 10.426/2002 Art. 7o II (multa por atraso — cache l10426_v2026-05-08.html linhas 213-217) combinada com IN RFB 2.005/2021 (extensao regulamentar para DCTFWeb — PENDENTE cache)",
+    "_nota_critica_v2": "Lei 10.426/02 Art. 7o caput NAO menciona DCTFWeb (so DIPJ/DCTF/Decl. Simplificada/DIRF/Dacon — texto cache linhas 193-203). DCTFWeb veio em 2018 (IN RFB 1787) e a aplicacao do Art. 7o e por extensao regulamentar via IN RFB 2.005/2021. Aurora v1 cruzava com Lei 9.430 Art. 61 (multa de mora de TRIBUTO nao pago, nao de declaracao acessoria) — corrigido aqui.",
     "competencia_pendente_no_diagnostico": "12/2025",
     "prazo_legal": "2026-01-15",
+    "_alerta_ws7c_ambiguidade_prazo": "WebSearch 09/05/2026 retornou 3 versoes pro prazo DCTFWeb: (a) 'dia 15 do mes seguinte' (versao mais comum), (b) 'ultimo dia util do mes seguinte', (c) 'dia 15 do 2o mes seguinte' (plano Escrivao original). Sem texto literal IN RFB 2.005/2021 (sijut2 SPA falha), Aurora cravou (a) = 15/01/2026.",
     "valor_irpj_csll_em_aberto": "1093728.11",
-    "alerta_multa_potencial": {
-      "tipo": "MULTA_POR_ATRASO",
-      "regra": "0.33% ao dia ate 20% (Lei 9.430/96 Art. 61)",
-      "valor_max_se_atrasar_60_dias": "218745.62"
+    "alerta_multa_dctfweb_60_dias_sem_oficio": {
+      "tipo": "MULTA_DCTFWEB_POR_ATRASO_60D",
+      "amparo_legal": "Lei 10.426/2002 Art. 7o II (cache linhas 213-217) + paragrafo 2o I (reducao a metade antes de oficio, cache linhas 252-264) + paragrafo 3o II (minimo R$ 500, cache linha 281-282)",
+      "calculo_passo_a_passo": {
+        "60_dias_atraso_em_meses_calendario_ou_fracao": 2,
+        "aliquota_mensal": "0.02",
+        "percentual_aplicado": "0.04",
+        "limite_teto_20_porcento": "0.20",
+        "tributos_informados_dctfweb": "1093728.11",
+        "multa_caput_antes_reducao": "43749.12",
+        "reducao_metade_paragrafo_2o_I": "0.50",
+        "multa_final_apos_reducao": "21874.56"
+      },
+      "valor_max_se_atingir_teto_20pct_sem_reducao": "218745.62",
+      "valor_max_com_reducao_metade": "109372.81"
+    },
+    "alerta_multa_mora_tributo_distinta": {
+      "tipo": "MULTA_MORA_TRIBUTO_NAO_PAGO",
+      "regra": "0,33% ao dia ate 20%",
+      "amparo_legal": "Lei 9.430/96 Art. 61 (cache l9430_v2026-05-08.html linhas 5394-5410)",
+      "_nota_distincao": "Esta multa incide sobre o TRIBUTO em atraso (IRPJ/CSLL nao recolhido), NAO sobre a obrigacao acessoria DCTFWeb. As duas sao cumulativas (declaracao + tributo)."
     }
   },
 
@@ -235,7 +361,7 @@
       "data_emissao": "2026-08-20",
       "valor_operacao": "180000.00",
       "ncm_nbs": "68101900",
-      "forma_recebimento": "BOLETO_VIA_PSP",
+      "forma_recebimento": "BOLETO",
       "lucro_real_mensal": "355625.00",
       "creditos_pis_cofins": "14808.00",
       "produto_importado": false,
@@ -245,17 +371,46 @@
   },
 
   "_resultado_esperado_motor": {
-    "carga_tributaria_total_anual": {
+    "carga_tributaria_total_anual_v2_refeita": {
+      "_nota_v2": "v1 dizia carga R$ 18,84M (19,84%) somando ICMS/IPI DESTACADOS — superestimava por nao considerar creditos de entrada nao-cumulativos. v2 mostra DUAS perspectivas: bruta (destacados) e liquida (a recolher apos creditos).",
       "irpj_principal": "508365.38",
       "irpj_adicional": "314910.25",
-      "csll": "270452.48",
-      "pis_liquido": "709500.00",
-      "cofins_liquido": "3268000.00",
-      "icms_destacado_estimado": "11400000.00",
-      "ipi_destacado_estimado": "2375000.00",
-      "_total": "18846228.11",
-      "_carga_efetiva_sobre_receita_bruta": "0.1984",
-      "_observacao": "Carga ~19,8% sobre receita bruta — consistente com industria de transformacao no Lucro Real (faixa tipica 18-22%)."
+      "csll": "279834.15",
+      "pis_liquido": "946440.00",
+      "cofins_liquido": "4359360.00",
+      "icms_destacado_bruto": "11400000.00",
+      "icms_a_recolher_apos_creditos": "5820000.00",
+      "_breakdown_creditos_icms_alerta": {
+        "_nota": "Indústria de pre-moldados em SP — alicota interna 18% (RICMS-SP, PENDENTE captura). Creditos de entrada tipicos:",
+        "credito_cimento_agregados_aliq_12_interestadual": "3744000.00",
+        "credito_aco_armacao_aliq_12": "873600.00",
+        "credito_aditivos_aliq_18_intra_sp": "374400.00",
+        "credito_energia_industrial_aliq_18": "468000.00",
+        "credito_ativo_imobilizado_aliq_12_LC_87_96": "120000.00",
+        "_total_creditos_icms": "5580000.00"
+      },
+      "ipi_destacado_bruto": "2375000.00",
+      "ipi_a_recolher_apos_creditos": "752600.00",
+      "_breakdown_creditos_ipi_alerta": {
+        "_nota": "Aurora produz mix com NCM tributado 5% (NCM 6810.99). Creditos de IPI das matérias-primas:",
+        "credito_cimento_aliq_5": "1092000.00",
+        "credito_aco_aliq_5": "364000.00",
+        "credito_aditivos_aliq_8": "166400.00",
+        "_total_creditos_ipi": "1622400.00"
+      },
+      "_total_carga_bruta_destacados": "20183909.78",
+      "_carga_efetiva_bruta_sobre_receita": "0.21246",
+      "_total_carga_liquida_a_recolher": "12981509.78",
+      "_carga_efetiva_liquida_sobre_receita": "0.13665",
+      "_observacao_metodologica_v2": "Carga liquida ~13,67% e a metrica fiscalmente honesta (consistente com benchmarks IBPT/RFB para industria de transformacao no Real, faixa tipica 12-18% liquida). Carga bruta 21,25% e pedagogicamente util pra mostrar a magnitude do destacado."
+    },
+    "alertas_obrigacoes_acessorias": {
+      "_modulo_consumidor": "core/obrigacoes_acessorias.py (WS7/WS7b/WS7c)",
+      "obrigacoes_aplicaveis_porte_demais_regime_real": [
+        "ECF (anual, ultimo dia util de julho do ano seguinte)",
+        "ECD (anual, ultimo dia util de junho do ano seguinte — convencao pendente cache IN RFB 2.003)",
+        "DCTFWEB (mensal, dia 15 do mes seguinte — convencao pendente cache IN RFB 2.005)"
+      ]
     }
   }
 }

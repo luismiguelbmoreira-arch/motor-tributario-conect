@@ -21,3 +21,11 @@ b6f6b3e2f808efc06f9872f9842ab0abc0a70b6d783602711548e5ed1ee972f0 | planalto/l821
 b1f463850721d2684b4741dcf97e441adae631c7d4083cb2c6da73c6eb16b0a0 | planalto/l14689_v2026-05-08.html | https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2023/lei/l14689.htm | 2026-05-08 | planalto
 7b563429311f0a966e54300f3a32b964126fb700141a51fd9c947899fa716284 | planalto/del1598_v2026-05-08.html | https://www.planalto.gov.br/ccivil_03/Decreto-Lei/Del1598.htm | 2026-05-08 | planalto
 2c5a98ee51a2cf1ddde888836d937e8abffccc333cb52f4588d38aca3cb693d6 | planalto/l4502_v2026-05-09.html | https://www.planalto.gov.br/ccivil_03/leis/l4502.htm | 2026-05-09 | planalto
+253388e24967793dadd129a19d1118375fcd1a1cf36c45b83ac1922cf1b2db97 | planalto/l9249_v2026-05-09.html | https://www.planalto.gov.br/ccivil_03/leis/l9249.htm | 2026-05-09 | planalto
+1d50f8f704dd45b006d7170895228afffaae35d5ade2d20a3a187daed3fe76a9 | planalto/l8981_v2026-05-09.html | https://www.planalto.gov.br/ccivil_03/leis/l8981.htm | 2026-05-09 | planalto
+3497307dfee230ec286909767e4a4c3c9ce125ea63465b0f0a20f603dc9ab770 | planalto/l9065_v2026-05-09.html | https://www.planalto.gov.br/ccivil_03/leis/l9065.htm | 2026-05-09 | planalto
+d3035bfd5d40e6481d32164e2aef614823777ae93f7f16f791cfa3c48f5a0f56 | planalto/l9316_v2026-05-09.html | https://www.planalto.gov.br/ccivil_03/leis/l9316.htm | 2026-05-09 | planalto
+e47ce6f171ec9909fd43767b07319bbf8a80c330ae7bc6f9cc7db92448576f42 | planalto/l10637_v2026-05-09.html | https://www.planalto.gov.br/ccivil_03/leis/2002/l10637.htm | 2026-05-09 | planalto
+06b9cf49739a733422c66850d012248ca22cf263d5b43a3c70ce2647f1f98eee | planalto/l10833_v2026-05-09.html | https://www.planalto.gov.br/ccivil_03/leis/2003/l10.833.htm | 2026-05-09 | planalto
+2f8a098c291d7b6e654faa94461c02f2d0fdd70568799d2cc99cc6674e324c8e | planalto/l8541_v2026-05-09.html | https://www.planalto.gov.br/ccivil_03/leis/l8541.htm | 2026-05-09 | planalto
+92b874a8da7c75ce5dd7e51fdfc1bf8f92ab1f3dc041648b2384329aa9360b4f | planalto/l7689_v2026-05-09.html | https://www.planalto.gov.br/ccivil_03/leis/l7689.htm | 2026-05-09 | planalto
