@@ -65,7 +65,7 @@ validadores.py               ← CNPJ Mod.11, CNAE, NCM, UF
 database/                    ← connection + enums + models + repositories/
 services/                    ← extrator_pdfs (Claude Vision) + storage_cifrado (AES-256-GCM) + analise_buffer + relatorio_pdf
 api/routers/                 ← auth + auditoria + usuarios + integracoes + historico + configuracoes
-tests/                       ← 1858 testes (100%)
+tests/                       ← 1879 testes (100%)
 ```
 
 ---
@@ -320,9 +320,9 @@ PMD não invocado = commit não acontece. Sem exceção.
 
 ---
 
-## 🗺️ ROADMAP — STATUS ATUAL (08/05/2026)
+## 🗺️ ROADMAP — STATUS ATUAL (09/05/2026)
 
-**Suite:** **1858 testes verdes** | **0 regressão**.
+**Suite:** **1879 testes verdes** | **0 regressão**.
 **Branch ativo:** `fase-2-mapa-mestre` (não mergeado em main).
 
 Histórico detalhado de commits e ERRs fechados: `docs/roadmap/HISTORICO.md` + `docs/roadmap/LOG_ERROS.md` + `git log`.
@@ -338,15 +338,16 @@ Histórico detalhado de commits e ERRs fechados: `docs/roadmap/HISTORICO.md` + `
 - **WS12** — `core/regras_cnae.py` + `cnae_excecoes.py` + `cnae_completo.json` regenerado (ERR-005 fechado em 08/05/2026)
 - **WS5** — Rail R6 logs refazíveis: `core/refazer.py` (função pura) + `scripts/refazer_calculo.py` (CLI parser BR, R$ + vírgula decimal, tolerância R$ 0,02)
 - **WS7 (parcial)** — `core/obrigacoes_acessorias.py` (409 LOC). 3 obrigações Simples cobertas pelo cache LC 123/2006: DASN-SIMEI (Art. 38 § 6º — mín R$ 50), DEFIS (Art. 38 § 3º — mín R$ 200), PGDAS-D (Art. 38-A redação LC 214/2025 — mín R$ 50/mês-ref). Multa máxima 20% (NÃO 10% — bloqueio MAX_07 do plano original prevenido). 4 bloqueios MAX_07 prevenidos antes do código. ANUAL+MENSAL implementadas; SEMESTRAL/TRIMESTRAL pendentes. 30 testes
-- **Cache fontes legais** — `data/fontes_legais/` com LC 123/214/227 capturadas via curl (WebFetch socket-dropping); protocolo Escrivão cache-first
+- **WS7b** — Capturados Lei 9.430/96, Lei 8.218/91, Lei 10.426/2002, Lei 12.973/2014, Lei 9.532/97, Lei 14.689/2023, **Decreto-Lei 1.598/77**. Matriz estendida pra Presumido/Real/Imune: ECF (DL 1.598/77 Art. 8º-A — 0,25% LL/mês máx 10%) + DCTFWeb (Lei 10.426 Art. 7º — mín R$ 500 demais regimes; offset_meses=2). Schema Obrigacao ganhou `prazo_offset_meses` + `prazo_n_dia_util`. **2 bloqueios MAX_07 prevenidos** pelo Escrivão: ERR-058 (Art. 8º-A está no DL 1.598/77, não Lei 9.430/96) + ERR-058.b (Lei 8.218/91 Art. 12 não tem piso "R$ 500-1500"). 12 testes novos (1858 → 1879)
+- **Cache fontes legais** — `data/fontes_legais/` com LC 123/214/227 + 7 leis WS7b + Lei 4.502/64 capturadas via curl (WebFetch socket-dropping); protocolo Escrivão cache-first
 
 ### ⏸️ Próximas etapas
 
 | Fase | Estado | Próxima ação |
 |---|---|---|
 | **WS6 etapa 7 — regimes específicos IBS/CBS** | ⏸️ **RETOMAR AQUI** | Cálculo automático cooperativa crédito (LC 214 Cap II Tít V, Arts. 181-208) e saúde (Arts. 234-238, alíquota referência −60%). Hoje só registra alertas. Faltam alíquotas referência por ano (2027-2033), redução 60% saúde, base Art. 235, vedações Art. 238. Plan-First obrigatório. |
-| ~~WS7b — captura Planalto + ECF/DCTFWeb~~ | ✅ **Fechado em 08/05/2026** | Capturados: Lei 9.430/96, Lei 8.218/91, Lei 10.426/2002, Lei 12.973/2014, Lei 9.532/97, Lei 14.689/2023, **Decreto-Lei 1.598/77**. **2 bloqueios MAX_07 prevenidos** pelo Escrivão antes do código: (a) ERR-058 — `Art. 8º-A` está no **DL 1.598/77** (incluído pela Lei 12.973/2014 Art. 2º), NÃO na Lei 9.430/96; (b) ERR-058.b — Lei 8.218/91 Art. 12 não tem piso "R$ 500-1500", só percentuais. Matriz estendida: ECF (DL 1.598/77 Art. 8º-A — 0,25% LL/mês máx 10%) + DCTFWeb (Lei 10.426 Art. 7º — mín R$ 500 demais regimes; offset_meses=2). Schema Obrigacao ganhou `prazo_offset_meses` + `prazo_n_dia_util`. 12 testes novos |
-| **WS7c — INs RFB + Resolução CGSN** | ⏸️ **RETOMAR AQUI (caminho restrito)** | **Lei 4.502/64 capturada** em 2026-05-09 (Planalto). **WebFetch também falhou** pra normas RFB (sijut2consulta retorna apenas redirect JS — mesmo problema do curl). 6 normas pendentes: IN RFB 2.003/2021 (ECD), IN RFB 2.004/2021 (ECF prazo), IN RFB 2.005/2021 (DCTFWeb prazo), IN RFB 1.252/2012 (EFD-Contribuições), IN RFB 1.371/2013 (EFD-ICMS-IPI), Resolução CGSN 140/2018 (prazos Simples). **Caminhos remanescentes**: (a) baixar PDF oficial diretamente da Imprensa Nacional `https://www.in.gov.br/web/dou/-/...` se a URL estável for conhecida; (b) navegador real (Playwright/Selenium) pra renderizar sijut2; (c) Migrador atualiza manualmente quando RFB publicar versão consolidada estável; (d) WebSearch específico pra encontrar URLs alternativas no Imprensa Nacional. Após cache: validar prazos `prazo_amparo_pendente=True` em DASN-SIMEI/DEFIS/PGDAS-D/ECF/DCTFWeb, adicionar ECD/EFD-Contribuições à matriz. Plus: caller de produção pra `gerar_alertas_obrigacoes()` |
+| ~~WS7b — captura Planalto + ECF/DCTFWeb~~ | ✅ **Fechado em 08/05/2026** | Ver bloco "Concluído neste ciclo" acima. ERR-058 + ERR-058.b prevenidos pelo Escrivão antes do código. |
+| **WS7c — INs RFB + Resolução CGSN (resolução parcial via WebSearch 09/05/2026)** | ⏸️ **PARCIALMENTE RESOLVIDO** | **Lei 4.502/64 capturada** (Planalto). **6 normas RFB ainda sem texto literal** — sijut2consulta SPA + sped.rfb.gov.br ECONNREFUSED + WebFetch falha. **WebSearch retornou prazos** (interpretação, NÃO texto literal): ECD "último dia útil de junho" (múltiplas fontes convergem), ECF "último dia útil de julho" (já estava no cache via DL 1.598/77), EFD-Contribuições "10º dia útil do 2º mês seguinte". **Conflito crítico no DCTFWeb**: WebSearch retornou 3 versões — "dia 15 do mês seguinte" (Art. 6 IN RFB 2.005), "último dia útil do mês seguinte", "dia 15 do 2º mês seguinte" (plano Escrivão original). Sem texto literal, motor reverteu DCTFWeb pra `offset_meses=1` (convenção conservadora — antes era 2) + nota explícita do conflito em `base_legal`. **ECD adicionada ao Lucro Real** (Lei 8.218/91 Art. 11 + DL 1.598/77 Art. 8º-A — multa = ECF; prazo "último dia útil de junho" como convenção pendente). **Caminhos remanescentes**: navegador real (Playwright); Migrador manual; PDF Imprensa Nacional. Plus: caller de produção pra `gerar_alertas_obrigacoes()` |
 | WS10 extensão | 🔵 | `TABELAS_ANEXOS` + `CRONOGRAMA_IVA` versionados |
 | WS6.b — Lucro Real refinado | 🔵 | Adições/exclusões extracontábeis + extrator DRE; fixture Aurora |
 | WS2 — Matriz 3×3 cenários 2026-2033 | 🔵 | Depende de WS6+WS10. Fonte oficial premissas (BCB Focus, IBGE) |
@@ -373,7 +374,7 @@ Histórico detalhado de commits e ERRs fechados: `docs/roadmap/HISTORICO.md` + `
 | ERR-027 (_erros perdido na persistência) | 🟡 | WS4 |
 | ERR-028 (CPF em campo CNPJ via Vision) | 🟡 | WS4 |
 
-ERRs fechados (ERR-005, 013, 017.b, 018.b, 049-051, 054-057): `docs/roadmap/LOG_ERROS.md`.
+ERRs fechados (ERR-005, 013, 017.b, 018.b, 049-051, 054-058, 058.b): `docs/roadmap/LOG_ERROS.md`.
 
 ### 🤖 Protocolo de auditoria multi-agente
 

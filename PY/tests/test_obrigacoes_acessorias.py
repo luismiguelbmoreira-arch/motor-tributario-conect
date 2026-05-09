@@ -454,14 +454,21 @@ class TestObrigacoesCitacoesLegais:
                                 f"de pendência: {o.base_legal!r}"
                             )
 
-    def test_ecd_efd_contribuicoes_ainda_pendentes(self):
-        # ECD e EFD-Contribuições ainda pendentes — multa específica vem
-        # de IN RFB (não-Planalto, captura agendada em WS7c).
+    def test_efd_contribuicoes_ainda_pendente(self):
+        # EFD-Contribuições ainda pendente — multa em Lei 8.218 Art. 12
+        # sem pisos, prazo em IN RFB 1.252/2012 sem cache.
         for regime in ("PRESUMIDO", "REAL"):
             obrigs = obter_obrigacoes(porte="DEMAIS", regime=regime)
             codigos = {o.codigo for o in obrigs}
-            assert "ECD" not in codigos
             assert "EFD_CONTRIBUICOES" not in codigos
+
+    def test_ecd_aplica_apenas_lucro_real(self):
+        # ECD foi adicionada em WS7c apenas para REAL (múltiplas fontes
+        # confirmam aplicação a Lucro Real). Presumido NÃO obriga ECD.
+        obrigs_real = obter_obrigacoes(porte="DEMAIS", regime="REAL")
+        assert "ECD" in {o.codigo for o in obrigs_real}
+        obrigs_presumido = obter_obrigacoes(porte="DEMAIS", regime="PRESUMIDO")
+        assert "ECD" not in {o.codigo for o in obrigs_presumido}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -537,32 +544,52 @@ class TestObrigacoesDCTFWebCitacao:
         dctf = next((o for o in obrigs if o.codigo == "DCTFWEB"), None)
         assert "R$ 500" in dctf.multa_descricao or "500,00" in dctf.multa_descricao
 
-    def test_dctfweb_offset_2_meses(self):
-        # IN RFB 2.005/2021 — "dia 15 do segundo mês seguinte". Schema
-        # tem prazo_offset_meses=2 pra esse caso.
+    def test_dctfweb_offset_conservador_1_pendente(self):
+        # WS7c — WebSearch retornou interpretações conflitantes pra prazo:
+        # "dia 15 do mês seguinte" vs "último dia útil do mês seguinte"
+        # vs "dia 15 do 2º mês seguinte" (plano Escrivão original).
+        # Sem texto literal IN RFB 2.005/2021, motor usa convenção
+        # conservadora offset_meses=1 + prazo_amparo_pendente=True.
         obrigs = obter_obrigacoes(porte="DEMAIS", regime="REAL")
         dctf = next((o for o in obrigs if o.codigo == "DCTFWEB"), None)
-        assert dctf.prazo_offset_meses == 2
+        assert dctf.prazo_offset_meses == 1
+        assert dctf.prazo_amparo_pendente is True
+        # base_legal explicita o conflito de fontes
+        assert "WebSearch" in dctf.base_legal or "conflitantes" in dctf.base_legal
 
 
 class TestAlertasObrigacoesPresumidoReal:
     """Alertas de vencimento pra obrigações Presumido+Real."""
 
-    def test_dctfweb_offset_2_calcula_vencimento_no_segundo_mes(self):
-        # Competência marco/2027 → DCTFWeb vence dia 15 de maio/2027
-        # (segundo mês seguinte, não abril).
+    def test_dctfweb_calcula_vencimento_no_mes_seguinte(self):
+        # Competência marco/2027 → DCTFWeb vence dia 15 de abril/2027
+        # (offset conservador = mês seguinte; 2º mês não confirmado).
         alertas = gerar_alertas_obrigacoes(
             porte="DEMAIS",
             regime="REAL",
-            hoje=date(2027, 5, 14),  # 1 dia antes do vencimento
+            hoje=date(2027, 4, 14),  # 1 dia antes do vencimento
             competencia_atual=date(2027, 3, 31),
             dias_antecedencia=30,
         )
         dctf_alerta = next((a for a in alertas if a.obrigacao.codigo == "DCTFWEB"), None)
         assert dctf_alerta is not None
-        assert dctf_alerta.data_vencimento == date(2027, 5, 15)
+        assert dctf_alerta.data_vencimento == date(2027, 4, 15)
         assert dctf_alerta.dias_restantes == 1
         assert dctf_alerta.nivel == "CRITICO"
+
+    def test_ecd_vence_ultimo_dia_util_junho(self):
+        # ECD: anual, último dia útil de junho do ano seguinte.
+        # 30/06/2027 é quarta-feira (último dia útil).
+        alertas = gerar_alertas_obrigacoes(
+            porte="DEMAIS",
+            regime="REAL",
+            hoje=date(2027, 6, 1),  # 29 dias até 30/06
+            competencia_atual=date(2026, 12, 31),
+            dias_antecedencia=30,
+        )
+        ecd_alerta = next((a for a in alertas if a.obrigacao.codigo == "ECD"), None)
+        assert ecd_alerta is not None
+        assert ecd_alerta.data_vencimento == date(2027, 6, 30)
 
     def test_ecf_vence_ultimo_dia_util_julho(self):
         # ECF: anual, último dia útil de julho do ano seguinte. 31/07/2027 é
