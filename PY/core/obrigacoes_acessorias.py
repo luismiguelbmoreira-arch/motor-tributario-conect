@@ -273,41 +273,49 @@ def derivar_nivel_porte(
 
 _AMPARO_DASN_SIMEI: str = (
     "LC 123/2006 Art. 38 § 6º (multa MEI por DASN-SIMEI: mín R$ 50). "
-    "Prazo conforme Resolução CGSN 140/2018 (Art. 25 LC 123 delega ao CGSN — "
-    "captura agendada em WS7b)"
+    "Prazo: 31 de maio do ano-calendário subsequente (Resolução CGSN 140/2018 — "
+    "fonte oficial Receita Federal confirmada via Chrome MCP em 2026-05-09; "
+    "ver data/fontes_legais/cache_chrome/cgsn140_simples_prazos_2026-05-09.txt)"
 )
 
 _AMPARO_DEFIS: str = (
     "LC 123/2006 Art. 38 I + § 3º (multa DEFIS: 2% ao mês limitado a 20%; "
     "mín R$ 200; reduções de metade ou 75% conforme § 2º). "
-    "Prazo conforme Resolução CGSN 140/2018 (Art. 25 LC 123 delega ao CGSN)"
+    "Prazo: 31 de março do ano-calendário subsequente (Resolução CGSN 140/2018 — "
+    "fonte oficial Receita Federal: 'a DEFIS referente aos fatos geradores "
+    "ocorridos no ano-calendário 2025 deverá ser apresentada até o dia 31 de "
+    "março de 2026'; capturado via Chrome MCP em 2026-05-09)"
 )
 
 _AMPARO_PGDAS_D: str = (
     "LC 123/2006 Art. 38-A (redação LC 214/2025 — multa por atraso na PGDAS-D: "
     "2% ao mês limitado a 20%; mín R$ 50 por mês-referência; § 2º + R$ 20 "
     "por grupo de 10 informações incorretas). "
-    "Prazo conforme Resolução CGSN 140/2018 (Art. 18 § 15-A LC 123 delega ao CGSN)"
+    "Prazo: dia 20 do mês seguinte (Resolução CGSN 140/2018 + Manual PGDAS-D "
+    "oficial Receita Federal — confirmado via Chrome MCP 2026-05-09)"
 )
 
-# WS7b — extensões com cache validado por Escrivão 2026-05-08
+# WS7c — extensões com prazos confirmados via Chrome MCP em 2026-05-09
 _AMPARO_ECF: str = (
     "Decreto-Lei 1.598/77 Art. 8º-A (incluído pela Lei 12.973/2014 Art. 2º — "
     "multa pela falta/atraso de apresentação do livro fiscal: 0,25% por mês "
     "ou fração sobre o lucro líquido antes do IRPJ/CSLL, limitada a 10%; "
     "II — 3% sobre valor omitido/inexato, mín R$ 100,00). "
-    "Prazo conforme IN RFB 2.004/2021 (captura pendente WS7b)"
+    "Prazo: último dia útil do mês de julho do ano posterior (IN RFB 2.004/2021 "
+    "— confirmado contra fonte oficial sped.rfb.gov.br/pagina/show/1285 via "
+    "Chrome MCP em 2026-05-09; ver data/fontes_legais/cache_chrome/ecf_prazo_*)"
 )
 
 _AMPARO_DCTFWEB_DEMAIS: str = (
     "Lei 10.426/2002 Art. 7º (multa por atraso DCTFWeb: 2% ao mês limitado "
     "a 20%; § 3º — mín R$ 500,00 para regime regular não-Simples). "
-    "Prazo conforme IN RFB 2.005/2021 (captura pendente WS7c — WebSearch "
-    "09/05/2026 retornou interpretações conflitantes: 'último dia útil do "
-    "mês seguinte' (Art. 6) vs 'dia 15 do 2º mês seguinte' (plano original "
-    "Escrivão). Sem texto literal IN RFB 2.005, motor usa convenção "
-    "conservadora 'mês seguinte' — caller deve verificar antes de tomar "
-    "decisão fiscal real)"
+    "Prazo: ÚLTIMO DIA ÚTIL do mês seguinte ao da competência (IN RFB "
+    "2.248/2025 publicada em 07/02/2025 — alterou o prazo anterior 'dia 15 do "
+    "mês seguinte' da IN RFB 2.005/2021). Texto oficial Receita Federal: "
+    "'A Receita Federal por meio da Instrução Normativa nº 2.248 de 07 de "
+    "fevereiro de 2025 alterou o prazo de envio da DCTFWeb para o último dia "
+    "útil do mês seguinte à ocorrência dos fatos geradores'. Capturado via "
+    "Chrome MCP em 2026-05-09. Ver data/fontes_legais/cache_chrome/dctfweb_*)"
 )
 
 _AMPARO_ECD: str = (
@@ -316,15 +324,23 @@ _AMPARO_ECD: str = (
     "MP 2.158-35/2001) + Decreto-Lei 1.598/77 Art. 8º-A (incluído pela Lei "
     "12.973/2014 Art. 2º — multa pela falta/atraso: 0,25% por mês ou fração "
     "sobre lucro líquido antes do IRPJ/CSLL, limitada a 10%). "
-    "Prazo conforme IN RFB 2.003/2021 (captura pendente WS7c — WebSearch "
-    "09/05/2026 confirmou múltiplas fontes: 'último dia útil de junho do "
-    "ano seguinte', mas sem texto literal IN RFB 2.003)"
+    "Prazo: último dia útil do mês de junho do ano subsequente (IN RFB "
+    "2.003/2021 Art. 5º com Redação dada pela IN RFB 2.142/2023 — texto "
+    "literal capturado contra sped.rfb.gov.br/pagina/show/499 via Chrome MCP "
+    "em 2026-05-09; ver data/fontes_legais/cache_chrome/ecd_prazo_*)"
 )
 
-# Pendências WS7c (cache de IN RFB ainda não capturável):
-# - ECD multa específica: Lei 8.218/91 Art. 11 (escrituração genérica) + Art. 12
-#   (percentuais sobre receita; sem piso fixo em reais — pisos em IN RFB pendente)
-# - EFD-Contribuições multa específica: idem Art. 12 + IN RFB 1.252/2012 pendente
+_AMPARO_EFD_CONTRIBUICOES: str = (
+    "IN RFB 1.252/2012 (regulamenta a EFD-Contribuições — escrituração "
+    "digital de PIS/COFINS + Contribuição Previdenciária sobre Receita "
+    "Bruta). Multa: Lei 8.218/91 Art. 12 (apenas percentuais sobre receita "
+    "bruta — sem piso fixo R$). Prazo: 10º dia útil do segundo mês "
+    "subsequente ao de referência (texto oficial Receita Federal: 'A "
+    "periodicidade de apresentação do arquivo da EFD-Contribuições é mensal, "
+    "devendo ser transmitido até o 10º (décimo) dia útil do segundo mês "
+    "subsequente ao de referência da escrituração'; capturado contra "
+    "sped.rfb.gov.br/pagina/show/284 via Chrome MCP em 2026-05-09)"
+)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -335,44 +351,44 @@ _DASN_SIMEI = Obrigacao(
     codigo="DASN_SIMEI",
     nome="DASN-SIMEI — Declaração Anual do Simples Nacional para o MEI",
     frequencia="ANUAL",
-    prazo_descricao="31 de maio do ano seguinte (Res. CGSN 140/2018 — pendente cache)",
+    prazo_descricao="31 de maio do ano-calendário subsequente",
     multa_descricao="2% ao mês sobre tributos declarados, limitado a 20%; mín R$ 50,00",
     base_legal=_AMPARO_DASN_SIMEI,
     prazo_dia=31,
     prazo_mes=5,
-    prazo_amparo_pendente=True,
+    prazo_amparo_pendente=False,
 )
 
 _DEFIS = Obrigacao(
     codigo="DEFIS",
     nome="DEFIS — Declaração de Informações Socioeconômicas e Fiscais",
     frequencia="ANUAL",
-    prazo_descricao="31 de março do ano seguinte (Res. CGSN 140/2018 — pendente cache)",
+    prazo_descricao="31 de março do ano-calendário subsequente",
     multa_descricao="2% ao mês sobre tributos declarados, limitado a 20%; mín R$ 200,00",
     base_legal=_AMPARO_DEFIS,
     prazo_dia=31,
     prazo_mes=3,
-    prazo_amparo_pendente=True,
+    prazo_amparo_pendente=False,
 )
 
 _PGDAS_D = Obrigacao(
     codigo="PGDAS_D",
     nome="PGDAS-D — Apuração mensal do DAS do Simples Nacional",
     frequencia="MENSAL",
-    prazo_descricao="dia 20 do mês seguinte (Res. CGSN 140/2018 — pendente cache)",
+    prazo_descricao="dia 20 do mês seguinte",
     multa_descricao="2% ao mês sobre tributos, limitado a 20%; mín R$ 50,00 por mês-referência",
     base_legal=_AMPARO_PGDAS_D,
     prazo_dia=20,
     prazo_mes=None,
-    prazo_amparo_pendente=True,
+    prazo_amparo_pendente=False,
 )
 
-# WS7b — Lucro Presumido / Real / Imune
+# WS7c — Lucro Presumido / Real / Imune (todos confirmados via Chrome MCP 2026-05-09)
 _ECF = Obrigacao(
     codigo="ECF",
     nome="ECF — Escrituração Contábil Fiscal",
     frequencia="ANUAL",
-    prazo_descricao="último dia útil de julho do ano seguinte (IN RFB 2.004/2021 — pendente cache)",
+    prazo_descricao="último dia útil do mês de julho do ano posterior (IN RFB 2.004/2021)",
     multa_descricao=(
         "0,25% sobre lucro líquido antes do IRPJ/CSLL por mês ou fração, "
         "limitada a 10%; ou 3% sobre valor omitido/inexato, mín R$ 100,00"
@@ -381,7 +397,7 @@ _ECF = Obrigacao(
     prazo_dia=None,
     prazo_mes=7,
     prazo_ultimo_dia_util=True,
-    prazo_amparo_pendente=True,
+    prazo_amparo_pendente=False,
 )
 
 _DCTFWEB_DEMAIS = Obrigacao(
@@ -389,16 +405,16 @@ _DCTFWEB_DEMAIS = Obrigacao(
     nome="DCTFWeb — Declaração de Débitos e Créditos Tributários Federais",
     frequencia="MENSAL",
     prazo_descricao=(
-        "convenção conservadora: dia 15 do mês seguinte (IN RFB 2.005/2021 — "
-        "captura pendente WS7c; WebSearch retornou interpretações conflitantes "
-        "— ver base_legal pra detalhes)"
+        "último dia útil do mês seguinte ao da competência "
+        "(IN RFB 2.248/2025 — alterou prazo anterior de 'dia 15')"
     ),
     multa_descricao="2% ao mês sobre os tributos declarados, limitado a 20%; mín R$ 500,00",
     base_legal=_AMPARO_DCTFWEB_DEMAIS,
-    prazo_dia=15,
+    prazo_dia=None,
     prazo_mes=None,
-    prazo_offset_meses=1,  # convenção (era 2; sem cache literal pra confirmar)
-    prazo_amparo_pendente=True,
+    prazo_ultimo_dia_util=True,  # alteração crítica WS7c: IN RFB 2.248/2025
+    prazo_offset_meses=1,
+    prazo_amparo_pendente=False,
 )
 
 _ECD = Obrigacao(
@@ -406,9 +422,8 @@ _ECD = Obrigacao(
     nome="ECD — Escrituração Contábil Digital",
     frequencia="ANUAL",
     prazo_descricao=(
-        "convenção: último dia útil de junho do ano seguinte "
-        "(IN RFB 2.003/2021 — captura pendente WS7c; múltiplas fontes "
-        "secundárias confirmam, sem texto literal validado)"
+        "último dia útil do mês de junho do ano subsequente "
+        "(IN RFB 2.003/2021 Art. 5º com Redação dada pela IN RFB 2.142/2023)"
     ),
     multa_descricao=(
         "0,25% sobre lucro líquido antes do IRPJ/CSLL por mês ou fração, "
@@ -418,7 +433,25 @@ _ECD = Obrigacao(
     prazo_dia=None,
     prazo_mes=6,
     prazo_ultimo_dia_util=True,
-    prazo_amparo_pendente=True,
+    prazo_amparo_pendente=False,
+)
+
+_EFD_CONTRIBUICOES = Obrigacao(
+    codigo="EFD_CONTRIBUICOES",
+    nome="EFD-Contribuições — Escrituração Fiscal Digital de PIS/COFINS",
+    frequencia="MENSAL",
+    prazo_descricao="10º dia útil do segundo mês subsequente ao da escrituração (IN RFB 1.252/2012)",
+    multa_descricao=(
+        "Lei 8.218/91 Art. 12 — percentuais sobre receita bruta "
+        "(0,5% caput I; 5% lim 1% caput II; 0,02%/dia lim 1% caput III, "
+        "redação Lei 13.670/2018). Pisos em reais vêm de IN RFB — não de Lei."
+    ),
+    base_legal=_AMPARO_EFD_CONTRIBUICOES,
+    prazo_dia=None,
+    prazo_mes=None,
+    prazo_offset_meses=2,  # "segundo mês subsequente"
+    prazo_n_dia_util=10,
+    prazo_amparo_pendente=False,
 )
 
 
@@ -434,16 +467,14 @@ _MATRIZ: dict[tuple[NivelPorte, Regime], tuple[Obrigacao, ...]] = {
     # ME e EPP no Simples
     ("ME", "SIMPLES"): (_DEFIS, _PGDAS_D),
     ("EPP", "SIMPLES"): (_DEFIS, _PGDAS_D),
-    # WS7b — Lucro Presumido (ECF + DCTFWeb — cache validado de multas)
-    ("DEMAIS", "PRESUMIDO"): (_ECF, _DCTFWEB_DEMAIS),
-    # WS7c — Lucro Real adiciona ECD (Lei 8.218/91 Art. 11 + DL 1.598/77 Art. 8º-A;
-    # prazo conforme IN RFB 2.003/2021 — pendente cache, mas múltiplas fontes
-    # secundárias convergem em "último dia útil de junho do ano seguinte").
-    # EFD-Contribuições continua pendente (multa em IN RFB 1.252/2012 sem cache).
-    ("DEMAIS", "REAL"): (_ECF, _ECD, _DCTFWEB_DEMAIS),
+    # WS7c — Lucro Presumido: ECF + DCTFWeb + EFD-Contribuições (todos confirmados
+    # via Chrome MCP em 2026-05-09 contra fontes oficiais Receita Federal).
+    ("DEMAIS", "PRESUMIDO"): (_ECF, _DCTFWEB_DEMAIS, _EFD_CONTRIBUICOES),
+    # Lucro Real adiciona ECD (Lei 8.218/91 Art. 11 + DL 1.598/77 Art. 8º-A;
+    # prazo IN RFB 2.003/2021 Art. 5º redação IN RFB 2.142/2023).
+    ("DEMAIS", "REAL"): (_ECF, _ECD, _DCTFWEB_DEMAIS, _EFD_CONTRIBUICOES),
     # IMUNE: declaração de ECF é obrigação Lei 9.532/97 Art. 12 § 2º (escrituração
-    # como requisito de imunidade). Sem cache de IN RFB pra prazo específico, mantém
-    # mesma estrutura ECF.
+    # como requisito de imunidade).
     ("DEMAIS", "IMUNE"): (_ECF,),
 }
 

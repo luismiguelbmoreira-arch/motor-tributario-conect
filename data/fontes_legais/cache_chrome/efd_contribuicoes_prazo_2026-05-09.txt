@@ -1,0 +1,29 @@
+FONTE: http://sped.rfb.gov.br/item/show/284 (redirecionou para /pagina/show/284)
+CAPTURADO_VIA: Claude in Chrome MCP
+DATA_CAPTURA: 2026-05-09
+NORMA_REFERENCIADA: IN RFB 1.252/2012
+TIPO: Pagina oficial Receita Federal — sped.rfb.gov.br
+
+TEXTO LITERAL EXTRAIDO (apenas trechos relevantes ao prazo):
+
+"Conforme disciplina a Instrucao Normativa RFB nº 1.252, de 01 de marco
+de 2012, estao obrigadas a escrituracao fiscal digital em referencia:
+
+  I - em relacao a Contribuicao para o PIS/Pasep e a Cofins, referentes
+  aos fatos geradores ocorridos a partir de 1º de janeiro de 2012, as
+  pessoas juridicas sujeitas a tributacao do Imposto sobre a Renda com
+  base no Lucro Real;
+  II - em relacao a Contribuicao para o PIS/Pasep e a Cofins, referentes
+  aos fatos geradores ocorridos a partir de 1º de janeiro de 2013, as
+  demais pessoas juridicas sujeitas a tributacao do Imposto sobre a
+  Renda com base no Lucro Presumido ou Arbitrado;
+  ...
+
+Apresentacao do arquivo:
+
+A periodicidade de apresentacao do arquivo da EFD-Contribuicoes e
+mensal, devendo ser transmitido, apos a sua validacao e assinatura
+digital, ate o 10º (decimo) dia util do segundo mes subsequente ao de
+referencia da escrituracao."
+
+CONFIRMADO: Prazo EFD-Contribuicoes = 10º dia util do 2º mes subsequente.

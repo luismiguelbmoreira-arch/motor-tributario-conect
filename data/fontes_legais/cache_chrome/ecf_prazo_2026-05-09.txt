@@ -1,0 +1,31 @@
+FONTE: http://sped.rfb.gov.br/pagina/show/1285
+CAPTURADO_VIA: Claude in Chrome MCP
+DATA_CAPTURA: 2026-05-09
+NORMA_REFERENCIADA: IN RFB 2.004/2021
+TIPO: Pagina oficial Receita Federal — sped.rfb.gov.br
+
+TEXTO LITERAL EXTRAIDO:
+
+"A Escrituracao Contabil Fiscal (ECF) substituiu a Declaracao de
+Informacoes Economico-Fiscais da Pessoa Juridica (DIPJ), a partir do
+ano-calendario 2014, com entrega prevista para o ultimo dia util do
+mes de julho do ano posterior ao do periodo da escrituracao no ambiente
+do Sistema Publico de Escrituracao Digital (Sped).
+
+Sao obrigadas ao preenchimento da ECF todas as pessoas juridicas,
+inclusive imunes e isentas, sejam elas tributadas pelo lucro real,
+lucro arbitrado ou lucro presumido, exceto:
+
+  I - As pessoas juridicas optantes pelo Regime Especial Unificado de
+  Arrecadacao de Tributos e Contribuicoes devidos pelas Microempresas
+  e Empresas de Pequeno Porte (Simples Nacional), de que trata a Lei
+  Complementar nº 123, de 14 de dezembro de 2006;
+
+  II - Os orgaos publicos, as autarquias e as fundacoes publicas;
+
+  III - As pessoas juridicas que nao tenham efetuado qualquer atividade
+  operacional, nao operacional, patrimonial ou financeira, inclusive
+  aplicacao no mercado financeiro ou de capitais, durante todo o
+  ano-calendario."
+
+CONFIRMADO: Prazo ECF = ultimo dia util de julho do ano posterior.

@@ -1,0 +1,36 @@
+FONTE_PRIMARIA: Noticia oficial Receita Federal sobre IN RFB 2.248/2025
+URL_NOTICIA: https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2025/fevereiro/contribuintes-ganham-mais-tempo-para-entregar-a-dctfweb
+URL_SUPLEMENTAR: https://www.gov.br/pt-br/servicos/declarar-debitos-e-creditos-tributarios-federais
+CAPTURADO_VIA: Claude in Chrome MCP (Google search + acesso direto)
+DATA_CAPTURA: 2026-05-09
+
+NORMAS REFERENCIADAS:
+- IN RFB 2.005/2021 (regulamentacao original DCTFWeb)
+- IN RFB 2.248/2025 (alteracao do prazo, publicada em 07/02/2025)
+
+ACHADO CRITICO — ALTERACAO DE PRAZO EM 2025:
+
+Versao ANTIGA (IN RFB 2.005/2021 original):
+"DCTFWeb mensal e dia 15 do mes seguinte" (vencimento DARF dia 20).
+Texto Receita Federal de 11/11/2021 confirmou: "A Receita Federal lembra
+que o prazo de entrega da DCTFWeb mensal e dia 15 do mes seguinte,
+sendo o vencimento do DARF dia 20."
+
+Versao VIGENTE (a partir de 07/02/2025 — IN RFB 2.248/2025):
+TEXTO OFICIAL Receita Federal:
+"A Receita Federal por meio da Instrucao Normativa nº 2.248 de 07 de
+fevereiro de 2025 alterou o prazo de envio da DCTFWeb para o ULTIMO
+DIA UTIL DO MES SEGUINTE a ocorrencia dos fatos geradores dos tributos
+nela informados."
+
+PERGUNTAS E RESPOSTAS RECEITA FEDERAL (gov.br):
+"O prazo para fechamento da DCTFWeb sera alterado para o ultimo dia util
+do mes subsequente, com excecao da competencia de janeiro de 2025, que
+podera ser fechada ate 31/03/2025."
+
+CONFIRMADO PARA 2026 EM DIANTE: Prazo DCTFWeb = ultimo dia util do mes
+seguinte ao da competencia (NOVO regime via IN RFB 2.248/2025).
+
+IMPACTO NO MOTOR (matriz WS7):
+- v1: prazo_dia=15, prazo_offset_meses=1 (errado pra 2025+)
+- v2: prazo_ultimo_dia_util=True, prazo_offset_meses=1 (correto pos IN 2.248/2025)

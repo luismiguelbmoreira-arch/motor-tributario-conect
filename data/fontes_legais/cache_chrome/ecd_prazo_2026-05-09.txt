@@ -1,0 +1,37 @@
+FONTE: http://sped.rfb.gov.br/pagina/show/499
+CAPTURADO_VIA: Claude in Chrome MCP (browser real, JS renderizado)
+DATA_CAPTURA: 2026-05-09
+NORMA_REFERENCIADA: IN RFB 2.003/2021 (com Redacao IN RFB 2.142/2023)
+TIPO: Pagina oficial Receita Federal — sped.rfb.gov.br
+
+TEXTO LITERAL EXTRAIDO (apenas trechos relevantes ao prazo):
+
+"Art. 5º A ECD deve ser transmitida ao Sistema Publico de Escrituracao
+Digital (Sped) ate o ultimo dia util do mes de junho do ano subsequente
+ao ano-calendario a que se refere a escrituracao. (Redacao dada pelo(a)
+Instrucao Normativa RFB nº 2142, de 26 de maio de 2023)
+
+§ 1º O prazo para entrega da ECD sera encerrado as 23h59min59s (vinte e
+tres horas, cinquenta e nove minutos e cinquenta e nove segundos),
+horario de Brasilia, do dia fixado para entrega da escrituracao.
+
+§ 2º A ECD transmitida no prazo previsto no caput sera considerada
+valida depois de confirmado seu recebimento pelo Sped.
+
+§ 3º Nos casos de extincao da pessoa juridica, cisao parcial, cisao
+total, fusao ou incorporacao, a ECD deve ser entregue pela pessoa
+juridica extinta, cindida, fusionada, incorporada e incorporadora,
+observados os seguintes prazos: (Vide Instrucao Normativa RFB nº 2082,
+de 18 de maio de 2022)
+
+  I - se o evento ocorrer no periodo compreendido entre janeiro e maio,
+  a ECD deve ser entregue ate o ultimo util do mes de junho do mesmo
+  ano; ou (Redacao dada pelo(a) Instrucao Normativa RFB nº 2142, de 26
+  de maio de 2023)
+
+  II - se o evento ocorrer no periodo compreendido entre junho e
+  dezembro, a ECD deve ser entregue ate o ultimo dia util do mes
+  subsequente ao do evento. (Redacao dada pelo(a) Instrucao Normativa
+  RFB nº 2142, de 26 de maio de 2023)"
+
+CONFIRMADO: Prazo ECD = ultimo dia util de junho do ano subsequente.

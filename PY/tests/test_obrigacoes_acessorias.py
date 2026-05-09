@@ -427,40 +427,35 @@ class TestObrigacoesCitacoesLegais:
                 )
 
     def test_nenhuma_obrigacao_cita_norma_sem_cache(self):
-        # Anti-alucinação: pendências WS7c — sem cache pra essas normas
-        # ainda. Atualizado após Escrivão capturar (08/05/2026):
-        #   Lei 9.430/96, Lei 8.218/91, Lei 10.426/2002, Lei 12.973/2014,
-        #   Lei 9.532/97, Lei 14.689/2023, Decreto-Lei 1.598/77.
+        # WS7c (09/05/2026) — Chrome MCP capturou prazos contra fontes oficiais
+        # Receita Federal (sped.rfb.gov.br + gov.br/receitafederal):
+        #   - ECD: IN RFB 2.003/2021 Art. 5º + IN RFB 2.142/2023
+        #   - ECF: IN RFB 2.004/2021
+        #   - EFD-Contribuições: IN RFB 1.252/2012
+        #   - DCTFWeb: IN RFB 2.248/2025 (alterou IN RFB 2.005/2021 — ÚLTIMO DIA ÚTIL)
+        #   - DASN-SIMEI/DEFIS/PGDAS-D: Resolução CGSN 140/2018
         # Permanece pendente:
-        #   - INs RFB 2.003-2.005/2021 (ECD/ECF/DCTFWeb prazos)
-        #   - IN RFB 1.252/2012 (EFD-Contribuições prazo+multa)
-        #   - IN RFB 1.371/2013 (EFD-ICMS-IPI)
-        #   - Lei 4.502/64 (IPI)
-        #   - Resolução CGSN 140/2018 (prazos Simples)
-        # Citações dessas normas só com texto literal "(captura pendente)" ou
-        # "(pendente cache)" — nunca como amparo único de número/percentual.
-        normas_sem_cache = ("IN RFB 2.003", "IN RFB 2.004", "IN RFB 2.005",
-                            "IN RFB 1.252", "IN RFB 1.371", "Lei 4.502",
-                            "Lei 4502")
+        #   - IN RFB 1.371/2013 (EFD-ICMS-IPI estadual — fora de escopo unificado)
+        #   - Lei 4.502/64 (IPI) — capturada Planalto, mas não usada na matriz
+        normas_sem_cache = ("IN RFB 1.371", "Lei 4.502", "Lei 4502")
         for porte in ("MEI", "ME", "EPP", "DEMAIS"):
             for regime in ("SIMPLES", "PRESUMIDO", "REAL", "MEI", "IMUNE"):
                 for o in obter_obrigacoes(porte=porte, regime=regime):
                     for norma in normas_sem_cache:
                         if norma in o.base_legal:
-                            # Cita pode ocorrer SE marcado como pendente
-                            # (ex: "IN RFB 2.004/2021 — captura pendente WS7b")
                             assert "pendente" in o.base_legal.lower(), (
                                 f"Obrigação {o.codigo} cita {norma} sem marca "
                                 f"de pendência: {o.base_legal!r}"
                             )
 
-    def test_efd_contribuicoes_ainda_pendente(self):
-        # EFD-Contribuições ainda pendente — multa em Lei 8.218 Art. 12
-        # sem pisos, prazo em IN RFB 1.252/2012 sem cache.
+    def test_efd_contribuicoes_agora_capturada_ws7c(self):
+        # WS7c (09/05/2026) — EFD-Contribuições adicionada após captura via
+        # Chrome MCP (sped.rfb.gov.br/item/show/284). Prazo confirmado:
+        # 10º dia útil do segundo mês subsequente.
         for regime in ("PRESUMIDO", "REAL"):
             obrigs = obter_obrigacoes(porte="DEMAIS", regime=regime)
             codigos = {o.codigo for o in obrigs}
-            assert "EFD_CONTRIBUICOES" not in codigos
+            assert "EFD_CONTRIBUICOES" in codigos
 
     def test_ecd_aplica_apenas_lucro_real(self):
         # ECD foi adicionada em WS7c apenas para REAL (múltiplas fontes
@@ -544,36 +539,36 @@ class TestObrigacoesDCTFWebCitacao:
         dctf = next((o for o in obrigs if o.codigo == "DCTFWEB"), None)
         assert "R$ 500" in dctf.multa_descricao or "500,00" in dctf.multa_descricao
 
-    def test_dctfweb_offset_conservador_1_pendente(self):
-        # WS7c — WebSearch retornou interpretações conflitantes pra prazo:
-        # "dia 15 do mês seguinte" vs "último dia útil do mês seguinte"
-        # vs "dia 15 do 2º mês seguinte" (plano Escrivão original).
-        # Sem texto literal IN RFB 2.005/2021, motor usa convenção
-        # conservadora offset_meses=1 + prazo_amparo_pendente=True.
+    def test_dctfweb_ultimo_dia_util_in_2248_2025(self):
+        # WS7c (09/05/2026) — Chrome MCP capturou IN RFB 2.248/2025 (Receita
+        # Federal): prazo da DCTFWeb foi ALTERADO de "dia 15" para "ÚLTIMO DIA
+        # ÚTIL DO MÊS SEGUINTE" em 07/02/2025. Schema reflete a mudança.
         obrigs = obter_obrigacoes(porte="DEMAIS", regime="REAL")
         dctf = next((o for o in obrigs if o.codigo == "DCTFWEB"), None)
         assert dctf.prazo_offset_meses == 1
-        assert dctf.prazo_amparo_pendente is True
-        # base_legal explicita o conflito de fontes
-        assert "WebSearch" in dctf.base_legal or "conflitantes" in dctf.base_legal
+        assert dctf.prazo_ultimo_dia_util is True
+        assert dctf.prazo_dia is None  # não usa dia fixo, usa último dia útil
+        assert dctf.prazo_amparo_pendente is False  # cache validado
+        assert "2.248/2025" in dctf.base_legal or "IN RFB 2.248" in dctf.base_legal
 
 
 class TestAlertasObrigacoesPresumidoReal:
     """Alertas de vencimento pra obrigações Presumido+Real."""
 
-    def test_dctfweb_calcula_vencimento_no_mes_seguinte(self):
-        # Competência marco/2027 → DCTFWeb vence dia 15 de abril/2027
-        # (offset conservador = mês seguinte; 2º mês não confirmado).
+    def test_dctfweb_calcula_vencimento_ultimo_dia_util(self):
+        # WS7c (09/05/2026) — IN RFB 2.248/2025 alterou prazo pra
+        # ÚLTIMO DIA ÚTIL do mês seguinte. Competência março/2027 →
+        # vencimento último dia útil de abril/2027 = 30/04/2027 (sexta).
         alertas = gerar_alertas_obrigacoes(
             porte="DEMAIS",
             regime="REAL",
-            hoje=date(2027, 4, 14),  # 1 dia antes do vencimento
+            hoje=date(2027, 4, 29),  # 1 dia antes do vencimento
             competencia_atual=date(2027, 3, 31),
             dias_antecedencia=30,
         )
         dctf_alerta = next((a for a in alertas if a.obrigacao.codigo == "DCTFWEB"), None)
         assert dctf_alerta is not None
-        assert dctf_alerta.data_vencimento == date(2027, 4, 15)
+        assert dctf_alerta.data_vencimento == date(2027, 4, 30)
         assert dctf_alerta.dias_restantes == 1
         assert dctf_alerta.nivel == "CRITICO"
 

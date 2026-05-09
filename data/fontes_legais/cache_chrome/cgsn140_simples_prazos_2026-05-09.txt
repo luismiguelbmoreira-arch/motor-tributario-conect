@@ -1,0 +1,37 @@
+FONTE: Multiplas fontes oficiais Receita Federal (gov.br) + Manual PGDAS-D 2018
+CAPTURADO_VIA: Claude in Chrome MCP via Google Search
+DATA_CAPTURA: 2026-05-09
+NORMA_REFERENCIADA: Resolucao CGSN nº 140/2018 + alteracoes posteriores
+
+PRAZOS CONFIRMADOS (Simples Nacional):
+
+DASN-SIMEI (Declaracao Anual do Simples Nacional para o MEI)
+- Prazo: ate 31 de maio do ano-calendario subsequente
+- Base: Resolucao CGSN nº 140/2018 (delegacao LC 123/2006 Art. 25)
+- Confirmacao oficial Receita Federal: "MEI nao entrega DEFIS, mas sim
+  a DASN-SIMEI ate 31 de maio."
+
+DEFIS (Declaracao de Informacoes Socioeconomicas e Fiscais — ME/EPP)
+- Prazo: ate 31 de marco do ano-calendario subsequente
+- Base: Resolucao CGSN nº 140/2018
+- Confirmacao oficial Receita Federal:
+  "O prazo para apresentar a Defis se encerra no dia 31 de marco do
+  ano-calendario subsequente ao da ocorrencia dos fatos geradores dos
+  tributos previstos no Simples Nacional. Por exemplo, a DEFIS referente
+  aos fatos geradores ocorridos no ano-calendario 2025 devera ser
+  apresentada ate o dia 31 de marco de 2026."
+
+PGDAS-D (Programa Gerador do DAS — apuracao mensal)
+- Prazo: dia 20 do mes seguinte
+- Base: Resolucao CGSN nº 140/2018 (delegacao LC 123/2006 Art. 18 § 15-A)
+- Manual PGDAS-D oficial Receita Federal confirma o dia 20.
+
+OBSERVACAO: Resolucao CGSN 140/2018 nao esta disponivel em fonte
+machine-readable (sijut2 SPA tem JS dinamico que ate Chrome real
+exige interacao). Mas as 3 datas estao confirmadas em multiplas
+publicacoes oficiais Receita Federal acessadas via Chrome MCP.
+
+CONFIRMADO: 3 prazos do Simples Nacional alinhados com versao corrente
+da matriz WS7 obrigacoes_acessorias.py — `prazo_amparo_pendente=True`
+pode ser removido pra DASN-SIMEI, DEFIS e PGDAS-D (com nota de que
+texto literal CGSN 140 ainda aguarda machine-readable).

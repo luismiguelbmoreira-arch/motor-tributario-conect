@@ -29,3 +29,10 @@ e47ce6f171ec9909fd43767b07319bbf8a80c330ae7bc6f9cc7db92448576f42 | planalto/l106
 06b9cf49739a733422c66850d012248ca22cf263d5b43a3c70ce2647f1f98eee | planalto/l10833_v2026-05-09.html | https://www.planalto.gov.br/ccivil_03/leis/2003/l10.833.htm | 2026-05-09 | planalto
 2f8a098c291d7b6e654faa94461c02f2d0fdd70568799d2cc99cc6674e324c8e | planalto/l8541_v2026-05-09.html | https://www.planalto.gov.br/ccivil_03/leis/l8541.htm | 2026-05-09 | planalto
 92b874a8da7c75ce5dd7e51fdfc1bf8f92ab1f3dc041648b2384329aa9360b4f | planalto/l7689_v2026-05-09.html | https://www.planalto.gov.br/ccivil_03/leis/l7689.htm | 2026-05-09 | planalto
+
+# WS7c — capturas Claude in Chrome MCP (sped.rfb.gov.br SPA renderizado)
+5834a669a754413ee11a5e21957206f126379639efc410b174efe38a0bb19c45 | cache_chrome/ecd_prazo_2026-05-09.txt | http://sped.rfb.gov.br/pagina/show/499 | 2026-05-09 | sped.rfb.gov.br via Claude in Chrome MCP
+1c790dc0e024dc72f1485098eb9e86e78af98a8a48ca4e7a91ab793e5427ca9b | cache_chrome/ecf_prazo_2026-05-09.txt | http://sped.rfb.gov.br/pagina/show/1285 | 2026-05-09 | sped.rfb.gov.br via Claude in Chrome MCP
+cc751b8864d2249def20c5c96571188ca78a06266451ccd103f0701339693caa | cache_chrome/efd_contribuicoes_prazo_2026-05-09.txt | http://sped.rfb.gov.br/item/show/284 | 2026-05-09 | sped.rfb.gov.br via Claude in Chrome MCP
+1a5d63d3756ddda349fab951a13405c22b89db49c4e5a8fab0c247ce77751960 | cache_chrome/dctfweb_prazo_2026-05-09.txt | https://www.gov.br/receitafederal/pt-br/assuntos/noticias/2025/fevereiro/contribuintes-ganham-mais-tempo-para-entregar-a-dctfweb | 2026-05-09 | sped.rfb.gov.br via Claude in Chrome MCP
+1e2d544fb9cebd99c1cc105a346d1ea43965373b764972dbe36f7fc097ab1ffe | cache_chrome/cgsn140_simples_prazos_2026-05-09.txt | multiplas-fontes-receita-federal-via-chrome | 2026-05-09 | sped.rfb.gov.br via Claude in Chrome MCP
