@@ -20,3 +20,4 @@ b6f6b3e2f808efc06f9872f9842ab0abc0a70b6d783602711548e5ed1ee972f0 | planalto/l821
 0175a9573cc7dd747a3b971c6f4684b3c5d88f51c0fc6ea9b04aefb2ea7fe5d6 | planalto/l9532_v2026-05-08.html | https://www.planalto.gov.br/ccivil_03/leis/l9532.htm | 2026-05-08 | planalto
 b1f463850721d2684b4741dcf97e441adae631c7d4083cb2c6da73c6eb16b0a0 | planalto/l14689_v2026-05-08.html | https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2023/lei/l14689.htm | 2026-05-08 | planalto
 7b563429311f0a966e54300f3a32b964126fb700141a51fd9c947899fa716284 | planalto/del1598_v2026-05-08.html | https://www.planalto.gov.br/ccivil_03/Decreto-Lei/Del1598.htm | 2026-05-08 | planalto
+2c5a98ee51a2cf1ddde888836d937e8abffccc333cb52f4588d38aca3cb693d6 | planalto/l4502_v2026-05-09.html | https://www.planalto.gov.br/ccivil_03/leis/l4502.htm | 2026-05-09 | planalto
