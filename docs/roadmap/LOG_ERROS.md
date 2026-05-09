@@ -1681,6 +1681,117 @@ operacional — útil em incidente/auditoria ANPD.
 
 ---
 
+### ERR-056 — Citações inventadas Art. 172 II/III pra cigarro/bebida (anti-alucinação)
+**Data:** 30/04/2026
+**Severidade:** 🔴 Crítico
+**Arquivo:** `PY/schemas/motor.py:34-46` + `PY/schemas/motor.py:353-368`
+**Descoberto em:** validação Escrivão pré-M5 (Fase 0b)
+**Amparo legal violado:** MAX_FISCAL_02 + MAX_FISCAL_07
+
+**Descrição:**
+Constante `NCMS_MONOFASICAS_BLOQUEADAS` atribuía cigarros (NCM 2402-2403) e bebidas alcoólicas (NCM 2203-2208) ao "LC 214/2025 Art. 172 II/III" — citação inventada. Validação Escrivão (5+ fontes secundárias autoritativas) confirmou:
+- Art. 172 lista TAXATIVAMENTE apenas combustíveis (gasolina, EAC, diesel, B100, GLP, GLGN, EHC, querosene aviação, óleo combustível, gás natural processado, biometano, GNV) sujeitos ao regime monofásico de IBS/CBS.
+- Cigarros e bebidas alcoólicas vão pro **Imposto Seletivo** (LC 214/2025 Art. 409 § 1º + Art. 410) — tributo diferente, com regra própria (incidência única, sem creditamento).
+
+**Solução aplicada:**
+- 2710 (combustíveis) → mantido em Art. 172 (monofásico).
+- 2402, 2403 (tabaco) → corrigido pra Art. 409 § 1º + 410 (Imposto Seletivo).
+- 2203-2208 (bebidas) → corrigido pra Art. 409 § 1º + 410.
+- Mensagem do `field_validator` agora distingue combustível (monofásico) de tabaco/bebidas (Seletivo).
+- Teste regressivo `test_err056_anti_alucinacao_seletivo.py` (20 testes) bloqueia volta da citação errada.
+
+**Status:** ✅ Corrigido em commit `4a46f07`. Suite 1449 → 1469 (+20 regressivos). Pré-requisito do M5 (`core/imposto_seletivo.py`) — sem este fix, M5 herdaria a confusão monofásico vs Seletivo.
+
+---
+
+### ERR-057 — Citação errada MAX_06 (Art. 47 §II + Arts. 344/353/356-360)
+**Data:** 30/04/2026
+**Severidade:** 🔴 Crítico
+**Arquivo:** `CLAUDE.md:451` (MAX_06) + `PY/core/motor_tributario.py:605/642/669/678/790` + `PY/services/relatorio_pdf.py:649/747/763`
+**Descoberto em:** validação Escrivão (4ª classe de erro de citação inventada/mal-mapeada da temporada — pós ERR-017.b e ERR-056)
+**Amparo legal violado:** MAX_FISCAL_02 + MAX_FISCAL_06 + MAX_FISCAL_07
+
+**Descrição:**
+MAX_06 do CLAUDE.md citava "LC 214/2025 Art. 47 §II + Arts. 344, 353, 356-360" como base do crédito B2B de fornecedor Simples Nacional. Validação Escrivão (5+ fontes autoritativas: LegisWeb, ModeloInicial, Jusbrasil, ConJur, Reformatributaria.com, Nuvant) confirmou:
+- Art. 47 §II é regra GERAL ("crédito = valor destacado no documento"), NÃO regra específica de fornecedor Simples.
+- Arts. 344/353/356-360 são CRONOGRAMA de transição CBS/IBS, NÃO creditamento.
+
+**Citação correta:** **LC 214/2025 Art. 47 § 9º** — quando IBS/CBS pagos via Simples, optantes não se apropriam de crédito; adquirente do regime regular se credita em valor equivalente ao recolhido no DAS.
+
+**Solução aplicada:**
+- CLAUDE.md MAX_06 corrigido + nota histórica do erro.
+- 6 pontos em `motor_tributario.py` + 3 pontos em `relatorio_pdf.py` atualizados (docstrings, títulos, campo `lei` da trilha, descrições do PDF).
+- Teste regressivo `tests/test_err057_anti_alucinacao_max06.py` (10 testes) bloqueia volta nos 3 arquivos críticos.
+
+**Status:** ✅ Corrigido em commit `35181ec` (+ cleanup secundário em `9c073ab` — UI/agents/comentários).
+
+---
+
+### ERR-058 — Plano original citava "Lei 9.430/96 Art. 8º-A" inexistente (anti-alucinação prévia ao código)
+**Data:** 08/05/2026
+**Severidade:** 🔴 Crítico (prevenido)
+**Arquivo:** `PY/core/obrigacoes_acessorias.py` (ECF) — citação corrigida ANTES de virar código
+**Descoberto em:** validação Escrivão pré-WS7b (5ª classe da temporada — ERR-017.b → 056 → 057 → 058)
+**Amparo legal violado:** MAX_FISCAL_02 + MAX_FISCAL_07
+
+**Descrição:**
+Plano WS7b citava "Lei 9.430/96 Art. 8º-A" como base da multa por atraso na entrega da ECF. Texto verificado pelo Escrivão (cache `data/fontes_legais/planalto/`):
+- Art. 8º-A está no **Decreto-Lei 1.598/77**, incluído pela Lei 12.973/2014 Art. 2º.
+- Lei 9.430/96 Art. 8º trata de assunto totalmente diferente (IRPJ janeiro/fevereiro 1997).
+
+**Citação correta:** **Decreto-Lei 1.598/77 Art. 8º-A** (incluído pela Lei 12.973/2014 Art. 2º) — multa "0,25% por mês-calendário ou fração do lucro líquido antes do IRPJ/CSLL, limitada a 10%".
+
+**Solução aplicada:**
+- Código nunca viu a citação errada (bloqueada antes do commit).
+- Testes regressivos `test_ecf_nao_cita_lei_9430_art_8a` + `test_ecf_cita_decreto_lei_1598_77`.
+
+**Status:** ✅ Prevenido em commit `4ddc89f`.
+
+---
+
+### ERR-058.b — Plano citava "Lei 8.218/91 Art. 12 multa R$ 500-1500" inexistente
+**Data:** 08/05/2026
+**Severidade:** 🔴 Crítico (prevenido)
+**Arquivo:** `PY/core/obrigacoes_acessorias.py` — pisos NÃO foram codados
+**Descoberto em:** mesma rodada WS7b
+**Amparo legal violado:** MAX_FISCAL_02 + MAX_FISCAL_07
+
+**Descrição:**
+Plano WS7b dizia "Lei 8.218/91 Art. 12 multa R$ 500-1500 + 0,02% receita". Texto verificado:
+- Art. 12 traz APENAS percentuais sobre receita bruta (0,5% I + 5% lim 1% II + 0,02%/dia lim 1% III).
+- NENHUM piso fixo em reais. Pisos R$ 500/1500 vêm de IN RFB (não-Planalto, captura pendente WS7c).
+
+**Solução aplicada:** código não usa esses pisos. Citação correta restrita ao Art. 12 da Lei 8.218/91 com os 3 percentuais reais.
+
+**Status:** ✅ Prevenido em commit `4ddc89f`.
+
+---
+
+### ERR-058.c — DCTFWeb codado com `offset_meses=2` sem texto literal IN RFB 2.005
+**Data:** 09/05/2026
+**Severidade:** 🟡 Atenção (revertido conservadoramente)
+**Arquivo:** `PY/core/obrigacoes_acessorias.py:395`
+**Descoberto em:** WebSearch WS7c retornou 3 versões conflitantes do prazo
+**Amparo legal violado:** MAX_FISCAL_02 + Rail R2 (proibição de extrapolação)
+
+**Descrição:**
+WS7b codou `prazo_offset_meses=2` pra DCTFWeb baseado no plano Escrivão original ("dia 15 do 2º mês seguinte"). Validação WS7c via WebSearch retornou TRÊS versões diferentes:
+1. "dia 15 do mês seguinte" (Art. 6 IN RFB 2.005, segundo fontes)
+2. "último dia útil do mês seguinte" (outra fonte)
+3. "dia 15 do 2º mês seguinte" (plano original)
+
+Sem texto literal IN RFB 2.005/2021 (sijut2 SPA falha + sped.rfb ECONNREFUSED + WebFetch falha), codar offset=2 era chute.
+
+**Solução aplicada:**
+- `prazo_offset_meses` revertido 2 → 1 (convenção conservadora — mês seguinte).
+- Nota explícita do conflito adicionada em `base_legal`.
+- `prazo_amparo_pendente=True` mantido até cache da IN RFB 2.005.
+- Caller que precisar de decisão fiscal real deve verificar IN RFB 2.005 manualmente.
+
+**Status:** ✅ Revertido em commit `9852a41`. Pendência: cache IN RFB 2.005/2021 via Playwright/Selenium ou Migrador manual quando RFB publicar versão consolidada estável.
+
+---
+
 ## HISTÓRICO DE AUDITORIAS REAIS
 
 | Data | Empresa | CNPJ | Período | DAS e-CAC | DAS Motor | Delta | Status |

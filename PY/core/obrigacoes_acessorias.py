@@ -16,19 +16,24 @@ hoje. Marcamos `prazo_amparo_pendente=True` para sinalização explícita
 (Rail R2: motor avisa, mas declara que a citação literal do prazo aguarda
 captura da Resolução CGSN 140/2018 — pendência WS7b).
 
-PENDÊNCIAS WS7b (captura de cache + extensão de matriz):
-  - ECF (Lucro Presumido + Real anual) — Lei 9.430/96 Art. 8º-A + IN RFB 2.004/2021
-  - ECD (Lucro Real anual)             — Lei 8.218/91 + IN RFB 2.003/2021
-  - EFD-Contribuições (mensal)         — Lei 8.218/91 Art. 12 + IN RFB 1.252/2012
-  - DCTFWeb (mensal)                   — Lei 10.426/2002 Art. 7º + IN RFB 2.005/2021
-  - EFD-ICMS estadual                  — Convênio ICMS 143/2006 (27 UFs — fora de escopo unificado)
-  - Resolução CGSN 140/2018            — confirmar URL canônica antes de capturar
+FONTES NORMATIVAS POR OBRIGAÇÃO (status 2026-05-09 — pós WS7b/WS7c parcial):
+  - ECF (Presumido + Real + Imune anual) — **Decreto-Lei 1.598/77 Art. 8º-A**
+    (incluído pela Lei 12.973/2014 Art. 2º) + IN RFB 2.004/2021 (prazo, pendente cache)
+  - ECD (Lucro Real anual)               — Lei 8.218/91 Art. 11 + DL 1.598/77 Art. 8º-A
+    (mesma multa da ECF) + IN RFB 2.003/2021 (prazo, pendente cache)
+  - EFD-Contribuições (mensal)           — Lei 8.218/91 Art. 12 + IN RFB 1.252/2012 (pendente)
+  - DCTFWeb (mensal)                     — Lei 10.426/2002 Art. 7º + IN RFB 2.005/2021 (pendente)
+  - EFD-ICMS estadual                    — Convênio ICMS 143/2006 (27 UFs — fora de escopo unificado)
+  - Resolução CGSN 140/2018              — prazos Simples (DASN-SIMEI/DEFIS/PGDAS-D), pendente
 
 BLOQUEIOS MAX_07 prevenidos pelo Escrivão antes do código:
   1. Multa máxima é 20% (Art. 38 I + § 3º) — NÃO 10% como o plano original dizia
   2. Multa MEI fica em Art. 38 § 6º (R$ 50 mín) — citação específica
   3. Multa DEFIS fica em Art. 38 § 3º (R$ 200 mín) — não Art. 25 genérico
   4. PGDAS-D multa = Art. 38-A com redação LC 214/2025 (não Art. 38 puro)
+  5. ECF: Art. 8º-A está no **DL 1.598/77**, NÃO Lei 9.430/96 (ERR-058)
+  6. Lei 8.218/91 Art. 12 traz APENAS percentuais — sem piso fixo R$ 500/1500 (ERR-058.b)
+  7. DCTFWeb offset_meses=1 conservador (era 2 no plano; sem texto IN RFB 2.005 — ERR-058.c)
 """
 from __future__ import annotations
 
