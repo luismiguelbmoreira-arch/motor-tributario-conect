@@ -104,6 +104,98 @@ class DocumentoFiscalExtraido(BaseModel):
         description="Origem da extração (ex: extracao_pdf_claude_vision, fonte_nibo).",
     )
 
+    @classmethod
+    def from_dados_extraidos_pdf(
+        cls,
+        dados: object,  # services.extrator_pdfs.DadosExtraidosPDF — Any pra evitar ciclo
+        *,
+        regime_atual: RegimeAtual,
+        competencia_override: Optional[date] = None,
+        documento_origem_hash: Optional[str] = None,
+    ) -> "DocumentoFiscalExtraido":
+        """
+        Adapter: DadosExtraidosPDF (Claude Vision) → DocumentoFiscalExtraido.
+
+        Mapeamento:
+          - cnpj: normaliza removendo pontuação
+          - competencia: parseia "MM/AAAA" → date(AAAA, MM, 1)
+          - receita_bruta_mensal: pega de `rpa_referencia` (receita do
+            período de apuração mensal)
+          - tributos: lê de `das_breakdown` (chaves IRPJ, CSLL, COFINS, PIS,
+            CPP, ICMS, ISS, IPI) — valores podem vir como str/Decimal/float
+
+        Args:
+            dados: instância de services.extrator_pdfs.DadosExtraidosPDF
+            regime_atual: regime declarado pela empresa (caller já validou)
+            competencia_override: força competência (default: parsear `dados.competencia`)
+            documento_origem_hash: SHA-256 do PDF cifrado (auditoria_documentos.hash)
+        """
+        # CNPJ normalizado (só dígitos)
+        cnpj_str = str(getattr(dados, "cnpj", "")).strip()
+        cnpj_digits = "".join(c for c in cnpj_str if c.isdigit())
+        if len(cnpj_digits) != 14:
+            raise ValueError(
+                f"CNPJ inválido em DadosExtraidosPDF: {cnpj_str!r} "
+                f"({len(cnpj_digits)} dígitos)"
+            )
+
+        # Competência
+        if competencia_override is not None:
+            competencia = competencia_override
+        else:
+            comp_str = str(getattr(dados, "competencia", "")).strip()
+            try:
+                mes, ano = comp_str.split("/")
+                competencia = date(int(ano), int(mes), 1)
+            except (ValueError, AttributeError) as e:
+                raise ValueError(
+                    f"competencia inválida em DadosExtraidosPDF: {comp_str!r}. "
+                    "Formato esperado: MM/AAAA."
+                ) from e
+
+        # Receita bruta = RPA mensal (não RBT12 anual)
+        rpa = str(getattr(dados, "rpa_referencia", "0"))
+        receita_bruta_mensal = _to_decimal(rpa)
+
+        # Breakdown DAS — dict[str, str|Decimal|float]
+        breakdown = getattr(dados, "das_breakdown", {}) or {}
+
+        return cls(
+            cnpj=cnpj_digits,
+            competencia=competencia,
+            regime_atual=regime_atual,
+            receita_bruta_mensal=receita_bruta_mensal,
+            irpj_pago=_to_decimal(breakdown.get("IRPJ", 0)),
+            csll_paga=_to_decimal(breakdown.get("CSLL", 0)),
+            pis_pago=_to_decimal(breakdown.get("PIS", 0)),
+            cofins_paga=_to_decimal(breakdown.get("COFINS", 0)),
+            icms_pago=_to_decimal(breakdown.get("ICMS", 0)),
+            iss_pago=_to_decimal(breakdown.get("ISS", 0)),
+            ipi_pago=_to_decimal(breakdown.get("IPI", 0)),
+            cpp_pago=_to_decimal(breakdown.get("CPP", 0)),
+            documento_origem_hash=documento_origem_hash,
+            fonte_extracao="extracao_pdf_claude_vision",
+        )
+
+
+def _to_decimal(v) -> Decimal:
+    """Conversor robusto str/float/Decimal/None → Decimal não-negativo."""
+    if v is None or v == "":
+        return Decimal("0")
+    if isinstance(v, Decimal):
+        return v
+    if isinstance(v, (int, float)):
+        return Decimal(str(v))
+    # String — pode vir como "1.234,56" (BR) ou "1234.56" (EN)
+    s = str(v).strip().replace("R$", "").strip()
+    # Remove separador de milhares BR (.) quando há vírgula decimal
+    if "," in s and s.count(",") == 1:
+        s = s.replace(".", "").replace(",", ".")
+    try:
+        return Decimal(s)
+    except Exception as e:
+        raise ValueError(f"Não consegui converter {v!r} para Decimal") from e
+
 
 class DeltaReformaTributaria(BaseModel):
     """
