@@ -1,0 +1,37 @@
+{
+  "_meta": {
+    "tipo": "DadosExtraidosPDF_serializado",
+    "origem_simulada": "PDF de DAS competencia 06/2026 da INDUSTRIA AURORA LTDA",
+    "valores_referencia": "Receita mensal R$ 7.916.666,67 (= R$ 95M / 12). Tributos da modelagem Aurora v2 anterior (preservada em .lixeira/aurora_v2_calculadora_2026-05-09/).",
+    "regime_atual_sugerido_no_caller": "REAL"
+  },
+
+  "cnpj": "15.644.601/0001-04",
+  "razao_social": "INDUSTRIA AURORA LTDA",
+  "cnae_principal": "1622600",
+  "uf_origem": "SP",
+  "faturamento_12m": "95000000.00",
+  "folha_salarios_12m": "4500000.00",
+  "anexo_simples": null,
+  "receita_com_st_icms": null,
+  "atividades_detalhadas": null,
+
+  "rpa_referencia": "7916666.67",
+  "das_ecac_referencia": "1085167.51",
+  "competencia": "06/2026",
+
+  "das_breakdown": {
+    "IRPJ": "42363.79",
+    "CSLL": "23319.51",
+    "PIS": "78870.00",
+    "COFINS": "363280.00",
+    "CPP": "0.00",
+    "ICMS": "485000.00",
+    "ISS": "0.00",
+    "IPI": "62716.67"
+  },
+
+  "campos_nao_encontrados": [],
+  "confianca_extracao": 0.97,
+  "observacoes": "Extracao simulada — valores derivados da modelagem Aurora v2 (Lucro Real R$ 95M anual). Dados mensais = 1/12 dos anuais."
+}

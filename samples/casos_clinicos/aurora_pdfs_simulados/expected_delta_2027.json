@@ -1,0 +1,49 @@
+{
+  "_meta": {
+    "tipo": "DeltaReformaTributaria_esperado",
+    "input_arquivo": "das_competencia_2026-06.json",
+    "ano_alvo": 2027,
+    "regime_atual": "REAL"
+  },
+
+  "cnpj": "15644601000104",
+  "competencia": "2026-06-01",
+  "ano_alvo": 2027,
+
+  "aliquota_cbs": "0.088",
+  "aliquota_ibs": "0.001",
+
+  "carga_atual": "1055549.97",
+
+  "_carga_atual_breakdown": {
+    "_nota": "Soma dos tributos pagos no DAS 06/2026 (extraidos do PDF)",
+    "IRPJ": "42363.79",
+    "CSLL": "23319.51",
+    "PIS": "78870.00",
+    "COFINS": "363280.00",
+    "CPP": "0.00",
+    "ICMS": "485000.00",
+    "ISS": "0.00",
+    "IPI": "62716.67"
+  },
+
+  "carga_projetada_aproximada": "1317983.31",
+  "_carga_projetada_calculo": {
+    "_nota": "Modelagem v2 do projetor — cronograma 2027. Soma: 696.666,67 + 7.916,67 + 42.363,79 + 23.319,51 + 62.716,67 + 485.000,00 = 1.317.983,31",
+    "cbs_sobre_receita_mensal": "696666.67",
+    "ibs_sobre_receita_mensal": "7916.67",
+    "irpj_inalterado": "42363.79",
+    "csll_inalterada": "23319.51",
+    "ipi_inalterado": "62716.67",
+    "cpp_inalterada": "0.00",
+    "pis_residual_2027": "0.00",
+    "cofins_residual_2027": "0.00",
+    "icms_residual_2027": "485000.00",
+    "iss_residual_2027": "0.00"
+  },
+
+  "delta_absoluto_aproximado": "262433.34",
+  "delta_percentual_aproximado": "0.2486",
+
+  "observacao": "Carga AUMENTA ~24,86% em 2027 porque CBS 8,8% (R$ 696.666,67) supera o PIS+COFINS extintos (R$ 442.150), e ICMS R$ 485.000 PERMANECE integral em 2027 (so reduz em 2029). Modelagem v2 e SIMPLIFICADA: nao considera credito B2B nem Split Payment (etapas futuras)."
+}
