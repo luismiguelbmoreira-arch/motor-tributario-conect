@@ -149,21 +149,50 @@ class TestProjecaoDelta:
         assert r.breakdown_projetado["csll_inalterada"] == Decimal("2000")
         assert r.breakdown_projetado["cpp_inalterada"] == Decimal("5000")
 
-    def test_pis_cofins_icms_iss_zerados_no_ano_alvo(self):
-        # Modelagem v1: PIS/COFINS/ICMS/ISS extintos integralmente no ano-alvo.
-        # (Em iteração futura, modelar transição gradual conforme Art. 344.)
+    def test_pis_cofins_extintos_a_partir_de_2027(self):
+        # Modelagem v2 (cronograma legal): PIS/COFINS 100% em 2026,
+        # extintos (0%) de 2027 em diante. LC 214/2025 Art. 348.
         d = _doc_simples_basico(
             receita=Decimal("100000"),
             pis=Decimal("1650"),
             cofins=Decimal("7600"),
+        )
+        # 2026: residual = 100% do pago
+        r_2026 = projetar_delta_reforma(documento=d, ano_alvo=2026)
+        assert r_2026.breakdown_projetado["pis_residual"] == Decimal("1650.00")
+        assert r_2026.breakdown_projetado["cofins_residual"] == Decimal("7600.00")
+        # 2027: residual = 0 (extintos)
+        r_2027 = projetar_delta_reforma(documento=d, ano_alvo=2027)
+        assert r_2027.breakdown_projetado["pis_residual"] == Decimal("0.00")
+        assert r_2027.breakdown_projetado["cofins_residual"] == Decimal("0.00")
+        # 2033: também 0
+        r_2033 = projetar_delta_reforma(documento=d, ano_alvo=2033)
+        assert r_2033.breakdown_projetado["pis_residual"] == Decimal("0.00")
+        assert r_2033.breakdown_projetado["cofins_residual"] == Decimal("0.00")
+
+    @pytest.mark.parametrize("ano,fator", [
+        (2026, Decimal("1.0")),
+        (2027, Decimal("1.0")),
+        (2028, Decimal("1.0")),
+        (2029, Decimal("0.9")),
+        (2030, Decimal("0.8")),
+        (2031, Decimal("0.7")),
+        (2032, Decimal("0.6")),
+        (2033, Decimal("0.0")),
+    ])
+    def test_icms_iss_reduzidos_gradualmente_2029_2033(self, ano, fator):
+        # Modelagem v2: ICMS/ISS 100% até 2028; -10%/ano em 2029-2032;
+        # extintos em 2033. fix ERR-045 do CRCSP.
+        d = _doc_simples_basico(
+            receita=Decimal("100000"),
             icms=Decimal("18000"),
             iss=Decimal("5000"),
         )
-        r = projetar_delta_reforma(documento=d, ano_alvo=2026)
-        assert r.breakdown_projetado["pis_residual"] == Decimal("0")
-        assert r.breakdown_projetado["cofins_residual"] == Decimal("0")
-        assert r.breakdown_projetado["icms_residual"] == Decimal("0")
-        assert r.breakdown_projetado["iss_residual"] == Decimal("0")
+        r = projetar_delta_reforma(documento=d, ano_alvo=ano)
+        icms_esperado = (Decimal("18000") * fator).quantize(Decimal("0.01"))
+        iss_esperado = (Decimal("5000") * fator).quantize(Decimal("0.01"))
+        assert r.breakdown_projetado["icms_residual"] == icms_esperado
+        assert r.breakdown_projetado["iss_residual"] == iss_esperado
 
     def test_delta_absoluto_e_percentual_calculados(self):
         d = _doc_simples_basico(

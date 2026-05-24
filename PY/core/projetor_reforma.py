@@ -42,6 +42,45 @@ from pydantic import BaseModel, ConfigDict, Field
 from core.tabelas_simples import CRONOGRAMA_IVA
 
 # ─────────────────────────────────────────────────────────────────────────────
+# CRONOGRAMA DE EXTINÇÃO PIS/COFINS/ICMS/ISS (modelagem v2)
+#
+# Espelha o cronograma fiscal validado pelo CRCSP/Luiz Moreira em
+# tabelas_simples.py (fix ERR-045 — "ICMS/ISS reduzidas em 10% ao ano"):
+#
+#   - PIS/COFINS:
+#       2026         → 100% devidos (CBS 0,9% é teste compensável)
+#       2027-2033    → 0% (extintos — substituídos por CBS plena)
+#
+#   - ICMS/ISS:
+#       2026-2028    → 100% devidos (IBS 0,1% é teste)
+#       2029         → 90%  (reduzidos 10%)
+#       2030         → 80%  (reduzidos 20%)
+#       2031         → 70%  (reduzidos 30%)
+#       2032         → 60%  (reduzidos 40%)
+#       2033         → 0%   (extintos — IBS pleno)
+#
+# Amparo: LC 214/2025 Arts. 344, 347, 348 + EC 132/2023.
+#
+# IRPJ, CSLL, CPP e IPI NÃO entram aqui — não são tocados pela Reforma.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_FATOR_RESIDUAL_PIS_COFINS: dict[int, Decimal] = {
+    2026: Decimal("1.0"),
+    2027: Decimal("0.0"), 2028: Decimal("0.0"), 2029: Decimal("0.0"),
+    2030: Decimal("0.0"), 2031: Decimal("0.0"), 2032: Decimal("0.0"),
+    2033: Decimal("0.0"),
+}
+
+_FATOR_RESIDUAL_ICMS_ISS: dict[int, Decimal] = {
+    2026: Decimal("1.0"), 2027: Decimal("1.0"), 2028: Decimal("1.0"),
+    2029: Decimal("0.9"),
+    2030: Decimal("0.8"),
+    2031: Decimal("0.7"),
+    2032: Decimal("0.6"),
+    2033: Decimal("0.0"),
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # TIPOS
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -259,11 +298,12 @@ def projetar_delta_reforma(
     mantendo IRPJ/CSLL/CPP inalterados (não são afetados pela Reforma) e
     reduzindo PIS/COFINS/ICMS/ISS conforme o cronograma de extinção.
 
-    NOTA: nesta primeira iteração, modelagem é SIMPLIFICADA — assume que:
-      - PIS+COFINS são totalmente substituídos por CBS no ano alvo (Art. 344)
-      - ICMS+ISS são totalmente substituídos por IBS (transição gradual
-        deveria atenuar isso pra anos < 2033 — pendência etapa futura)
-      - IRPJ/CSLL/CPP/IPI permanecem
+    MODELAGEM v2 (09/05/2026): cronograma de extinção gradual conforme
+    LC 214/2025 Arts. 344, 347, 348 (validado por CRCSP/Luiz Moreira em
+    tabelas_simples.py — fix ERR-045):
+      - PIS/COFINS: 100% em 2026; 0% de 2027 em diante (extintos)
+      - ICMS/ISS: 100% em 2026-2028; 90/80/70/60% em 2029-2032; 0% em 2033
+      - IRPJ/CSLL/CPP/IPI: permanecem (não tocados pela Reforma)
       - Sem cálculo de crédito B2B nem Split Payment (etapas futuras)
 
     Args:
@@ -287,6 +327,9 @@ def projetar_delta_reforma(
     aliq_cbs = Decimal(str(aliquotas["CBS"]))
     aliq_ibs = Decimal(str(aliquotas["IBS"]))
 
+    fator_pis_cofins = _FATOR_RESIDUAL_PIS_COFINS[ano_alvo]
+    fator_icms_iss = _FATOR_RESIDUAL_ICMS_ISS[ano_alvo]
+
     # Carga atual = soma dos tributos pagos (já líquidos, extraídos do PDF)
     carga_atual = (
         documento.irpj_pago
@@ -299,11 +342,25 @@ def projetar_delta_reforma(
         + documento.cpp_pago
     ).quantize(Decimal("0.01"), ROUND_HALF_UP)
 
-    # Projeção CBS/IBS sobre receita bruta (modelagem v1 — sem créditos)
+    # Projeção CBS/IBS sobre receita bruta (sem créditos — etapa futura)
     cbs_projetado = (documento.receita_bruta_mensal * aliq_cbs).quantize(
         Decimal("0.01"), ROUND_HALF_UP,
     )
     ibs_projetado = (documento.receita_bruta_mensal * aliq_ibs).quantize(
+        Decimal("0.01"), ROUND_HALF_UP,
+    )
+
+    # Residuais PIS/COFINS/ICMS/ISS (modelagem v2 — cronograma legal)
+    pis_residual = (documento.pis_pago * fator_pis_cofins).quantize(
+        Decimal("0.01"), ROUND_HALF_UP,
+    )
+    cofins_residual = (documento.cofins_paga * fator_pis_cofins).quantize(
+        Decimal("0.01"), ROUND_HALF_UP,
+    )
+    icms_residual = (documento.icms_pago * fator_icms_iss).quantize(
+        Decimal("0.01"), ROUND_HALF_UP,
+    )
+    iss_residual = (documento.iss_pago * fator_icms_iss).quantize(
         Decimal("0.01"), ROUND_HALF_UP,
     )
 
@@ -315,11 +372,10 @@ def projetar_delta_reforma(
         "csll_inalterada": documento.csll_paga,
         "ipi_inalterado": documento.ipi_pago,
         "cpp_inalterada": documento.cpp_pago,
-        # PIS/COFINS/ICMS/ISS extintos no ano-alvo (modelagem v1 simplificada)
-        "pis_residual": Decimal("0"),
-        "cofins_residual": Decimal("0"),
-        "icms_residual": Decimal("0"),
-        "iss_residual": Decimal("0"),
+        "pis_residual": pis_residual,
+        "cofins_residual": cofins_residual,
+        "icms_residual": icms_residual,
+        "iss_residual": iss_residual,
     }
 
     carga_projetada = sum(breakdown.values())
