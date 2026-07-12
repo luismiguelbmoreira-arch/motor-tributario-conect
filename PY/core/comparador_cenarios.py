@@ -53,12 +53,12 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from core.orquestrador_societario import validar_combinacao
 from core.projetor_reforma import (
     AnoTransicao,
     DocumentoFiscalExtraido,
     projetar_delta_reforma,
 )
-from core.orquestrador_societario import validar_combinacao
 from core.sublimites_uf import sublimite_para_uf
 from core.tabelas_simples import (
     DISTRIBUICAO_DAS,

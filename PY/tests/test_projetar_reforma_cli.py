@@ -19,7 +19,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # Import lazy do CLI (depende de path setup acima)
 from scripts.projetar_reforma_cli import _build_parser, _fmt_brl, main  # noqa: E402
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # FIXTURES
 # ─────────────────────────────────────────────────────────────────────────────

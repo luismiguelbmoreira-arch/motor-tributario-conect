@@ -29,7 +29,6 @@ from core.projetor_reforma import (  # noqa: E402
 )
 from core.tabelas_simples import CRONOGRAMA_IVA  # noqa: E402
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # FIXTURES
 # ─────────────────────────────────────────────────────────────────────────────
