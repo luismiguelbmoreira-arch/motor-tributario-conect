@@ -19,7 +19,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # Import lazy do CLI (depende de path setup acima)
 from scripts.projetar_reforma_cli import _build_parser, _fmt_brl, main  # noqa: E402
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # FIXTURES
 # ─────────────────────────────────────────────────────────────────────────────
@@ -186,10 +185,13 @@ class TestOutputCompleto:
         assert "Aliquota IBS" in out
 
     def test_output_json_tem_breakdown(self, pdf_temp, capsys):
+        # Regime NORMAL (Presumido) → breakdown do caminho de extinção
+        # gradual. SIMPLES tem branch próprio (guard LC 214 Art. 41) com
+        # chaves das_* — coberto em test_projetor_reforma.TestGuardSimplesMei.
         main([
             "--pdf", str(pdf_temp),
             "--ano-alvo", "2027",
-            "--regime-atual", "SIMPLES",
+            "--regime-atual", "PRESUMIDO",
             "--mock",
             "--json",
         ])
@@ -199,6 +201,80 @@ class TestOutputCompleto:
         assert "cbs" in bk
         assert "ibs" in bk
         assert "irpj_inalterado" in bk
+
+    def test_output_json_simples_mantem_das(self, pdf_temp, capsys):
+        # Guard SIMPLES/MEI: DAS mantém total, sem CBS/IBS por fora.
+        main([
+            "--pdf", str(pdf_temp),
+            "--ano-alvo", "2027",
+            "--regime-atual", "SIMPLES",
+            "--mock",
+            "--json",
+        ])
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["carga_projetada"] == payload["carga_atual"]
+        assert "das_pis" in payload["breakdown_projetado"]
+
+    def test_comparar_output_humano(self, pdf_temp, capsys):
+        ret = main([
+            "--pdf", str(pdf_temp),
+            "--ano-alvo", "2027",
+            "--regime-atual", "SIMPLES",
+            "--mock",
+            "--comparar",
+        ])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "COMPARADOR DE CENARIOS" in out
+        assert "MANTER_SIMPLES" in out
+        assert "MIGRAR_PRESUMIDO" in out
+        assert "Alertas" in out
+
+    def test_comparar_output_json_estruturado(self, pdf_temp, capsys):
+        ret = main([
+            "--pdf", str(pdf_temp),
+            "--ano-alvo", "2027",
+            "--regime-atual", "SIMPLES",
+            "--mock",
+            "--comparar",
+            "--json",
+        ])
+        assert ret == 0
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["resultado"] in (
+            "VENCEDOR_DEFINIDO", "INCONCLUSIVO", "SEM_COMPARACAO",
+        )
+        ids = {c["id"] for c in payload["cenarios"]}
+        assert "MANTER_SIMPLES" in ids
+        assert "MIGRAR_REAL" in ids
+
+    def test_lucro_real_mensal_invalido_erro_amigavel(self, pdf_temp, capsys):
+        # Decimal inválido não pode virar traceback cru (achado BAIXO PMD)
+        with pytest.raises(SystemExit) as exc:
+            main([
+                "--pdf", str(pdf_temp),
+                "--ano-alvo", "2027",
+                "--regime-atual", "SIMPLES",
+                "--mock",
+                "--comparar",
+                "--lucro-real-mensal", "abc",
+            ])
+        assert exc.value.code == 2
+        assert "valor monetario invalido" in capsys.readouterr().err
+
+    def test_comparar_lucro_real_mensal_habilita_cenario_real(self, pdf_temp, capsys):
+        main([
+            "--pdf", str(pdf_temp),
+            "--ano-alvo", "2027",
+            "--regime-atual", "SIMPLES",
+            "--mock",
+            "--comparar",
+            "--json",
+            "--lucro-real-mensal", "20000.00",
+        ])
+        payload = json.loads(capsys.readouterr().out)
+        real = next(c for c in payload["cenarios"] if c["id"] == "MIGRAR_REAL")
+        assert real["status"] == "AVALIADO"
 
     def test_output_humano_mostra_base_legal(self, pdf_temp, capsys):
         main([

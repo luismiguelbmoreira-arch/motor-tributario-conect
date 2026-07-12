@@ -1792,6 +1792,29 @@ Sem texto literal IN RFB 2.005/2021 (sijut2 SPA falha + sped.rfb ECONNREFUSED + 
 
 ---
 
+### ERR-059 — `OtimizadorTributario` duplicado, desconectado e com float em dinheiro
+**Data:** 12/07/2026
+**Severidade:** 🟡 Atenção (débito técnico com prazo)
+**Arquivo:** `PY/core/planejamento_tributario.py:32-184`
+**Descoberto em:** Gate PMD do comparador de cenários (achado MEDIO)
+**Amparo legal violado:** Convenção "nunca float em dinheiro" (CLAUDE.md) + R9
+
+**Descrição:**
+`OtimizadorTributario.comparar_regimes()` nunca foi conectado (zero callers,
+zero testes) e responde a mesma pergunta do novo `core/comparador_cenarios.py`
+com metodologia inferior: soma cargas de perímetros diferentes (DAS total do
+Simples × só federais do Presumido/Real), sem guarda anti-falso-vencedor, e
+usa `float` em dinheiro (linhas 110-113). Manter os dois é convite pra alguém
+usar o errado.
+
+**Solução aplicada (parcial):**
+- Docstring DEPRECATED no topo do módulo apontando pro comparador novo.
+
+**Status:** 🟡 Aberto. Prazo: remover ou converter em wrapper de
+`comparar_cenarios` até o fechamento do WS3 (PDF refundido dual).
+
+---
+
 ## HISTÓRICO DE AUDITORIAS REAIS
 
 | Data | Empresa | CNPJ | Período | DAS e-CAC | DAS Motor | Delta | Status |

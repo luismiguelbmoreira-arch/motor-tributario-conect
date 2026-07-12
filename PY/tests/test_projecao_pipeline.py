@@ -155,6 +155,74 @@ class TestRastreabilidade:
 # EXTRATOR REAL — default deve ser o real (não testamos chamada à API)
 # ─────────────────────────────────────────────────────────────────────────────
 
+class TestComparativoPipeline:
+    """gerar_comparativo_pipeline: guia extraída → melhor cenário."""
+
+    def test_retorna_comparativo(self):
+        from core.comparador_cenarios import ComparativoCenarios
+        from services.projecao_pipeline import gerar_comparativo_pipeline
+
+        r = gerar_comparativo_pipeline(
+            [b"x"],
+            ano_alvo=2027,
+            regime_atual="SIMPLES",
+            extrator=_extrator_mock_simples,
+        )
+        assert isinstance(r, ComparativoCenarios)
+        assert r.cnpj == "12345678000195"
+        assert r.regime_atual == "SIMPLES"
+
+    def test_perfil_montado_do_proprio_extrator(self):
+        # CNAE/UF/RBT12 vêm do payload do extrator — cenário MIGRAR_PRESUMIDO
+        # é avaliado sem nenhum input manual.
+        from services.projecao_pipeline import gerar_comparativo_pipeline
+
+        r = gerar_comparativo_pipeline(
+            [b"x"],
+            ano_alvo=2027,
+            regime_atual="SIMPLES",
+            extrator=_extrator_mock_simples,
+        )
+        presumido = next(c for c in r.cenarios if c.id == "MIGRAR_PRESUMIDO")
+        assert presumido.status == "AVALIADO"
+
+    def test_override_habilita_cenario_real(self):
+        from services.projecao_pipeline import gerar_comparativo_pipeline
+
+        r = gerar_comparativo_pipeline(
+            [b"x"],
+            ano_alvo=2027,
+            regime_atual="SIMPLES",
+            extrator=_extrator_mock_simples,
+            perfil_overrides={"lucro_real_mensal": Decimal("20000.00")},
+        )
+        real = next(c for c in r.cenarios if c.id == "MIGRAR_REAL")
+        assert real.status == "AVALIADO"
+
+    def test_sem_override_cenario_real_nao_avaliado(self):
+        from services.projecao_pipeline import gerar_comparativo_pipeline
+
+        r = gerar_comparativo_pipeline(
+            [b"x"],
+            ano_alvo=2027,
+            regime_atual="SIMPLES",
+            extrator=_extrator_mock_simples,
+        )
+        real = next(c for c in r.cenarios if c.id == "MIGRAR_REAL")
+        assert real.status == "NAO_AVALIADO"
+
+    def test_pdfs_vazio_levanta(self):
+        from services.projecao_pipeline import gerar_comparativo_pipeline
+
+        with pytest.raises(ValueError, match="vazio"):
+            gerar_comparativo_pipeline(
+                [],
+                ano_alvo=2027,
+                regime_atual="SIMPLES",
+                extrator=_extrator_mock_simples,
+            )
+
+
 class TestExtratorReal:
     def test_default_extrator_eh_o_real_quando_none(self):
         # Se chamarmos sem injetar extrator, o pipeline tenta importar o real.
