@@ -46,11 +46,15 @@ def _doc_simples_basico(
     iss: Decimal = Decimal("0"),
     cpp: Decimal = Decimal("0"),
     competencia: date = date(2026, 6, 1),
+    regime: str = "PRESUMIDO",
 ) -> DocumentoFiscalExtraido:
+    # Default PRESUMIDO: os testes de extinção gradual modelam regime
+    # NORMAL (fora do Simples). SIMPLES/MEI têm branch próprio no projetor
+    # (LC 214/2025 Art. 41 §§ 1º-2º) — testado em TestGuardSimplesMei.
     return DocumentoFiscalExtraido(
         cnpj=cnpj,
         competencia=competencia,
-        regime_atual="SIMPLES",
+        regime_atual=regime,  # type: ignore[arg-type]
         receita_bruta_mensal=receita,
         irpj_pago=irpj,
         csll_paga=csll,
@@ -120,8 +124,8 @@ class TestCronogramaIVA:
 # ─────────────────────────────────────────────────────────────────────────────
 
 class TestProjecaoDelta:
-    def test_simples_puro_so_pis_cofins_substituidos_por_cbs_ibs(self):
-        # Empresa Simples paga PIS R$ 1.650 + COFINS R$ 7.600 (sobre R$ 100k)
+    def test_regime_normal_pis_cofins_substituidos_por_cbs_ibs(self):
+        # Empresa em regime normal paga PIS R$ 1.650 + COFINS R$ 7.600 (s/ R$ 100k)
         # No ano-alvo, esses tributos viram CBS+IBS sobre a receita.
         d = _doc_simples_basico(
             receita=Decimal("100000.00"),
@@ -215,6 +219,84 @@ class TestProjecaoDelta:
         r = projetar_delta_reforma(documento=d, ano_alvo=2026)
         assert r.carga_atual == Decimal("0")
         assert r.delta_percentual == Decimal("0")  # não explode
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GUARD SIMPLES/MEI — LC 214/2025 Art. 41 §§ 1º-2º + Art. 519
+# Dentro do Simples, PIS/COFINS/ICMS/ISS não se extinguem: migram pra CBS/IBS
+# NA PARTILHA do DAS, mantendo o total. Parecer Luiz Moreira 12/07/2026.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestGuardSimplesMei:
+    def _doc_das(self, regime: str = "SIMPLES") -> DocumentoFiscalExtraido:
+        # DAS de R$ 9.250 com partilha típica (Anexo I, valores ilustrativos
+        # extraídos de guia — não calculados)
+        return _doc_simples_basico(
+            regime=regime,
+            receita=Decimal("100000.00"),
+            irpj=Decimal("508.75"),
+            csll=Decimal("323.75"),
+            cofins=Decimal("1178.45"),
+            pis=Decimal("255.30"),
+            cpp=Decimal("3838.75"),
+            icms=Decimal("3145.00"),
+        )
+
+    @pytest.mark.parametrize("ano", [2026, 2027, 2029, 2033])
+    def test_simples_das_mantem_total_em_todos_os_anos(self, ano):
+        r = projetar_delta_reforma(documento=self._doc_das(), ano_alvo=ano)
+        assert r.carga_projetada == r.carga_atual == Decimal("9250.00")
+        assert r.delta_absoluto == Decimal("0.00")
+
+    def test_simples_nao_soma_cbs_ibs_por_fora(self):
+        # A distorção que o guard previne: CBS/IBS sobre a receita POR FORA
+        # do DAS (receita 100k × 8,9% = 8.900 em 2027) somada à carga.
+        r = projetar_delta_reforma(documento=self._doc_das(), ano_alvo=2027)
+        assert "cbs" not in r.breakdown_projetado
+        assert "ibs" not in r.breakdown_projetado
+        assert r.carga_projetada < Decimal("10000")
+
+    def test_simples_nao_extingue_parcelas_do_das_em_2027(self):
+        # Parcelas PIS/COFINS do DAS NÃO zeram em 2027 (migram pra CBS na
+        # partilha, total mantido) — antes do guard, zeravam.
+        r = projetar_delta_reforma(documento=self._doc_das(), ano_alvo=2027)
+        assert r.breakdown_projetado["das_pis"] == Decimal("255.30")
+        assert r.breakdown_projetado["das_cofins"] == Decimal("1178.45")
+        assert r.breakdown_projetado["das_icms"] == Decimal("3145.00")
+
+    def test_mei_recebe_mesmo_tratamento(self):
+        r = projetar_delta_reforma(documento=self._doc_das(regime="MEI"), ano_alvo=2030)
+        assert r.carga_projetada == r.carga_atual
+        assert r.delta_absoluto == Decimal("0.00")
+
+    def test_aviso_de_aproximacao_presente_e_nao_vazio(self):
+        r = projetar_delta_reforma(documento=self._doc_das(), ano_alvo=2027)
+        assert any("APROXIMACAO_ANEXOS_LC214" in a for a in r.avisos)
+
+    def test_sem_aviso_de_aproximacao_em_2026(self):
+        # Em 2026 as tabelas vigentes SÃO as oficiais da LC 123 — não há
+        # aproximação a avisar (achado MEDIO do PMD, 12/07/2026).
+        r = projetar_delta_reforma(documento=self._doc_das(), ano_alvo=2026)
+        assert r.avisos == ()
+
+    def test_base_legal_cita_art_41_e_519(self):
+        r = projetar_delta_reforma(documento=self._doc_das(), ano_alvo=2027)
+        amparos = " | ".join(r.base_legal)
+        assert "Art. 41" in amparos
+        assert "Art. 519" in amparos
+
+    def test_regime_normal_nao_passa_pelo_guard(self):
+        # Regressão: PRESUMIDO continua no caminho de extinção gradual.
+        d = _doc_simples_basico(
+            regime="PRESUMIDO",
+            receita=Decimal("100000"),
+            pis=Decimal("1650"),
+            cofins=Decimal("7600"),
+        )
+        r = projetar_delta_reforma(documento=d, ano_alvo=2027)
+        assert r.breakdown_projetado["pis_residual"] == Decimal("0.00")
+        assert "cbs" in r.breakdown_projetado
+        assert r.avisos == ()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -3,6 +3,15 @@
 planejamento_tributario.py — Cérebro Preditivo (Otimizador de Regimes)
 Projeto: Motor Tributário Conect 2026-2033
 
+⚠️ DEPRECATED (ERR-059, 12/07/2026) — NÃO USE EM CÓDIGO NOVO.
+Substituído por `core/comparador_cenarios.py::comparar_cenarios`, que:
+  - compara no PERÍMETRO COMPARÁVEL (federal + CBS/IBS) dos dois lados,
+    em vez de somar cargas de perímetros diferentes (DAS total × federais);
+  - tem guarda anti-falso-vencedor (INCONCLUSIVO) e trilha com amparo legal;
+  - não usa float em dinheiro (este módulo usa — viola convenção do repo).
+Este arquivo nunca foi conectado a endpoint/teste. Prazo de remoção ou
+conversão em wrapper: WS3 (PDF refundido). Ver docs/roadmap/LOG_ERROS.md.
+
 DESCRIÇÃO:
 Em vez de auditar cálculos retroativos, recebe a base documental de uma empresa
 (dados de Receita extraídos do PGDAS-D e eventuais dados de DRE/Balancetes)

@@ -279,6 +279,10 @@ class DeltaReformaTributaria(BaseModel):
             "EC 132/2023 (Reforma Tributária)",
         )
     )
+    avisos: tuple[str, ...] = Field(
+        default=(),
+        description="Avisos não supressíveis (aproximações e limitações da projeção).",
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -326,6 +330,21 @@ def projetar_delta_reforma(
     aliquotas = CRONOGRAMA_IVA[ano_alvo]
     aliq_cbs = Decimal(str(aliquotas["CBS"]))
     aliq_ibs = Decimal(str(aliquotas["IBS"]))
+
+    # ── Guard de regime (espírito Rail R5) ──────────────────────────────────
+    # SIMPLES/MEI NÃO passam pelos fatores de extinção: dentro do Simples,
+    # PIS/COFINS/ICMS/ISS não se extinguem — MIGRAM pra CBS/IBS NA PARTILHA
+    # do DAS, mantendo o recolhimento unificado (LC 214/2025, Art. 41,
+    # §§ 1º e 2º + Art. 519, que dá aos Anexos I-V da LC 123 a redação dos
+    # Anexos XVIII-XXII). Aplicar extinção aqui zeraria parcelas do DAS em
+    # 2027+ e somaria CBS/IBS "por fora" — dupla distorção.
+    if documento.regime_atual in ("SIMPLES", "MEI"):
+        return _projetar_simples_mei(
+            documento=documento,
+            ano_alvo=ano_alvo,
+            aliq_cbs=aliq_cbs,
+            aliq_ibs=aliq_ibs,
+        )
 
     fator_pis_cofins = _FATOR_RESIDUAL_PIS_COFINS[ano_alvo]
     fator_icms_iss = _FATOR_RESIDUAL_ICMS_ISS[ano_alvo]
@@ -403,4 +422,78 @@ def projetar_delta_reforma(
         breakdown_projetado=breakdown,
         aliquota_cbs=aliq_cbs,
         aliquota_ibs=aliq_ibs,
+    )
+
+
+AVISO_SIMPLES_APROXIMACAO = (
+    "APROXIMACAO_ANEXOS_LC214: total do DAS mantido constante no ano-alvo. "
+    "As tabelas dos Anexos XVIII-XXII da LC 214/2025 (Art. 519, vigências "
+    "2027-2033, com CBS/IBS na partilha) ainda não estão versionadas no "
+    "motor — as alíquotas nominais publicadas variam pontualmente por "
+    "vigência (ex.: Anexo I faixa 6: 19,00% → 18,90% em 2027-2028)."
+)
+
+
+def _projetar_simples_mei(
+    *,
+    documento: DocumentoFiscalExtraido,
+    ano_alvo: AnoTransicao,
+    aliq_cbs: Decimal,
+    aliq_ibs: Decimal,
+) -> DeltaReformaTributaria:
+    """
+    Projeção pra optantes do Simples Nacional / MEI.
+
+    O optante permanece sujeito ao regime unificado (LC 214/2025, Art. 41,
+    §§ 1º e 2º): CBS/IBS entram DENTRO da partilha do DAS (Anexos XVIII-XXII,
+    Art. 519) substituindo PIS/COFINS/ICMS/ISS sem alterar materialmente o
+    total recolhido. Modelagem interina validada (parecer Luiz Moreira
+    12/07/2026): carga projetada = carga atual, com aviso de aproximação
+    não supressível até o versionamento das tabelas 2027+.
+    """
+    carga_atual = (
+        documento.irpj_pago
+        + documento.csll_paga
+        + documento.pis_pago
+        + documento.cofins_paga
+        + documento.icms_pago
+        + documento.iss_pago
+        + documento.ipi_pago
+        + documento.cpp_pago
+    ).quantize(Decimal("0.01"), ROUND_HALF_UP)
+
+    # Parcelas do DAS mantidas — em 2027+ PIS/COFINS/ICMS/ISS migram pra
+    # CBS/IBS na partilha, com total preservado (aproximação interina).
+    breakdown = {
+        "das_irpj": documento.irpj_pago,
+        "das_csll": documento.csll_paga,
+        "das_pis": documento.pis_pago,
+        "das_cofins": documento.cofins_paga,
+        "das_icms": documento.icms_pago,
+        "das_iss": documento.iss_pago,
+        "das_ipi": documento.ipi_pago,
+        "das_cpp": documento.cpp_pago,
+    }
+
+    return DeltaReformaTributaria(
+        competencia=documento.competencia,
+        ano_alvo=ano_alvo,
+        cnpj=documento.cnpj,
+        carga_atual=carga_atual,
+        carga_projetada=carga_atual,
+        delta_absoluto=Decimal("0.00"),
+        delta_percentual=Decimal("0"),
+        breakdown_projetado=breakdown,
+        aliquota_cbs=aliq_cbs,
+        aliquota_ibs=aliq_ibs,
+        base_legal=(
+            "LC 214/2025 Art. 41, §§ 1º e 2º (optante permanece no regime unificado)",
+            "LC 214/2025 Art. 519 (Anexos XVIII-XXII — CBS/IBS na partilha do DAS)",
+            "LC 123/2006 Art. 13 (recolhimento unificado)",
+            "EC 132/2023 (Reforma Tributária)",
+        ),
+        # Em 2026 as tabelas vigentes SÃO as oficiais da LC 123 — não há
+        # aproximação; o aviso só vale quando os Anexos XVIII-XXII (2027+)
+        # passam a reger a partilha.
+        avisos=(AVISO_SIMPLES_APROXIMACAO,) if ano_alvo >= 2027 else (),
     )

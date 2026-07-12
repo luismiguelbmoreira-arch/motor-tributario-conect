@@ -24,6 +24,10 @@ OPÇÕES:
     --regime-atual R  SIMPLES | PRESUMIDO | REAL | MEI | IMUNE
     --mock            Usa extrator fake determinístico (sem Claude Vision)
     --json            Saída em JSON (default: humano)
+    --comparar        Roda o COMPARADOR DE CENÁRIOS (melhor regime no
+                      ano-alvo) em vez da projeção simples
+    --lucro-real-mensal R$   DRE mensal — habilita o cenário Lucro Real
+    --tipo-societario T      Forma jurídica RFB (LTDA, SA, EI, ...)
 
 EXIT CODE:
     0  = projeção bem-sucedida
@@ -40,6 +44,14 @@ from pathlib import Path
 from typing import Sequence
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+
+def _decimal_arg(s: str) -> Decimal:
+    """Converte argumento monetário; erro amigável em vez de traceback."""
+    try:
+        return Decimal(s)
+    except Exception:
+        raise argparse.ArgumentTypeError(f"valor monetario invalido: {s!r}")
 
 
 def _fmt_brl(v: Decimal) -> str:
@@ -171,7 +183,104 @@ def _build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true",
         help="Saida em JSON (default: humano)",
     )
+    p.add_argument(
+        "--comparar", action="store_true",
+        help="Roda o comparador de cenarios (melhor regime no ano-alvo)",
+    )
+    p.add_argument(
+        "--lucro-real-mensal", type=_decimal_arg, default=None,
+        help="Lucro real MENSAL comprovado por DRE (habilita cenario REAL)",
+    )
+    p.add_argument(
+        "--tipo-societario", default=None,
+        help="Forma juridica RFB (LTDA, SA, EI, SLU, SS, COOPERATIVA...)",
+    )
     return p
+
+
+def _imprimir_comparativo_humano(comp) -> None:
+    """Output do comparador em PT-BR pro terminal."""
+    print("=" * 70)
+    print("COMPARADOR DE CENARIOS FISCAIS — CLI")
+    print("=" * 70)
+    print(f"\nCNPJ:          {comp.cnpj}")
+    print(f"Competencia:   {comp.competencia.isoformat()}")
+    print(f"Ano-alvo:      {comp.ano_alvo}")
+    print(f"Regime atual:  {comp.regime_atual}")
+    print(f"\nRESULTADO:     {comp.resultado}")
+    if comp.melhor_cenario_id:
+        print(f"Melhor cenario: {comp.melhor_cenario_id}")
+    if comp.economia_mensal_vs_manter is not None:
+        print(f"Economia vs manter: {_fmt_brl(comp.economia_mensal_vs_manter)}/mes "
+              f"({_fmt_brl(comp.economia_anual_vs_manter)}/ano)")
+
+    print("\n— Cenarios (perimetro comparavel: federal + CBS/IBS) —")
+    for c in comp.cenarios:
+        perim = (
+            _fmt_brl(c.perimetro_comparavel_mensal)
+            if c.perimetro_comparavel_mensal is not None else "—"
+        )
+        print(f"  {c.id:20s} {c.status:12s} {perim:>18s}  [{c.origem_carga}]")
+        if c.motivo:
+            print(f"    motivo: {c.motivo}")
+        for trib, valor in c.fora_do_perimetro.items():
+            print(f"    fora do ranking: {trib} = {valor}")
+
+    print("\n— Alertas (nao supressiveis) —")
+    for a in comp.alertas:
+        print(f"  [{a['id']}] {a['titulo']}")
+        print(f"    {a['detalhe']}")
+        print(f"    Amparo: {a['amparo_legal']}")
+
+    print("\n— Base legal —")
+    for amparo in comp.base_legal:
+        print(f"  - {amparo}")
+    print("=" * 70)
+
+
+def _imprimir_comparativo_json(comp) -> None:
+    payload = {
+        "cnpj": comp.cnpj,
+        "competencia": comp.competencia.isoformat(),
+        "ano_alvo": comp.ano_alvo,
+        "regime_atual": comp.regime_atual,
+        "resultado": comp.resultado,
+        "melhor_cenario_id": comp.melhor_cenario_id,
+        "economia_mensal_vs_manter": (
+            str(comp.economia_mensal_vs_manter)
+            if comp.economia_mensal_vs_manter is not None else None
+        ),
+        "economia_anual_vs_manter": (
+            str(comp.economia_anual_vs_manter)
+            if comp.economia_anual_vs_manter is not None else None
+        ),
+        "piso_nao_comparado_mensal": str(comp.piso_nao_comparado_mensal),
+        "cenarios": [
+            {
+                "id": c.id,
+                "regime": c.regime,
+                "status": c.status,
+                "origem_carga": c.origem_carga,
+                "motivo": c.motivo,
+                "perimetro_comparavel_mensal": (
+                    str(c.perimetro_comparavel_mensal)
+                    if c.perimetro_comparavel_mensal is not None else None
+                ),
+                "breakdown_perimetro": {
+                    k: str(v) for k, v in c.breakdown_perimetro.items()
+                },
+                "fora_do_perimetro": dict(c.fora_do_perimetro),
+                "anexo_simples": c.anexo_simples,
+                "fator_r": c.fator_r,
+                "avisos": list(c.avisos),
+                "base_legal": list(c.base_legal),
+            }
+            for c in comp.cenarios
+        ],
+        "alertas": [dict(a) for a in comp.alertas],
+        "base_legal": list(comp.base_legal),
+    }
+    print(json.dumps(payload, indent=2, ensure_ascii=False))
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -189,6 +298,31 @@ def main(argv: Sequence[str] | None = None) -> int:
     extrator = _extrator_mock if args.mock else None
 
     # 3. Roda pipeline (import lazy pra acelerar --help)
+    if args.comparar:
+        from services.projecao_pipeline import gerar_comparativo_pipeline
+
+        overrides = {}
+        if args.lucro_real_mensal is not None:
+            overrides["lucro_real_mensal"] = args.lucro_real_mensal
+        if args.tipo_societario is not None:
+            overrides["tipo_societario"] = args.tipo_societario
+        try:
+            comp = gerar_comparativo_pipeline(
+                pdfs_bytes,
+                ano_alvo=args.ano_alvo,
+                regime_atual=args.regime_atual,
+                extrator=extrator,
+                perfil_overrides=overrides or None,
+            )
+        except ValueError as e:
+            print(f"ERRO no pipeline: {e}", file=sys.stderr)
+            return 2
+        if args.json:
+            _imprimir_comparativo_json(comp)
+        else:
+            _imprimir_comparativo_humano(comp)
+        return 0
+
     from services.projecao_pipeline import gerar_projecao_pipeline
     try:
         delta = gerar_projecao_pipeline(
