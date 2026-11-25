@@ -1,0 +1,6 @@
+# Motor Tributário Conect — app desktop Windows (.exe)
+# Só para gerar/rodar o .exe. Servidor, Docker e CI usam requirements.txt.
+# Instalar: python -m pip install -r requirements.txt -r requirements-desktop.txt
+
+pywebview>=5.0          # janela nativa (WebView2 no Windows)
+pyinstaller>=6.0        # empacota em .exe

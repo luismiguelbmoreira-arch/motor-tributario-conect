@@ -67,3 +67,8 @@ docs/piloto_*.html
 UI/README.md
 PY/regimes/README.md
 PY/integrations/README.md
+
+# App desktop (.exe) — artefatos de build e dados locais
+PY/desktop/build/
+PY/desktop/dist/
+PY/desktop/.runtime/
