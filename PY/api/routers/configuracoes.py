@@ -185,6 +185,8 @@ def _exigir_modo_desktop() -> None:
     summary="Status da chave da Anthropic (nunca devolve a chave)",
 )
 def status_chave_anthropic() -> ChaveAnthropicStatus:
+    # Fora do desktop: 404 (não expõe origem nem final da chave do servidor)
+    _exigir_modo_desktop()
     return ChaveAnthropicStatus(**chave_anthropic.status_chave())
 
 

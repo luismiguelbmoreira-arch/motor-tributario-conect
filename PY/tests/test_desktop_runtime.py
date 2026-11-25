@@ -11,6 +11,7 @@ import os
 import socket
 import sys
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -146,19 +147,19 @@ class TestAmbienteDesktop:
 
 @pytest.fixture
 def desktop_isolado(monkeypatch, tmp_path):
-    """O launcher muda os.environ e o cwd; monkeypatch desfaz no fim do teste.
+    """O launcher muda os.environ e o cwd; tudo é desfeito no fim do teste.
 
     APPDATA vai para tmp: o teste nunca toca o %APPDATA% real.
+    patch.dict tira snapshot do ambiente inteiro e o restaura no fim: variáveis
+    que o launcher CRIA (ex.: MOTOR_CONECT_DESKTOP) somem. Sem isso a flag vazava
+    para os testes seguintes e o extrator passaria a ler o cofre real do Windows.
     """
-    monkeypatch.setenv("APPDATA", str(tmp_path))
-    for nome in ("DATABASE_URL", runtime.STORAGE_DIR_ENV, runtime.DESKTOP_FLAG_ENV, runtime.UI_DIR_ENV):
-        # setenv/delenv registram o valor original; o teardown restaura
-        if nome in os.environ:
-            monkeypatch.setenv(nome, os.environ[nome])
-        else:
-            monkeypatch.delenv(nome, raising=False)
-    monkeypatch.chdir(tmp_path)
-    return tmp_path
+    with mock.patch.dict(os.environ):
+        os.environ["APPDATA"] = str(tmp_path)
+        for nome in ("DATABASE_URL", runtime.STORAGE_DIR_ENV, runtime.DESKTOP_FLAG_ENV, runtime.UI_DIR_ENV):
+            os.environ.pop(nome, None)
+        monkeypatch.chdir(tmp_path)
+        yield tmp_path
 
 
 class TestLauncherSmoke:

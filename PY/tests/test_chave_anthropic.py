@@ -170,10 +170,16 @@ class TestExtrator:
 
 
 class TestRotas:
-    def test_get_fora_do_desktop(self, cofre, client_autenticado):
+    def test_get_404_fora_do_desktop(self, cofre, client_autenticado, monkeypatch):
+        monkeypatch.setenv(ca.ENV_VAR, CHAVE_ENV)
+        r = client_autenticado.get("/settings/anthropic-key")
+        assert r.status_code == 404
+        assert "eNvV" not in r.text
+
+    def test_get_desktop_sem_chave(self, desktop, client_autenticado):
         r = client_autenticado.get("/settings/anthropic-key")
         assert r.status_code == 200
-        assert r.json() == {"configurada": False, "origem": None, "final": None, "editavel": False}
+        assert r.json() == {"configurada": False, "origem": None, "final": None, "editavel": True}
 
     def test_put_delete_404_fora_do_desktop(self, cofre, client_autenticado):
         assert client_autenticado.put("/settings/anthropic-key", json={"chave": CHAVE}).status_code == 404

@@ -76,7 +76,8 @@ Windows (`keyring`, serviço `MotorTributario`, usuário `ANTHROPIC_API_KEY`).
 | servidor / CI / testes | só a variável `ANTHROPIC_API_KEY` (o cofre nunca é lido) |
 
 - `GET /settings/anthropic-key` → `{configurada, origem, final (4 últimos), editavel}`; nunca a chave.
-- `PUT` (`{"chave": "sk-ant-..."}`) e `DELETE` só existem no modo desktop (404 fora dele).
+- `GET`, `PUT` (`{"chave": "sk-ant-..."}`) e `DELETE` só existem no modo desktop (404 fora dele).
+- Precedência no exe: chave do cofre vence a variável de ambiente (cadastrar na tela substitui a do ambiente).
 - A chave é lida na hora do uso; não vai para `os.environ`, log nem resposta.
 - O cofre é do **usuário do Windows**: quem usa a mesma conta do Windows usa a mesma chave,
   qualquer que seja o login no app.
