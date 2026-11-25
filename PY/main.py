@@ -81,6 +81,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from pydantic import ValidationError as PydanticValidationError  # noqa: E402
 from slowapi import _rate_limit_exceeded_handler  # noqa: E402
 from slowapi.errors import RateLimitExceeded  # noqa: E402
+from starlette.concurrency import run_in_threadpool  # noqa: E402
 
 # Adiciona PY/ ao path para imports relativos
 sys.path.insert(0, str(Path(__file__).parent))
@@ -1009,7 +1010,8 @@ async def gerar_relatorio_pdf(
         pii = None
 
     try:
-        pdf_bytes = _gerar_pdf(diagnostico, pii=pii)
+        # Geração é síncrona (até 60 s no Edge): numa thread, para não travar o servidor.
+        pdf_bytes = await run_in_threadpool(_gerar_pdf, diagnostico, pii=pii)
     except RuntimeError as exc:
         if "não instalado" in str(exc):
             raise HTTPException(

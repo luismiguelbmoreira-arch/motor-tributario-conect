@@ -21,6 +21,20 @@ from services import relatorio_pdf as rp  # noqa: E402
 PII_FICTICIA = {"razao_social": "Empresa Fictícia Ação Ltda", "cnpj": "11.222.333/0001-81"}
 
 
+@pytest.fixture(autouse=True)
+def temp_isolado(request, monkeypatch, tmp_path):
+    """Temp próprio do teste (a varredura de sobras não toca no %TEMP% real).
+
+    Nos testes com Popen falso, sem Job Object: o falso não tem handle de processo.
+    """
+    if request.node.name == "test_edge_real_gera_pdf":
+        return
+    temp = tmp_path / "temp"
+    temp.mkdir()
+    monkeypatch.setattr(rp.tempfile, "tempdir", str(temp))
+    monkeypatch.setattr(rp, "_criar_job", lambda: None)
+
+
 @pytest.fixture
 def sem_weasyprint(monkeypatch):
     monkeypatch.setattr(rp, "_tentar_importar_weasyprint", lambda: False)
@@ -156,6 +170,148 @@ class TestGerarPdfFallback:
         rp._apagar_pasta(pasta)
         assert len(avisos) == 1 and "não pôde ser apagada" in avisos[0]
         assert "motor-pdf-" not in avisos[0]
+
+
+class TestHtmlSeguroNoEdge:
+    """O Edge roda JS e lê file://: texto do diagnóstico não pode virar HTML."""
+
+    def test_formatadores_escapam_texto_que_nao_e_numero(self):
+        assert rp._fmt_moeda("<script>x</script>") == "&lt;script&gt;x&lt;/script&gt;"
+        assert rp._fmt_pct('<img src="a">') == "&lt;img src=&quot;a&quot;&gt;"
+        assert rp._fmt_moeda("1234.5") == "R$ 1.234,50"  # número segue igual
+
+    def test_campo_numerico_com_html_sai_escapado(self):
+        html = rp._gerar_html({"empresa": {"rbt12": "<script>alert(1)</script>"}}, pii=None)
+        assert "<script>alert(1)" not in html
+        assert "&lt;script&gt;alert(1)" in html
+
+    def test_html_do_edge_tem_csp_logo_apos_head(self, sem_weasyprint, monkeypatch):
+        registro = {}
+        monkeypatch.setattr(rp, "_achar_navegador_pdf", lambda: "msedge.exe")
+        monkeypatch.setattr(rp.subprocess, "Popen", _popen_falso(registro))
+        rp.gerar_pdf({}, pii=PII_FICTICIA)
+        html = registro["html_bytes"].decode("utf-8-sig")
+        assert html.count("Content-Security-Policy") == 1
+        assert "default-src 'none'; style-src 'unsafe-inline'" in html
+        assert html.index("<head>") < html.index("Content-Security-Policy") < html.index("<style")
+
+    def test_csp_sem_head_vai_no_comeco(self):
+        assert rp._com_csp("<p>x</p>").startswith(rp._CSP_EDGE)
+
+
+class TestSobrasDeAppMorto:
+    def _pasta(self, nome, idade_s):
+        pasta = Path(rp.tempfile.gettempdir()) / nome
+        pasta.mkdir()
+        (pasta / "relatorio.html").write_text("dado fictício", encoding="utf-8")
+        momento = rp.time.time() - idade_s
+        os.utime(pasta, (momento, momento))
+        return pasta
+
+    def test_apaga_so_pastas_motor_pdf_antigas(self):
+        antiga = self._pasta("motor-pdf-antiga", rp.IDADE_SOBRA_TEMP_S + 60)
+        recente = self._pasta("motor-pdf-recente", 5)  # pode ser geração em andamento
+        alheia = self._pasta("outro-app-antiga", rp.IDADE_SOBRA_TEMP_S + 60)
+        assert rp._varrer_sobras_temp() == 1
+        assert not antiga.exists()
+        assert recente.exists() and alheia.exists()
+
+    def test_gerar_pdf_varre_antes_de_criar_a_pasta(self, sem_weasyprint, monkeypatch):
+        antiga = self._pasta("motor-pdf-sobra", rp.IDADE_SOBRA_TEMP_S + 60)
+        registro = {}
+        monkeypatch.setattr(rp, "_achar_navegador_pdf", lambda: "msedge.exe")
+        monkeypatch.setattr(rp.subprocess, "Popen", _popen_falso(registro))
+        rp.gerar_pdf({})
+        assert not antiga.exists()
+
+
+def _cmd_falso():
+    """Comando mínimo para o Popen falso: HTML existente no temp do teste."""
+    temp = Path(rp.tempfile.gettempdir())
+    html = temp / "a.html"
+    html.write_text("<p>x</p>", encoding="utf-8")
+    return ["msedge.exe", f"--print-to-pdf={temp / 'a.pdf'}", html.as_uri()]
+
+
+class _JobFalso:
+    def __init__(self, entra=True, erro=False):
+        self.entra, self.erro = entra, erro
+        self.colocados, self.fechado = [], 0
+
+    def colocar_e_retomar(self, proc):
+        if self.erro:
+            raise OSError("falhou")
+        self.colocados.append(proc.pid)
+        return self.entra
+
+    def fechar(self):
+        self.fechado += 1
+
+
+class TestJobObject:
+    def _preparar(self, monkeypatch, job, **popen):
+        registro = {}
+        monkeypatch.setattr(rp, "_criar_job", lambda: job)
+        monkeypatch.setattr(rp.subprocess, "Popen", _popen_falso(registro, **popen))
+        monkeypatch.setattr(rp.subprocess, "run", lambda cmd, **kw: registro.setdefault("run", []).append(cmd))
+        return registro
+
+    def test_edge_nasce_suspenso_entra_no_job_e_job_fecha_no_fim(self, monkeypatch):
+        job = _JobFalso()
+        registro = self._preparar(monkeypatch, job)
+        rp._rodar_edge(_cmd_falso())
+        assert registro["kwargs"]["creationflags"] & rp._CREATE_SUSPENDED
+        assert job.colocados == [4321] and job.fechado == 1
+
+    def test_timeout_com_job_ainda_encerra_arvore_e_fecha_job(self, monkeypatch):
+        monkeypatch.setattr(rp.sys, "platform", "win32")
+        job = _JobFalso()
+        registro = self._preparar(monkeypatch, job, estoura=True)
+        with pytest.raises(subprocess.TimeoutExpired):
+            rp._rodar_edge(_cmd_falso())
+        assert registro["run"] == [["taskkill", "/PID", "4321", "/T", "/F"]]
+        assert job.fechado == 1
+
+    def test_sem_entrar_no_job_segue_sem_ele(self, monkeypatch):
+        job = _JobFalso(entra=False)
+        self._preparar(monkeypatch, job)
+        rp._rodar_edge(_cmd_falso())
+        assert job.fechado == 1  # fechado uma vez, na hora que não entrou
+
+    def test_erro_ao_retomar_mata_o_processo_suspenso(self, monkeypatch):
+        job = _JobFalso(erro=True)
+        registro = self._preparar(monkeypatch, job)
+        with pytest.raises(OSError):
+            rp._rodar_edge(_cmd_falso())
+        assert registro.get("kill") is True and job.fechado == 1
+
+    def test_sem_job_nao_cria_suspenso(self, monkeypatch):
+        registro = self._preparar(monkeypatch, None)
+        rp._rodar_edge(_cmd_falso())
+        assert not registro["kwargs"]["creationflags"] & rp._CREATE_SUSPENDED
+
+
+def test_endpoint_gera_pdf_fora_do_loop_de_eventos(monkeypatch):
+    """/relatorio/pdf não pode travar o servidor: a geração roda numa thread."""
+    import asyncio
+
+    import main
+
+    vistos = []
+
+    def gerar_falso(diagnostico, pii=None):
+        try:
+            asyncio.get_running_loop()
+            vistos.append("no loop")
+        except RuntimeError:
+            vistos.append("fora do loop")
+        return b"%PDF-1.7 falso"
+
+    monkeypatch.setattr(main, "_RELATORIO_DISPONIVEL", True)
+    monkeypatch.setattr(main, "_gerar_pdf", gerar_falso)
+    resp = asyncio.run(main.gerar_relatorio_pdf({"diagnostico": {}}, current_user={}))
+    assert resp.body == b"%PDF-1.7 falso"
+    assert vistos == ["fora do loop"]
 
 
 @pytest.mark.skipif(
