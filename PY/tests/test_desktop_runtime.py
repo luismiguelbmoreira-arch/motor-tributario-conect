@@ -145,6 +145,91 @@ class TestAmbienteDesktop:
         assert runtime.alembic_dir() == tmp_path / "alembic"
 
 
+class TestSegredosPorInstalacao:
+    def test_jwt_secret_persiste_entre_inicios(self, tmp_path):
+        s1 = runtime.garantir_jwt_secret(tmp_path)
+        s2 = runtime.garantir_jwt_secret(tmp_path)
+        assert s1 == s2
+        assert len(s1) == 64 and int(s1, 16) >= 0
+        assert (tmp_path / runtime.JWT_SECRET_FILENAME).read_text(encoding="ascii") == s1
+
+    def test_jwt_secret_diferente_por_instalacao(self, tmp_path):
+        a, b = tmp_path / "a", tmp_path / "b"
+        a.mkdir()
+        b.mkdir()
+        assert runtime.garantir_jwt_secret(a) != runtime.garantir_jwt_secret(b)
+
+    @pytest.mark.parametrize("conteudo", ["", "curto", "z" * 64, "\n"])
+    def test_jwt_secret_invalido_e_regerado(self, tmp_path, conteudo):
+        (tmp_path / runtime.JWT_SECRET_FILENAME).write_text(conteudo, encoding="ascii")
+        novo = runtime.garantir_jwt_secret(tmp_path)
+        assert len(novo) == 64 and novo != conteudo
+        assert runtime.garantir_jwt_secret(tmp_path) == novo
+
+    def test_jwt_secret_com_quebra_de_linha_e_aceito(self, tmp_path):
+        valor = "ab" * 32
+        (tmp_path / runtime.JWT_SECRET_FILENAME).write_text(valor + "\r\n", encoding="ascii")
+        assert runtime.garantir_jwt_secret(tmp_path) == valor
+
+    def test_prepare_environment_arquivo_vence_ambiente(self, tmp_path):
+        env = {runtime.JWT_SECRET_ENV: "segredo-do-env"}
+        runtime.prepare_environment(env, data_dir=tmp_path)
+        assert env[runtime.JWT_SECRET_ENV] != "segredo-do-env"
+        assert env[runtime.JWT_SECRET_ENV] == (tmp_path / runtime.JWT_SECRET_FILENAME).read_text(encoding="ascii")
+
+    def test_prepare_environment_sem_data_dir_nao_cria_secret(self):
+        env: dict[str, str] = {}
+        runtime.prepare_environment(env)
+        assert runtime.JWT_SECRET_ENV not in env
+
+    def test_desktop_environment_continua_puro(self, tmp_path):
+        runtime.desktop_environment(tmp_path)
+        assert not (tmp_path / runtime.JWT_SECRET_FILENAME).exists()
+
+
+def _banco_com_users(path: Path, n: int) -> None:
+    import sqlite3
+
+    con = sqlite3.connect(str(path))
+    con.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT)")
+    for i in range(n):
+        con.execute("INSERT INTO users (username) VALUES (?)", (f"u{i}",))
+    con.commit()
+    con.close()
+
+
+class TestAdminInicial:
+    def test_banco_inexistente_ou_sem_tabela_conta_como_vazio(self, tmp_path):
+        assert runtime.banco_sem_usuarios(tmp_path / "nao_existe.db") is True
+        import sqlite3
+
+        sem_tabela = tmp_path / "x.db"
+        sqlite3.connect(str(sem_tabela)).close()
+        assert runtime.banco_sem_usuarios(sem_tabela) is True
+
+    def test_banco_vazio_gera_senha_arquivo_e_env(self, tmp_path):
+        _banco_com_users(tmp_path / runtime.DB_FILENAME, 0)
+        env: dict[str, str] = {}
+        senha = runtime.preparar_admin_inicial(tmp_path, env)
+        assert senha and len(senha) >= 16
+        assert env[runtime.ADMIN_PASSWORD_ENV] == senha
+        texto = runtime.arquivo_senha_inicial(tmp_path).read_text(encoding="utf-8")
+        assert senha in texto and "admin" in texto
+
+    def test_senha_diferente_por_instalacao(self, tmp_path):
+        a, b = tmp_path / "a", tmp_path / "b"
+        a.mkdir()
+        b.mkdir()
+        assert runtime.preparar_admin_inicial(a, {}) != runtime.preparar_admin_inicial(b, {})
+
+    def test_banco_com_usuarios_nao_mexe_em_nada(self, tmp_path):
+        _banco_com_users(tmp_path / runtime.DB_FILENAME, 1)
+        env: dict[str, str] = {}
+        assert runtime.preparar_admin_inicial(tmp_path, env) is None
+        assert runtime.ADMIN_PASSWORD_ENV not in env
+        assert not runtime.arquivo_senha_inicial(tmp_path).exists()
+
+
 @pytest.fixture
 def desktop_isolado(monkeypatch, tmp_path):
     """O launcher muda os.environ e o cwd; tudo é desfeito no fim do teste.
@@ -170,7 +255,25 @@ class TestLauncherSmoke:
         assert '"ui_status": 200' in saida
         assert '"db_ok": true' in saida
         assert '"cofre_backend":' in saida  # dev/CI só reporta; no exe precisa ser WinVaultKeyring
-        assert (desktop_isolado / "MotorTributario" / runtime.DB_FILENAME).is_file()
+        dados = desktop_isolado / "MotorTributario"
+        assert (dados / runtime.DB_FILENAME).is_file()
+        # 1ª execução: secret e senha inicial criados; a senha nunca sai no relatório
+        assert (dados / runtime.JWT_SECRET_FILENAME).is_file()
+        assert '"admin_inicial": true' in saida
+        senha = runtime.arquivo_senha_inicial(dados).read_text(encoding="utf-8").split("Senha:")[1].split()[0]
+        assert senha not in saida
+        assert runtime.ADMIN_PASSWORD_ENV not in os.environ  # limpa depois da startup
+
+    def test_segundo_smoke_reaproveita_secret_e_nao_gera_senha(self, desktop_isolado, capsys, monkeypatch):
+        dados = desktop_isolado / "MotorTributario"
+        dados.mkdir()
+        _banco_com_users(dados / runtime.DB_FILENAME, 1)
+        secret = runtime.garantir_jwt_secret(dados)
+        assert launcher.main(["--smoke"]) == 0
+        saida = capsys.readouterr().out
+        assert '"admin_inicial": false' in saida
+        assert os.environ[runtime.JWT_SECRET_ENV] == secret
+        assert not runtime.arquivo_senha_inicial(dados).exists()
 
     def test_smoke_falha_quando_health_nao_responde(self, desktop_isolado, monkeypatch, capsys):
         monkeypatch.setattr(runtime, "wait_until_healthy", lambda *a, **k: False)

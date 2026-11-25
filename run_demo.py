@@ -7,9 +7,10 @@ Uso: python run_demo.py
 Sobe a API FastAPI + serve a UI em /ui/
 Abre o browser automaticamente em http://localhost:<porta>/ui/login.html
 
-Credenciais padrão:
+Credenciais:
   Usuário: admin
-  Senha:   Conect@2026!
+  Senha:   a de DEFAULT_ADMIN_PASSWORD (PY/.env, ver env.template).
+           Sem ela, a senha é gerada na 1ª execução e sai uma vez no log do servidor.
 """
 
 import argparse
@@ -94,7 +95,8 @@ def main():
     print(f"    {url_ui}")
     print(f"\n  Credenciais de acesso:")
     print(f"    Usuário: admin")
-    print(f"    Senha:   Conect@2026!")
+    print("    Senha:   a de DEFAULT_ADMIN_PASSWORD (PY/.env, ver env.template)")
+    print("             sem ela: gerada na 1ª execução, sai uma vez no log do servidor")
     print(f"\n  API docs: {url_base}/docs")
     print(f"\n  Pressione Ctrl+C para encerrar.")
     print("=" * 60)

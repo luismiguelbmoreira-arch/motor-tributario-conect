@@ -44,10 +44,27 @@ Log do exe: `%APPDATA%\MotorTributario\logs\launcher.log`.
 | Banco SQLite | `motor_tributario.db` |
 | PDFs cifrados da auditoria | `auditoria\` |
 | Log | `logs\launcher.log` |
+| Secret JWT desta instalação | `jwt_secret` |
+| Senha inicial do `admin` (só na 1ª execução) | `senha_inicial_admin.txt` |
 
-O launcher força `DATABASE_URL` e `MOTOR_CONECT_STORAGE_DIR` para essa pasta, define
-`MOTOR_CONECT_DESKTOP=1` (o `.env` não sobrescreve) e usa a pasta como diretório atual.
-Atualizar o exe não apaga esses dados.
+O launcher força `DATABASE_URL`, `MOTOR_CONECT_STORAGE_DIR` e `JWT_SECRET_KEY` para essa
+pasta, define `MOTOR_CONECT_DESKTOP=1` (o `.env` não sobrescreve) e usa a pasta como
+diretório atual. Atualizar o exe não apaga esses dados.
+
+### Segredos por instalação
+
+- **JWT**: `jwt_secret` (64 hex, `secrets.token_hex(32)`) é criado na 1ª execução e
+  reaproveitado depois; vence qualquer `JWT_SECRET_KEY` do ambiente. Apagar o arquivo só
+  derruba os logins abertos (tokens de 8 h).
+- **Admin inicial**: se o banco não tem usuário nenhum, o launcher gera uma senha aleatória
+  (`secrets.token_urlsafe(12)`), passa para `auth.criar_admin_default` via
+  `DEFAULT_ADMIN_PASSWORD` (tirada do ambiente depois da startup) e grava
+  `senha_inicial_admin.txt`. Ao abrir, uma caixa mostra usuário, senha e o caminho do
+  arquivo enquanto ele existir. A senha não vai para o log nem para o resultado do `--smoke`.
+- Os dois arquivos ficam em texto puro no perfil do usuário do Windows, com a mesma
+  proteção do `motor_tributario.db` (que também não é cifrado).
+- O `--smoke` do `build_exe.ps1` roda numa `APPDATA` temporária (apagada no fim): o build
+  não cria banco, secret nem admin no seu perfil.
 
 ### Banco a cada início (`PY/desktop/db_bootstrap.py`)
 
@@ -91,6 +108,7 @@ Windows (`keyring`, serviço `MotorTributario`, usuário `ANTHROPIC_API_KEY`).
 ## Limitações conhecidas (próximos PRs)
 
 - UI ainda carrega Inter (Google Fonts), lucide, chart.js e tailwind de CDN → sem internet a UI quebra.
-- `JWT_SECRET_KEY` e `MOTOR_CONECT_MASTER_KEY` ainda vêm de `.env`/ambiente.
+- `MOTOR_CONECT_MASTER_KEY` ainda vem de `.env`/ambiente (decisão aberta).
+- A UI não tem tela de troca de senha e ignora `must_change_password`: o admin fica com a senha inicial.
 - weasyprint sem GTK no bundle → `/relatorio/pdf` responde 503 no exe.
 - Sem assinatura de código: o SmartScreen avisa na primeira execução.

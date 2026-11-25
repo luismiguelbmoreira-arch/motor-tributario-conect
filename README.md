@@ -34,7 +34,8 @@ alembic upgrade head
 ```bash
 python run_demo.py
 # Acesse http://localhost:8000/ui/login.html
-# Credenciais: admin / Conect@2026!
+# Usuário: admin. Senha: a de DEFAULT_ADMIN_PASSWORD no PY/.env (ver env.template).
+# Sem ela, uma senha aleatória é gerada na 1ª execução e aparece uma vez no log.
 ```
 
 ### API direta
