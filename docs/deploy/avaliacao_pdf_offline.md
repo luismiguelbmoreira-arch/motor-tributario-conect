@@ -18,7 +18,8 @@ comprovante chegam como imagem e continuam precisando de Vision ou OCR.
 
 ```
 cd PY
-uv venv ..\..\eval_venv && uv pip install --python ..\..\eval_venv pdfplumber
+python -m venv ..\..\eval_venv
+..\..\eval_venv\Scripts\python.exe -m pip install pdfplumber
 ..\..\eval_venv\Scripts\python.exe scripts\avaliar_pdf_texto.py ..\samples\uploads_clientes
 ```
 
