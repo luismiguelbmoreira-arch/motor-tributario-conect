@@ -104,11 +104,32 @@ Windows (`keyring`, serviço `MotorTributario`, usuário `ANTHROPIC_API_KEY`).
 
 - Windows 10/11 com **Microsoft Edge WebView2 Runtime** (já vem no Windows 11).
   Sem ele o launcher mostra uma caixa de erro com o link de instalação (não cai no motor antigo MSHTML).
+- **Microsoft Edge** (navegador) para o PDF do relatório. Vem no Windows 10/11.
+
+## PDF do relatório
+
+`services/relatorio_pdf.gerar_pdf` tenta, em ordem:
+
+1. **weasyprint**: precisa de GTK/Pango, que o exe não leva;
+2. **Edge headless** (`msedge.exe --headless --print-to-pdf`): é o mesmo Chromium do WebView2,
+   e o HTML é o mesmo.
+
+- O caminho do Edge vem do registro (App Paths) ou das pastas padrão de Program Files/LocalAppData.
+- O runtime do WebView2 (`msedgewebview2.exe`) não serve para isso: rodado sozinho em headless,
+  sai com código 13. Por isso o PDF depende do Edge navegador.
+- O HTML, que tem dado do cliente, fica numa pasta temporária própria (`motor-pdf-*`) que é apagada
+  no fim. Ele roda com um perfil descartável e sem cabeçalho nem rodapé (nem data nem caminho do
+  arquivo). Timeout de 60 s.
+- No log entram só o tamanho do PDF e o tipo do erro.
+- Sem weasyprint e sem Edge, `/relatorio/pdf` responde 503.
+- O smoke do exe testa o motor de PDF e, na 1ª execução, também `POST /relatorio/pdf` com o
+  token do admin. Usa um diagnóstico vazio e não grava o PDF.
 
 ## Limitações conhecidas (próximos PRs)
 
 - UI ainda carrega Inter (Google Fonts), lucide, chart.js e tailwind de CDN → sem internet a UI quebra.
 - `MOTOR_CONECT_MASTER_KEY` ainda vem de `.env`/ambiente (decisão aberta).
 - A UI não tem tela de troca de senha e ignora `must_change_password`: o admin fica com a senha inicial.
-- weasyprint sem GTK no bundle → `/relatorio/pdf` responde 503 no exe.
+- O layout do PDF do Edge (quebras de página, métricas de fonte) não foi comparado visualmente
+  com o do weasyprint.
 - Sem assinatura de código: o SmartScreen avisa na primeira execução.

@@ -2,13 +2,22 @@
 relatorio_pdf.py — Geração de relatório PDF via weasyprint
 Motor Tributário Conect 2026-2033 · FASE 5
 Âncora Legal: LC 123/2006 | LC 214/2025 | EC 132/2023
+
+Motor de PDF, em ordem:
+1. weasyprint (precisa de GTK/Pango — padrão em Linux/servidor);
+2. no Windows, sem GTK: Microsoft Edge headless (`--print-to-pdf`), o mesmo
+   Chromium do WebView2. Sem dependência nova; o HTML é o mesmo.
 """
 from __future__ import annotations
 
 import logging
 import os
+import subprocess
+import sys
+import tempfile
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any
+from pathlib import Path
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -1066,23 +1075,122 @@ def gerar_pdf(diagnostico: dict, pii: dict | None = None) -> bytes:
         bytes do PDF gerado
 
     Raises:
-        RuntimeError: se weasyprint não estiver instalado ou falhar
+        RuntimeError: sem motor de PDF ("não instalado") ou falha na geração
     """
-    # Lazy import: só carrega weasyprint na primeira chamada
-    if not _tentar_importar_weasyprint() or _WeasyprintHTML is None:
-        raise RuntimeError(
-            "weasyprint não instalado ou GTK ausente. "
-            "Execute: pip install weasyprint>=61.0 (Windows: precisa GTK3 Runtime)"
-        )
-
     html_str = _gerar_html(diagnostico, pii=pii)
-    try:
-        pdf_bytes: bytes = _WeasyprintHTML(string=html_str).write_pdf()
-        logger.info(
-            "PDF gerado com sucesso — %d bytes",  # sem PII no log
-            len(pdf_bytes),
+
+    # Lazy import: só carrega weasyprint na primeira chamada
+    if _tentar_importar_weasyprint() and _WeasyprintHTML is not None:
+        try:
+            pdf_bytes: bytes = _WeasyprintHTML(string=html_str).write_pdf()
+            logger.info(
+                "PDF gerado com sucesso — %d bytes",  # sem PII no log
+                len(pdf_bytes),
+            )
+            return pdf_bytes
+        except Exception as exc:
+            logger.error("Erro ao gerar PDF via weasyprint: %s", exc)
+            raise RuntimeError(f"Falha na geração do PDF: {exc}") from exc
+
+    navegador = _achar_navegador_pdf()
+    if navegador is None:
+        raise RuntimeError(
+            "weasyprint não instalado (ou GTK ausente) e Microsoft Edge não encontrado. "
+            "Execute: pip install weasyprint>=61.0 (Windows: GTK3 Runtime ou Edge)"
         )
-        return pdf_bytes
-    except Exception as exc:
-        logger.error("Erro ao gerar PDF via weasyprint: %s", exc)
-        raise RuntimeError(f"Falha na geração do PDF: {exc}") from exc
+    try:
+        pdf_bytes = _pdf_via_navegador(html_str, navegador)
+    except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
+        # Só o tipo: a mensagem pode trazer o caminho do HTML temporário.
+        logger.error("Erro ao gerar PDF via Edge headless: %s", type(exc).__name__)
+        raise RuntimeError("Falha na geração do PDF via Edge headless.") from exc
+    logger.info("PDF gerado via Edge headless — %d bytes", len(pdf_bytes))  # sem PII
+    return pdf_bytes
+
+
+# ── Fallback Windows: Microsoft Edge headless ─────────────────────────────
+TIMEOUT_NAVEGADOR_S = 60
+_EDGE_RELATIVO = Path("Microsoft") / "Edge" / "Application" / "msedge.exe"
+
+
+def _edge_no_registro() -> Optional[str]:
+    """Caminho do msedge.exe registrado em App Paths (HKLM, depois HKCU)."""
+    try:
+        import winreg
+    except ImportError:
+        return None
+    chave = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe"
+    for raiz in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+        try:
+            with winreg.OpenKey(raiz, chave) as k:
+                valor, _ = winreg.QueryValueEx(k, "")
+        except OSError:
+            continue
+        if valor and Path(valor).is_file():
+            return str(valor)
+    return None
+
+
+def _achar_navegador_pdf() -> Optional[str]:
+    """msedge.exe instalado, ou None. Só no Windows.
+
+    O runtime do WebView2 (msedgewebview2.exe) não roda sozinho em modo
+    headless (testado: sai com código 13), por isso usa o Edge navegador.
+    """
+    if sys.platform != "win32":
+        return None
+    registrado = _edge_no_registro()
+    if registrado:
+        return registrado
+    for var in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"):
+        base = os.environ.get(var)
+        if base and (Path(base) / _EDGE_RELATIVO).is_file():
+            return str(Path(base) / _EDGE_RELATIVO)
+    return None
+
+
+def _comando_edge(navegador: str, html: Path, saida: Path, perfil: Path) -> list[str]:
+    return [
+        navegador,
+        "--headless",
+        "--disable-gpu",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-extensions",
+        "--disable-background-networking",
+        "--disable-component-update",
+        "--disable-crash-reporter",
+        "--disable-sync",
+        "--no-pdf-header-footer",  # sem data, título e caminho do arquivo no rodapé
+        f"--user-data-dir={perfil}",  # perfil descartável: não toca no Edge do usuário
+        f"--print-to-pdf={saida}",
+        html.as_uri(),
+    ]
+
+
+def _pdf_via_navegador(html_str: str, navegador: str) -> bytes:
+    """Imprime o HTML em PDF com o Edge headless numa pasta temporária apagada no fim.
+
+    O HTML tem dados do cliente: fica só em pasta temporária própria, nunca vai
+    para log. Timeout encerra só o processo que este código abriu.
+    """
+    with tempfile.TemporaryDirectory(prefix="motor-pdf-", ignore_cleanup_errors=True) as tmp:
+        pasta = Path(tmp)
+        html = pasta / "relatorio.html"
+        saida = pasta / "relatorio.pdf"
+        html.write_text(html_str, encoding="utf-8-sig")  # BOM: Chromium lê como UTF-8
+        subprocess.run(
+            _comando_edge(navegador, html, saida, pasta / "perfil"),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=TIMEOUT_NAVEGADOR_S,
+            check=False,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        if not saida.is_file():
+            raise RuntimeError("Edge não gerou o arquivo PDF")
+        dados = saida.read_bytes()
+    if not dados.startswith(b"%PDF"):
+        raise RuntimeError("Saída do Edge não é PDF")
+    return dados
