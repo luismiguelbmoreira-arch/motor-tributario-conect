@@ -67,3 +67,7 @@ docs/piloto_*.html
 UI/README.md
 PY/regimes/README.md
 PY/integrations/README.md
+
+# Build do .exe desktop (PyInstaller)
+PY/build/
+PY/dist/

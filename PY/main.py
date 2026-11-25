@@ -620,8 +620,10 @@ app.add_middleware(
 )
 
 # Servir UI como arquivos estáticos — montado APÓS todos os routes no final do módulo
-# Calculado aqui para suportar execução a partir de qualquer diretório
-_UI_DIR = Path(__file__).parent.parent / "UI"
+# Calculado aqui para suportar execução a partir de qualquer diretório.
+# MOTOR_CONECT_UI_DIR: definido pelo launcher desktop (PyInstaller) — UI dentro do bundle.
+# resolve(): sem ele, import via "tests/api/../../main.py" faz .parent.parent virar PY/tests (lexical).
+_UI_DIR = Path(os.environ.get("MOTOR_CONECT_UI_DIR") or (Path(__file__).resolve().parent.parent / "UI"))
 
 
 # ─────────────────────────────────────────────────────────────────────────────

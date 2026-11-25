@@ -1,0 +1,6 @@
+# Motor Tributário Conect — dependências SÓ do .exe Windows (não usadas no CI/web)
+# Instalar (Windows):  python -m pip install -r requirements.txt -r requirements-desktop.txt
+# Versões fixas de propósito: build reprodutível.
+
+pywebview==6.2.1        # janela nativa (WebView2 / Edge Chromium); puxa pythonnet, clr-loader, bottle, proxy_tools
+pyinstaller==6.22.3     # empacota em .exe (onedir); puxa pyinstaller-hooks-contrib, pefile, altgraph, pywin32-ctypes
