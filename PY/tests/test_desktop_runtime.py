@@ -168,6 +168,7 @@ class TestLauncherSmoke:
         assert '"smoke": "ok"' in saida
         assert '"ui_status": 200' in saida
         assert '"db_ok": true' in saida
+        assert '"cofre_backend":' in saida  # dev/CI só reporta; no exe precisa ser WinVaultKeyring
         assert (desktop_isolado / "MotorTributario" / runtime.DB_FILENAME).is_file()
 
     def test_smoke_falha_quando_health_nao_responde(self, desktop_isolado, monkeypatch, capsys):

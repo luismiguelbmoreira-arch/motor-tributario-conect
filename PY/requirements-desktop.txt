@@ -4,3 +4,4 @@
 
 pywebview==6.2.1        # janela nativa (WebView2 / Edge Chromium); puxa pythonnet, clr-loader, bottle, proxy_tools
 pyinstaller==6.22.3     # empacota em .exe (onedir); puxa pyinstaller-hooks-contrib, pefile, altgraph, pywin32-ctypes
+keyring==25.7.0         # chave da Anthropic no Gerenciador de Credenciais do Windows; puxa jaraco.classes, jaraco.context, jaraco.functools, more-itertools, pywin32-ctypes

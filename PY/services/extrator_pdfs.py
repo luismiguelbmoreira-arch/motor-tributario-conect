@@ -35,12 +35,18 @@ from typing import Any, Literal, Optional
 import anthropic
 from pydantic import BaseModel, Field, field_validator
 
+from services.chave_anthropic import obter_chave_anthropic
+
 # Carrega .env automaticamente (procura em PY/.env, raiz, e cwd)
 # override=True em dev/prod, mas NÃO em ENVIRONMENT=test (testes setam env antes do import)
 try:
     from dotenv import load_dotenv
     _here = Path(__file__).resolve().parent
-    _override = os.environ.get("ENVIRONMENT", "").lower() != "test"
+    # desktop (.exe): o launcher já definiu o ambiente; .env não sobrescreve (igual main.py)
+    _override = (
+        os.environ.get("ENVIRONMENT", "").lower() != "test"
+        and os.environ.get("MOTOR_CONECT_DESKTOP") != "1"
+    )
     for _candidato in (_here / ".env", _here.parent / ".env", Path.cwd() / ".env"):
         if _candidato.exists():
             load_dotenv(_candidato, override=_override)
@@ -314,11 +320,12 @@ def extrair_dados_pdfs(caminhos_pdf: list[str | Path]) -> DadosExtraidosPDF:
         ])
         print(dados.das_ecac_referencia)  # "16428.83"
     """
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    api_key = obter_chave_anthropic()
     if not api_key:
         raise ValueError(
             "ANTHROPIC_API_KEY nao configurada. "
-            "Defina a variavel de ambiente antes de usar o extrator. "
+            "Defina a variavel de ambiente antes de usar o extrator "
+            "(no app desktop: tela Configuracoes). "
             "Exemplo: set ANTHROPIC_API_KEY=sk-ant-..."
         )
 
@@ -620,11 +627,12 @@ def processar_pdfs_bytes(
         raise ValueError(
             f"arquivos_nomes ({len(arquivos_nomes)}) precisa ter o mesmo tamanho de conteudos ({len(conteudos)})"
         )
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    api_key = obter_chave_anthropic()
     if not api_key:
         raise ValueError(
             "ANTHROPIC_API_KEY nao configurada. "
-            "Defina a variavel de ambiente antes de usar o extrator."
+            "Defina a variavel de ambiente antes de usar o extrator "
+            "(no app desktop: tela Configuracoes)."
         )
 
     if not conteudos:

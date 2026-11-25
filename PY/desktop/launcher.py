@@ -13,8 +13,8 @@ Fluxo:
 
 Modo de verificação sem janela:
   MotorTributario.exe --smoke
-  → sobe o servidor, checa /health, /ui/login.html e o banco em %APPDATA%,
-    grava o resultado no log
+  → sobe o servidor, checa /health, /ui/login.html, o banco em %APPDATA% e
+    (no exe) o backend do cofre do Windows; grava o resultado no log
     e sai com código 0 (ok) ou 1 (falha).
 
 Dev (sem empacotar), a partir de PY/:
@@ -107,7 +107,16 @@ def run_smoke() -> int:
             and db_info["revisao"] == db_info["head"]
         )
         result["db_ok"] = db_ok
+        # Cofre da chave da Anthropic: só o nome do backend, nenhuma credencial é lida.
+        # No exe exige o cofre do Windows; em dev/CI só reporta.
+        from services.chave_anthropic import nome_backend
+
+        backend = nome_backend()
+        cofre_ok = backend == "WinVaultKeyring"
+        result.update(cofre_backend=backend, cofre_ok=cofre_ok)
         ok = status_health == 200 and status_ui == 200 and len(corpo_ui) > 0 and db_ok
+        if runtime.is_frozen():
+            ok = ok and cofre_ok
         result["smoke"] = "ok" if ok else "fail"
         return 0 if ok else 1
     except Exception as exc:  # noqa: BLE001 — smoke reporta qualquer falha

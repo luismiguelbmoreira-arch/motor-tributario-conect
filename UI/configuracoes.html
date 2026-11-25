@@ -45,6 +45,23 @@
           </div>
         </div>
       </div>
+
+      <!-- Chave da Anthropic: só aparece no app desktop (GET /settings/anthropic-key → editavel) -->
+      <div id="card-chave-anthropic" class="glass-card mt-8" style="max-width: 600px;" hidden>
+        <div class="flex-col gap-6">
+          <div class="flex-col gap-2">
+            <label class="input-label" for="chave-anthropic" style="font-weight: 600;">Chave da Anthropic</label>
+            <input id="chave-anthropic" class="input-field" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-..." title="Sua chave da API da Anthropic">
+            <p id="chave-anthropic-status" class="text-muted" style="font-size: 0.7rem;"></p>
+            <p class="text-muted" style="font-size: 0.7rem;">Fica guardada no Gerenciador de Credenciais do Windows deste usuário. Não sai deste computador e não é mostrada de novo.</p>
+          </div>
+
+          <div class="flex-row justify-end gap-2 mt-4">
+            <button id="btn-remover-chave" class="btn btn-ghost">Remover</button>
+            <button id="btn-salvar-chave" class="btn btn-primary">Salvar chave</button>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
   <script src="components.js"></script>
@@ -131,6 +148,63 @@
         }
       }
 
+      // ─── Chave da Anthropic (app desktop) ────────────────────────────
+      // A chave digitada só vai no corpo do PUT; nunca é lida de volta.
+      function mostrarStatusChave(st) {
+        const card = document.getElementById('card-chave-anthropic');
+        const txt = document.getElementById('chave-anthropic-status');
+        if (!card || !txt) return;
+        card.hidden = !st.editavel;
+        if (!st.configurada) {
+          txt.textContent = 'Nenhuma chave cadastrada: o upload de PDFs fica desativado.';
+        } else if (st.origem === 'cofre_windows') {
+          txt.textContent = 'Chave cadastrada (termina em ' + (st.final || '????') + ').';
+        } else {
+          txt.textContent = 'Usando a variável de ambiente ANTHROPIC_API_KEY. Cadastre uma chave aqui para substituí-la.';
+        }
+      }
+
+      async function carregarStatusChave() {
+        try {
+          const resp = await window.mcFetch('/settings/anthropic-key');
+          if (!resp.ok) return;
+          mostrarStatusChave(await resp.json());
+        } catch (_) {
+          // Silencioso: o card continua escondido.
+        }
+      }
+
+      async function enviarChave(metodo) {
+        const input = document.getElementById('chave-anthropic');
+        const opcoes = { method: metodo };
+        if (metodo === 'PUT') {
+          const chave = input ? input.value.trim() : '';
+          if (!chave) {
+            window.mcToast('Cole a chave antes de salvar.', 'error');
+            return;
+          }
+          opcoes.headers = { 'Content-Type': 'application/json' };
+          opcoes.body = JSON.stringify({ chave: chave });
+        }
+        try {
+          const resp = await window.mcFetch('/settings/anthropic-key', opcoes);
+          if (input) input.value = '';
+          if (resp.ok) {
+            mostrarStatusChave(await resp.json());
+            window.mcToast(metodo === 'PUT' ? 'Chave salva.' : 'Chave removida.', 'success');
+          } else {
+            let msg = 'Falha ao salvar a chave.';
+            try {
+              const err = await resp.json();
+              if (err && typeof err.detail === 'string') msg = err.detail;
+            } catch (_) { /* corpo sem JSON */ }
+            window.mcToast(msg, 'error');
+          }
+        } catch (err) {
+          window.mcToast((err && err.message) || 'Falha de rede.', 'error');
+        }
+      }
+
       document.addEventListener('DOMContentLoaded', function () {
         const btn = document.getElementById('btn-salvar-settings');
         if (btn) {
@@ -139,7 +213,22 @@
             window.mcWithSubmitLock(btn, salvarSettings);
           });
         }
+        const btnChave = document.getElementById('btn-salvar-chave');
+        if (btnChave) {
+          btnChave.addEventListener('click', function (e) {
+            e.preventDefault();
+            window.mcWithSubmitLock(btnChave, function () { return enviarChave('PUT'); });
+          });
+        }
+        const btnRemover = document.getElementById('btn-remover-chave');
+        if (btnRemover) {
+          btnRemover.addEventListener('click', function (e) {
+            e.preventDefault();
+            window.mcWithSubmitLock(btnRemover, function () { return enviarChave('DELETE'); });
+          });
+        }
         carregarSettings();
+        carregarStatusChave();
       });
     })();
   </script>

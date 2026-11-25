@@ -1603,10 +1603,14 @@ async def analise_pdf(
         msg = str(exc)
         logger.error("Erro em POST /analise/pdf: %s", msg)
         if "ANTHROPIC_API_KEY" in msg:
-            raise HTTPException(
-                status_code=503,
-                detail="ANTHROPIC_API_KEY não configurada. Defina a variável no arquivo PY/.env para usar o upload de PDFs.",
-            )
+            if os.environ.get("MOTOR_CONECT_DESKTOP") == "1":
+                detalhe = (
+                    "Chave da Anthropic não configurada. Cadastre a sua em "
+                    "Configurações → Chave da Anthropic para usar o upload de PDFs."
+                )
+            else:
+                detalhe = "ANTHROPIC_API_KEY não configurada. Defina a variável no arquivo PY/.env para usar o upload de PDFs."
+            raise HTTPException(status_code=503, detail=detalhe)
         raise HTTPException(status_code=422, detail=msg)
     except Exception as exc:
         logger.error("Erro em POST /analise/pdf: %s — %s", type(exc).__name__, exc)
