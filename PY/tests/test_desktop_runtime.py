@@ -7,7 +7,6 @@ que sobe o servidor real numa thread e checa /health + /ui/login.html.
 Nada aqui importa `webview`: roda no CI Linux.
 """
 
-import io
 import os
 import socket
 import sys
@@ -114,15 +113,64 @@ class TestServidor:
         assert cfg.log_config is None
 
 
+class TestAmbienteDesktop:
+    def test_sqlite_url_absoluta_com_barras_normais(self, tmp_path):
+        url = runtime.sqlite_url(tmp_path / "x.db")
+        assert url.startswith("sqlite:///")
+        assert "\\" not in url
+        assert Path(url[len("sqlite:///"):]) == (tmp_path / "x.db").resolve()
+
+    def test_desktop_environment_aponta_tudo_para_data_dir(self, tmp_path):
+        env = runtime.desktop_environment(tmp_path)
+        assert env[runtime.DESKTOP_FLAG_ENV] == "1"
+        assert env["DATABASE_URL"] == runtime.sqlite_url(tmp_path / runtime.DB_FILENAME)
+        assert env[runtime.STORAGE_DIR_ENV] == str(tmp_path / "auditoria")
+
+    def test_prepare_environment_com_data_dir_forca_banco(self, tmp_path):
+        dados = tmp_path / "MotorTributario"
+        env = {"DATABASE_URL": "sqlite:///outro.db"}
+        runtime.prepare_environment(env, data_dir=dados)
+        assert dados.is_dir()
+        assert env["DATABASE_URL"] == runtime.sqlite_url(dados / runtime.DB_FILENAME)
+
+    def test_alembic_dir_dev(self, monkeypatch):
+        monkeypatch.delattr(sys, "frozen", raising=False)
+        assert (runtime.alembic_dir() / "env.py").is_file()
+        assert list((runtime.alembic_dir() / "versions").glob("*.py"))
+
+    def test_alembic_dir_frozen(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(sys, "frozen", True, raising=False)
+        monkeypatch.setattr(sys, "_MEIPASS", str(tmp_path), raising=False)
+        assert runtime.alembic_dir() == tmp_path / "alembic"
+
+
+@pytest.fixture
+def desktop_isolado(monkeypatch, tmp_path):
+    """O launcher muda os.environ e o cwd; monkeypatch desfaz no fim do teste.
+
+    APPDATA vai para tmp: o teste nunca toca o %APPDATA% real.
+    """
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    for nome in ("DATABASE_URL", runtime.STORAGE_DIR_ENV, runtime.DESKTOP_FLAG_ENV, runtime.UI_DIR_ENV):
+        # setenv/delenv registram o valor original; o teardown restaura
+        if nome in os.environ:
+            monkeypatch.setenv(nome, os.environ[nome])
+        else:
+            monkeypatch.delenv(nome, raising=False)
+    monkeypatch.chdir(tmp_path)
+    return tmp_path
+
+
 class TestLauncherSmoke:
-    def test_smoke_sobe_servidor_real_e_serve_ui(self, monkeypatch, capsys, tmp_path):
-        monkeypatch.setenv("APPDATA", str(tmp_path))
+    def test_smoke_sobe_servidor_real_e_serve_ui(self, desktop_isolado, capsys):
         assert launcher.main(["--smoke"]) == 0
         saida = capsys.readouterr().out
         assert '"smoke": "ok"' in saida
         assert '"ui_status": 200' in saida
+        assert '"db_ok": true' in saida
+        assert (desktop_isolado / "MotorTributario" / runtime.DB_FILENAME).is_file()
 
-    def test_smoke_falha_quando_health_nao_responde(self, monkeypatch, capsys):
+    def test_smoke_falha_quando_health_nao_responde(self, desktop_isolado, monkeypatch, capsys):
         monkeypatch.setattr(runtime, "wait_until_healthy", lambda *a, **k: False)
         assert launcher.run_smoke() == 1
         assert '"smoke": "fail"' in capsys.readouterr().out

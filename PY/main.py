@@ -51,10 +51,15 @@ os.environ.setdefault("NO_AT_BRIDGE", "1")
 # Em ambiente de teste (ENVIRONMENT=test), NÃO sobrescreve — os testes setam
 # DATABASE_URL/JWT_SECRET_KEY antes do import e precisam que esses valores
 # vençam o .env de desenvolvimento.
+# No .exe desktop (MOTOR_CONECT_DESKTOP=1) também NÃO sobrescreve: o launcher já
+# apontou DATABASE_URL/MOTOR_CONECT_STORAGE_DIR para %APPDATA%\MotorTributario.
 try:
     from dotenv import load_dotenv
     _here = Path(__file__).resolve().parent
-    _override = os.environ.get("ENVIRONMENT", "").lower() != "test"
+    _override = (
+        os.environ.get("ENVIRONMENT", "").lower() != "test"
+        and os.environ.get("MOTOR_CONECT_DESKTOP") != "1"
+    )
     for _candidato in (_here / ".env", _here.parent / ".env", Path.cwd() / ".env"):
         if _candidato.exists():
             load_dotenv(_candidato, override=_override)
