@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """tests/test_relatorio_pdf_motor.py — escolha do motor de PDF (weasyprint → Edge headless).
 
-Os testes de unidade não abrem o Edge: subprocess.run é trocado por um falso.
+Os testes de unidade não abrem o Edge: subprocess.Popen é trocado por um falso.
 Só `test_edge_real_gera_pdf` abre o Edge de verdade, e só no Windows com Edge.
 """
 
@@ -27,21 +27,35 @@ def sem_weasyprint(monkeypatch):
     monkeypatch.setattr(rp, "_WeasyprintHTML", None)
 
 
-def _run_falso(registro, conteudo=b"%PDF-1.7 falso"):
-    """subprocess.run falso: guarda o comando e o HTML e grava o PDF pedido."""
+def _popen_falso(registro, conteudo=b"%PDF-1.7 falso", estoura=False):
+    """subprocess.Popen falso: guarda o comando e o HTML e grava o PDF pedido.
 
-    def run(cmd, **kwargs):
-        registro["cmd"] = cmd
-        registro["kwargs"] = kwargs
-        html = Path(url2pathname(urlparse(cmd[-1]).path))
-        registro["html_bytes"] = html.read_bytes()
-        registro["pasta"] = html.parent
-        saida = next(a.split("=", 1)[1] for a in cmd if a.startswith("--print-to-pdf="))
-        if conteudo is not None:
-            Path(saida).write_bytes(conteudo)
-        return subprocess.CompletedProcess(cmd, 0)
+    Com estoura=True, o 1º wait() levanta TimeoutExpired (Edge travado).
+    """
 
-    return run
+    class PopenFalso:
+        pid = 4321
+
+        def __init__(self, cmd, **kwargs):
+            registro["cmd"] = cmd
+            registro["kwargs"] = kwargs
+            html = Path(url2pathname(urlparse(cmd[-1]).path))
+            registro["html_bytes"] = html.read_bytes()
+            registro["pasta"] = html.parent
+            saida = next(a.split("=", 1)[1] for a in cmd if a.startswith("--print-to-pdf="))
+            if conteudo is not None and not estoura:
+                Path(saida).write_bytes(conteudo)
+
+        def wait(self, timeout=None):
+            registro.setdefault("waits", []).append(timeout)
+            if estoura and len(registro["waits"]) == 1:
+                raise subprocess.TimeoutExpired(registro["cmd"], timeout)
+            return 0
+
+        def kill(self):
+            registro["kill"] = True
+
+    return PopenFalso
 
 
 class TestAcharNavegador:
@@ -78,15 +92,15 @@ class TestGerarPdfFallback:
     def test_sem_weasyprint_usa_edge(self, sem_weasyprint, monkeypatch):
         registro = {}
         monkeypatch.setattr(rp, "_achar_navegador_pdf", lambda: "C:/fake/msedge.exe")
-        monkeypatch.setattr(rp.subprocess, "run", _run_falso(registro))
+        monkeypatch.setattr(rp.subprocess, "Popen", _popen_falso(registro))
         assert rp.gerar_pdf({}, pii=PII_FICTICIA) == b"%PDF-1.7 falso"
         cmd = registro["cmd"]
         assert cmd[0] == "C:/fake/msedge.exe"
         assert "--headless" in cmd and "--no-pdf-header-footer" in cmd
         perfil = next(a.split("=", 1)[1] for a in cmd if a.startswith("--user-data-dir="))
         assert Path(perfil).parent == registro["pasta"]  # perfil descartável, não o do usuário
+        assert registro["waits"] == [rp.TIMEOUT_NAVEGADOR_S]
         kwargs = registro["kwargs"]
-        assert kwargs["timeout"] == rp.TIMEOUT_NAVEGADOR_S
         assert kwargs["stdout"] is subprocess.DEVNULL and kwargs["stderr"] is subprocess.DEVNULL
         assert "shell" not in kwargs
         # HTML em UTF-8 com BOM e com os acentos intactos
@@ -96,34 +110,52 @@ class TestGerarPdfFallback:
     def test_pasta_temporaria_com_dado_do_cliente_e_apagada(self, sem_weasyprint, monkeypatch):
         registro = {}
         monkeypatch.setattr(rp, "_achar_navegador_pdf", lambda: "msedge.exe")
-        monkeypatch.setattr(rp.subprocess, "run", _run_falso(registro))
+        monkeypatch.setattr(rp.subprocess, "Popen", _popen_falso(registro))
         rp.gerar_pdf({}, pii=PII_FICTICIA)
         assert not registro["pasta"].exists()
 
     def test_edge_sem_arquivo_vira_falha_500(self, sem_weasyprint, monkeypatch):
         registro = {}
         monkeypatch.setattr(rp, "_achar_navegador_pdf", lambda: "msedge.exe")
-        monkeypatch.setattr(rp.subprocess, "run", _run_falso(registro, conteudo=None))
+        monkeypatch.setattr(rp.subprocess, "Popen", _popen_falso(registro, conteudo=None))
         with pytest.raises(RuntimeError) as exc:
             rp.gerar_pdf({})
         assert "não instalado" not in str(exc.value)
+        assert not registro["pasta"].exists()
 
     def test_saida_que_nao_e_pdf_falha(self, sem_weasyprint, monkeypatch):
         monkeypatch.setattr(rp, "_achar_navegador_pdf", lambda: "msedge.exe")
-        monkeypatch.setattr(rp.subprocess, "run", _run_falso({}, conteudo=b"<html>erro"))
+        monkeypatch.setattr(rp.subprocess, "Popen", _popen_falso({}, conteudo=b"<html>erro"))
         with pytest.raises(RuntimeError, match="Falha"):
             rp.gerar_pdf({})
 
-    def test_timeout_nao_loga_caminho(self, sem_weasyprint, monkeypatch, caplog):
-        def estoura(cmd, **kwargs):
-            raise subprocess.TimeoutExpired(cmd, kwargs["timeout"])
-
+    def test_timeout_encerra_arvore_pelo_pid_e_apaga_pasta(self, sem_weasyprint, monkeypatch, caplog):
+        registro = {}
+        chamadas_run = []
+        monkeypatch.setattr(rp.sys, "platform", "win32")
         monkeypatch.setattr(rp, "_achar_navegador_pdf", lambda: "msedge.exe")
-        monkeypatch.setattr(rp.subprocess, "run", estoura)
+        monkeypatch.setattr(rp.subprocess, "Popen", _popen_falso(registro, estoura=True))
+        monkeypatch.setattr(rp.subprocess, "run", lambda cmd, **kw: chamadas_run.append(cmd))
         with pytest.raises(RuntimeError, match="Falha"):
             rp.gerar_pdf({}, pii=PII_FICTICIA)
+        # árvore inteira, pelo PID que o código abriu — nunca por nome (/IM)
+        assert chamadas_run == [["taskkill", "/PID", "4321", "/T", "/F"]]
+        assert registro.get("kill") is True
+        assert not registro["pasta"].exists()  # HTML com dado do cliente não fica em temp
         assert "motor-pdf-" not in caplog.text and "Fictícia" not in caplog.text
         assert "TimeoutExpired" in caplog.text
+
+    def test_pasta_presa_gera_aviso_sem_caminho(self, monkeypatch, tmp_path):
+        # registro direto: outros testes da suíte mudam o nível/propagação do logger
+        avisos = []
+        pasta = tmp_path / "motor-pdf-presa"
+        pasta.mkdir()
+        monkeypatch.setattr(rp.shutil, "rmtree", lambda *a, **k: None)  # arquivo "em uso"
+        monkeypatch.setattr(rp.time, "sleep", lambda s: None)
+        monkeypatch.setattr(rp.logger, "warning", lambda msg, *a: avisos.append(msg % a if a else msg))
+        rp._apagar_pasta(pasta)
+        assert len(avisos) == 1 and "não pôde ser apagada" in avisos[0]
+        assert "motor-pdf-" not in avisos[0]
 
 
 @pytest.mark.skipif(
