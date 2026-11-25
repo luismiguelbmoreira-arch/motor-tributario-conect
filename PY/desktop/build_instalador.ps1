@@ -22,7 +22,7 @@ if (-not $Versao) {
 }
 
 $Proibidos = @("*.db", "*.db-wal", "*.db-shm", ".env", "*.env", "master.key", "jwt_secret", "senha_inicial_admin.txt")
-$Achados = Get-ChildItem -Path $Dist -Recurse -File -Include $Proibidos -ErrorAction SilentlyContinue
+$Achados = Get-ChildItem -Path $Dist -Recurse -File -Force -Include $Proibidos -ErrorAction SilentlyContinue
 if ($Achados) { throw "dist tem arquivo proibido (banco/segredo): $($Achados.Name -join ', ')" }
 
 $Candidatos = @(

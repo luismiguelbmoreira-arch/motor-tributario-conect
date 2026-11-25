@@ -42,9 +42,8 @@ def test_appid_fixo():
     assert re.search(r"^AppId=\{\{[0-9A-F-]{36}\}$", _secao("Setup"), re.M)
 
 
-def test_desinstalacao_nao_apaga_dados_do_usuario():
-    texto = _texto()
-    if "[UninstallDelete]" in texto:
-        alvo = _secao("UninstallDelete")
-        assert "{userappdata}" not in alvo and "{app}" in alvo
-    assert "MotorTributario\\motor_tributario.db" not in texto
+def test_desinstalacao_so_remove_o_que_instalou():
+    # Sem [UninstallDelete]: "filesandordirs {app}" apagaria uma pasta escolhida pelo
+    # usuário que já existia com outros arquivos; {userappdata} apagaria banco e segredos.
+    assert not re.search(r"^\[UninstallDelete\]", _texto(), re.M)
+    assert not re.search(r"^\[InstallDelete\]", _texto(), re.M)

@@ -149,6 +149,8 @@ A versão vem de `version=` em `main.py`; `-Versao X.Y.Z` sobrescreve. `ISCC.exe
 - `AppId` fixo no `.iss`: nova versão instala por cima da anterior. Não trocar o GUID.
 - Nada de banco, `.env`, `master.key`, `jwt_secret` ou senha inicial entra no pacote. O script de
   build recusa o dist se achar algum, e o `.iss` também os exclui.
+- A desinstalação remove só os arquivos que o instalador pôs; outros arquivos que estiverem na
+  pasta escolhida ficam.
 - **Desinstalar não apaga os dados** (`%APPDATA%\MotorTributario`: banco, segredos, PDFs cifrados,
   logs). O motivo é o dossiê de auditoria (CTN 173). Apagar à mão só com backup feito.
   A chave da Anthropic no Gerenciador de Credenciais também fica.

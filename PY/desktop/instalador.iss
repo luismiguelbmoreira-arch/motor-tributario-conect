@@ -64,6 +64,6 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopico
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 
-[UninstallDelete]
-; Só a pasta do programa. %APPDATA%\MotorTributario (dados) fica de propósito.
-Type: filesandordirs; Name: "{app}"
+; Sem [UninstallDelete]: o desinstalador remove só os arquivos que instalou.
+; "filesandordirs {app}" apagaria a pasta inteira, e o usuário pode ter escolhido
+; uma pasta que já existia com outros arquivos. %APPDATA%\MotorTributario fica.
