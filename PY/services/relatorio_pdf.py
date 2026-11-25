@@ -12,9 +12,11 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any, Optional
@@ -1168,29 +1170,83 @@ def _comando_edge(navegador: str, html: Path, saida: Path, perfil: Path) -> list
     ]
 
 
+_SEM_JANELA = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def _encerrar_arvore(pid: int) -> None:
+    """Encerra o processo `pid` e os filhos dele (renderer, gpu, utility do Chromium).
+
+    Pelo PID que este código abriu, nunca pelo nome: não toca em outro Edge do usuário.
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        subprocess.run(
+            ["taskkill", "/PID", str(pid), "/T", "/F"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=15,
+            check=False,
+            creationflags=_SEM_JANELA,
+        )
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+def _rodar_edge(cmd: list[str]) -> None:
+    """Roda o Edge e espera. No timeout, encerra a árvore inteira e repassa o TimeoutExpired.
+
+    subprocess.run(timeout=) mataria só o processo principal; os filhos do Chromium
+    ficariam órfãos segurando a pasta temporária (que tem o HTML com dado do cliente).
+    """
+    proc = subprocess.Popen(
+        cmd,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=_SEM_JANELA,
+    )
+    try:
+        proc.wait(timeout=TIMEOUT_NAVEGADOR_S)
+    except subprocess.TimeoutExpired:
+        _encerrar_arvore(proc.pid)  # antes do kill: o taskkill /T acha os filhos pelo pai
+        proc.kill()
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            pass
+        raise
+
+
+def _apagar_pasta(pasta: Path, tentativas: int = 6, espera_s: float = 0.5) -> None:
+    """Apaga a pasta temporária, tentando de novo enquanto algum arquivo estiver em uso."""
+    for _ in range(tentativas):
+        shutil.rmtree(pasta, ignore_errors=True)
+        if not pasta.exists():
+            return
+        time.sleep(espera_s)
+    # Sem caminho no log: o nome da pasta não é dado do cliente, mas o log não precisa dele.
+    logger.warning("Pasta temporária do PDF não pôde ser apagada (arquivo em uso).")
+
+
 def _pdf_via_navegador(html_str: str, navegador: str) -> bytes:
     """Imprime o HTML em PDF com o Edge headless numa pasta temporária apagada no fim.
 
     O HTML tem dados do cliente: fica só em pasta temporária própria, nunca vai
-    para log. Timeout encerra só o processo que este código abriu.
+    para log. Timeout encerra só a árvore de processos que este código abriu.
     """
-    with tempfile.TemporaryDirectory(prefix="motor-pdf-", ignore_cleanup_errors=True) as tmp:
-        pasta = Path(tmp)
+    pasta = Path(tempfile.mkdtemp(prefix="motor-pdf-"))
+    try:
         html = pasta / "relatorio.html"
         saida = pasta / "relatorio.pdf"
         html.write_text(html_str, encoding="utf-8-sig")  # BOM: Chromium lê como UTF-8
-        subprocess.run(
-            _comando_edge(navegador, html, saida, pasta / "perfil"),
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=TIMEOUT_NAVEGADOR_S,
-            check=False,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
+        _rodar_edge(_comando_edge(navegador, html, saida, pasta / "perfil"))
         if not saida.is_file():
             raise RuntimeError("Edge não gerou o arquivo PDF")
         dados = saida.read_bytes()
+    finally:
+        _apagar_pasta(pasta)
     if not dados.startswith(b"%PDF"):
         raise RuntimeError("Saída do Edge não é PDF")
     return dados

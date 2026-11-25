@@ -121,7 +121,8 @@ Windows (`keyring`, serviço `MotorTributario`, usuário `ANTHROPIC_API_KEY`).
   sai com código 13. Por isso o PDF depende do Edge navegador.
 - O HTML, que tem dado do cliente, fica numa pasta temporária própria (`motor-pdf-*`) que é apagada
   no fim. Ele roda com um perfil descartável e sem cabeçalho nem rodapé (nem data nem caminho do
-  arquivo). Timeout de 60 s.
+  arquivo). Timeout de 60 s: estourou, encerra a árvore do Edge que o app abriu (`taskkill /PID … /T`,
+  nunca por nome) e apaga a pasta, com novas tentativas se algum arquivo ainda estiver em uso.
 - No log entram só o tamanho do PDF e o tipo do erro.
 - Sem weasyprint e sem Edge, `/relatorio/pdf` responde 503.
 - O smoke do exe testa o motor de PDF e, na 1ª execução, também `POST /relatorio/pdf` com o
