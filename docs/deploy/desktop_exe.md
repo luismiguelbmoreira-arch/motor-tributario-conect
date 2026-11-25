@@ -32,6 +32,8 @@ cd PY
 | `PY/desktop/db_bootstrap.py` | cria/migra o SQLite do usuário a cada início (abaixo) |
 | `PY/desktop/motor_tributario.spec` | PyInstaller onedir; inclui só código alcançável + `UI/` + `alembic/` (nada de `.env`, `*.db`, `data/`) |
 | `PY/desktop/build_exe.ps1` | build + smoke |
+| `PY/desktop/instalador.iss` | script Inno Setup 6 do instalador (abaixo) |
+| `PY/desktop/build_instalador.ps1` | acha o `ISCC.exe`, recusa dist com banco/segredo, compila, mostra o SHA-256 |
 | `PY/services/chave_anthropic.py` | de onde vem a `ANTHROPIC_API_KEY` (abaixo) |
 | `PY/requirements-desktop.txt` | pywebview + pyinstaller + keyring, versões fixas; fora do `requirements.txt` (CI Linux não instala) |
 
@@ -124,6 +126,34 @@ Windows (`keyring`, serviço `MotorTributario`, usuário `ANTHROPIC_API_KEY`).
 - Sem weasyprint e sem Edge, `/relatorio/pdf` responde 503.
 - O smoke do exe testa o motor de PDF e, na 1ª execução, também `POST /relatorio/pdf` com o
   token do admin. Usa um diagnóstico vazio e não grava o PDF.
+
+## Instalador (Inno Setup)
+
+Gera um único `MotorTributario-Setup-<versão>.exe` a partir da pasta do PyInstaller.
+
+```powershell
+winget install --id JRSoftware.InnoSetup -e --scope user   # ferramenta de build, só na máquina que gera
+cd PY
+powershell -ExecutionPolicy Bypass -File desktop\build_exe.ps1        # 1º o exe
+powershell -ExecutionPolicy Bypass -File desktop\build_instalador.ps1 # depois o instalador
+```
+
+Saída: `PY\dist\instalador\MotorTributario-Setup-<versão>.exe` (fora do git, como `dist/`).
+A versão vem de `version=` em `main.py`; `-Versao X.Y.Z` sobrescreve. `ISCC.exe` é procurado em
+`$env:INNO_ISCC`, Program Files e `%LOCALAPPDATA%\Programs\Inno Setup 6`.
+
+- Instala **por usuário, sem admin**, em `%LOCALAPPDATA%\Programs\MotorTributario`.
+  Cria atalho no menu Iniciar; atalho na área de trabalho é opcional (desmarcado).
+- O instalador é em português (Brasil) e só para Windows 10/11 x64.
+- `AppId` fixo no `.iss`: nova versão instala por cima da anterior. Não trocar o GUID.
+- Nada de banco, `.env`, `master.key`, `jwt_secret` ou senha inicial entra no pacote. O script de
+  build recusa o dist se achar algum, e o `.iss` também os exclui.
+- **Desinstalar não apaga os dados** (`%APPDATA%\MotorTributario`: banco, segredos, PDFs cifrados,
+  logs). O motivo é o dossiê de auditoria (CTN 173). Apagar à mão só com backup feito.
+  A chave da Anthropic no Gerenciador de Credenciais também fica.
+- Instalação silenciosa (TI): `MotorTributario-Setup-<versão>.exe /VERYSILENT /CURRENTUSER`.
+  Desinstalação silenciosa: `unins000.exe /VERYSILENT` na pasta do app.
+- Sem assinatura de código: o SmartScreen avisa no instalador e no exe.
 
 ## Limitações conhecidas (próximos PRs)
 
