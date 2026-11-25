@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
@@ -34,9 +35,18 @@ os.environ.setdefault("GIO_MODULE_DIR", "")
 # startup da API (que disparam GLib-GIO-WARNING no Windows mesmo sem usar PDF).
 _WeasyprintHTML = None
 _WEASYPRINT_DISPONIVEL = None  # None = ainda nao tentou importar
+# gerar_pdf roda em threadpool: duas 1ªs chamadas juntas trocariam o fd 2 (dup2) ao mesmo tempo.
+_LOCK_IMPORT = threading.Lock()
 
 def _tentar_importar_weasyprint():
     """Importa weasyprint sob demanda. Idempotente."""
+    if _WEASYPRINT_DISPONIVEL is not None:
+        return _WEASYPRINT_DISPONIVEL
+    with _LOCK_IMPORT:
+        return _importar_weasyprint_uma_vez()
+
+
+def _importar_weasyprint_uma_vez():
     global _WeasyprintHTML, _WEASYPRINT_DISPONIVEL
     if _WEASYPRINT_DISPONIVEL is not None:
         return _WEASYPRINT_DISPONIVEL
@@ -64,7 +74,7 @@ def _fmt_moeda(valor: Any) -> str:
     try:
         return f"R$ {Decimal(str(valor)):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     except Exception:
-        return str(valor)
+        return _esc(valor)  # não é número: texto livre vai pro HTML, então escapa
 
 
 def _fmt_pct(valor: Any, casas: int = 2) -> str:
@@ -72,7 +82,7 @@ def _fmt_pct(valor: Any, casas: int = 2) -> str:
     try:
         return f"{Decimal(str(valor)) * 100:.{casas}f}%".replace(".", ",")
     except Exception:
-        return str(valor)
+        return _esc(valor)  # não é número: texto livre vai pro HTML, então escapa
 
 
 def _esc(s: Any) -> str:
@@ -1194,29 +1204,133 @@ def _encerrar_arvore(pid: int) -> None:
         pass
 
 
+_CREATE_SUSPENDED = 0x00000004
+_JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
+_JobObjectExtendedLimitInformation = 9
+
+
+class _JobWindows:
+    """Job Object do Windows com KILL_ON_JOB_CLOSE (só ctypes, sem dependência).
+
+    O Edge e todos os filhos dele entram no job. Fechar o handle (no fim da geração,
+    ou o Windows fechando porque o app morreu) encerra a árvore inteira.
+    """
+
+    def __init__(self) -> None:
+        import ctypes
+        from ctypes import wintypes
+
+        class _Basica(ctypes.Structure):
+            _fields_ = [
+                ("PerProcessUserTimeLimit", ctypes.c_int64),
+                ("PerJobUserTimeLimit", ctypes.c_int64),
+                ("LimitFlags", wintypes.DWORD),
+                ("MinimumWorkingSetSize", ctypes.c_size_t),
+                ("MaximumWorkingSetSize", ctypes.c_size_t),
+                ("ActiveProcessLimit", wintypes.DWORD),
+                ("Affinity", ctypes.c_size_t),
+                ("PriorityClass", wintypes.DWORD),
+                ("SchedulingClass", wintypes.DWORD),
+            ]
+
+        class _Io(ctypes.Structure):
+            _fields_ = [(n, ctypes.c_uint64) for n in ("r", "w", "o", "rb", "wb", "ob")]
+
+        class _Estendida(ctypes.Structure):
+            _fields_ = [
+                ("BasicLimitInformation", _Basica),
+                ("IoInfo", _Io),
+                ("ProcessMemoryLimit", ctypes.c_size_t),
+                ("JobMemoryLimit", ctypes.c_size_t),
+                ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                ("PeakJobMemoryUsed", ctypes.c_size_t),
+            ]
+
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.CreateJobObjectW.restype = wintypes.HANDLE
+        k32.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
+        k32.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+        k32.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+        k32.CloseHandle.argtypes = [wintypes.HANDLE]
+        ntdll = ctypes.WinDLL("ntdll")
+        ntdll.NtResumeProcess.argtypes = [wintypes.HANDLE]
+        self._k32, self._ntdll = k32, ntdll
+
+        handle = k32.CreateJobObjectW(None, None)
+        if not handle:
+            raise OSError("CreateJobObjectW falhou")
+        info = _Estendida()
+        info.BasicLimitInformation.LimitFlags = _JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        if not k32.SetInformationJobObject(
+            handle, _JobObjectExtendedLimitInformation, ctypes.byref(info), ctypes.sizeof(info)
+        ):
+            k32.CloseHandle(handle)
+            raise OSError("SetInformationJobObject falhou")
+        self.handle = handle
+
+    def colocar_e_retomar(self, proc: subprocess.Popen) -> bool:
+        """Põe o processo (criado suspenso) no job e o retoma. True se entrou no job."""
+        handle = int(proc._handle)  # handle do processo que o Popen abriu (Windows)
+        try:
+            return bool(self._k32.AssignProcessToJobObject(self.handle, handle))
+        finally:
+            self._ntdll.NtResumeProcess(handle)  # retoma mesmo se não entrou no job
+
+    def fechar(self) -> None:
+        """Fecha o handle: o Windows encerra o que ainda estiver vivo no job."""
+        if self.handle:
+            self._k32.CloseHandle(self.handle)
+            self.handle = None
+
+
+def _criar_job() -> Optional[_JobWindows]:
+    if sys.platform != "win32":
+        return None
+    try:
+        return _JobWindows()
+    except (OSError, AttributeError):
+        return None
+
+
 def _rodar_edge(cmd: list[str]) -> None:
     """Roda o Edge e espera. No timeout, encerra a árvore inteira e repassa o TimeoutExpired.
 
     subprocess.run(timeout=) mataria só o processo principal; os filhos do Chromium
     ficariam órfãos segurando a pasta temporária (que tem o HTML com dado do cliente).
+    No Windows o Edge nasce suspenso e entra num Job Object antes de rodar: se o app
+    morrer no meio, o Windows fecha o job e encerra o Edge e os filhos junto.
     """
+    job = _criar_job()
     proc = subprocess.Popen(
         cmd,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        creationflags=_SEM_JANELA,
+        creationflags=_SEM_JANELA | (_CREATE_SUSPENDED if job else 0),
     )
     try:
-        proc.wait(timeout=TIMEOUT_NAVEGADOR_S)
-    except subprocess.TimeoutExpired:
-        _encerrar_arvore(proc.pid)  # antes do kill: o taskkill /T acha os filhos pelo pai
-        proc.kill()
+        if job:
+            try:
+                no_job = job.colocar_e_retomar(proc)
+            except Exception:
+                proc.kill()  # suspenso e sem retomar: não deixa processo parado para trás
+                raise
+            if not no_job:
+                job.fechar()
+                job = None  # fora do job: o timeout ainda usa o taskkill pelo PID
         try:
-            proc.wait(timeout=10)
+            proc.wait(timeout=TIMEOUT_NAVEGADOR_S)
         except subprocess.TimeoutExpired:
-            pass
-        raise
+            _encerrar_arvore(proc.pid)  # antes do kill: o taskkill /T acha os filhos pelo pai
+            proc.kill()
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                pass
+            raise
+    finally:
+        if job:
+            job.fechar()  # encerra filhos que ainda estejam vivos (crashpad, utility)
 
 
 def _apagar_pasta(pasta: Path, tentativas: int = 6, espera_s: float = 0.5) -> None:
@@ -1230,17 +1344,59 @@ def _apagar_pasta(pasta: Path, tentativas: int = 6, espera_s: float = 0.5) -> No
     logger.warning("Pasta temporária do PDF não pôde ser apagada (arquivo em uso).")
 
 
+_PREFIXO_TEMP = "motor-pdf-"
+# Bem acima de timeout + limpeza: não pega a pasta de uma geração em andamento (outra instância).
+IDADE_SOBRA_TEMP_S = 600
+
+# O Edge roda JavaScript e abre file:// (o weasyprint não). Nada de script, iframe, imagem
+# ou arquivo local: só o CSS inline do próprio template.
+_CSP_EDGE = (
+    '<meta http-equiv="Content-Security-Policy" '
+    "content=\"default-src 'none'; style-src 'unsafe-inline'\">"
+)
+
+
+def _com_csp(html_str: str) -> str:
+    """Põe a CSP logo depois de <head> (ou no começo, se não houver <head>)."""
+    marca = "<head>"
+    i = html_str.find(marca)
+    if i < 0:
+        return _CSP_EDGE + html_str
+    i += len(marca)
+    return html_str[:i] + "\n  " + _CSP_EDGE + html_str[i:]
+
+
+def _varrer_sobras_temp(idade_min_s: int = IDADE_SOBRA_TEMP_S) -> int:
+    """Apaga pastas motor-pdf-* antigas (app morto no meio da geração). Devolve quantas."""
+    agora = time.time()
+    apagadas = 0
+    for pasta in Path(tempfile.gettempdir()).glob(f"{_PREFIXO_TEMP}*"):
+        try:
+            if not pasta.is_dir() or agora - pasta.stat().st_mtime < idade_min_s:
+                continue
+        except OSError:
+            continue
+        shutil.rmtree(pasta, ignore_errors=True)
+        if not pasta.exists():
+            apagadas += 1
+    if apagadas:
+        logger.info("%d pasta(s) temporária(s) antiga(s) do PDF apagada(s).", apagadas)  # sem caminho
+    return apagadas
+
+
 def _pdf_via_navegador(html_str: str, navegador: str) -> bytes:
     """Imprime o HTML em PDF com o Edge headless numa pasta temporária apagada no fim.
 
     O HTML tem dados do cliente: fica só em pasta temporária própria, nunca vai
     para log. Timeout encerra só a árvore de processos que este código abriu.
+    Antes, apaga sobras antigas de gerações que não terminaram (app morto).
     """
-    pasta = Path(tempfile.mkdtemp(prefix="motor-pdf-"))
+    _varrer_sobras_temp()
+    pasta = Path(tempfile.mkdtemp(prefix=_PREFIXO_TEMP))
     try:
         html = pasta / "relatorio.html"
         saida = pasta / "relatorio.pdf"
-        html.write_text(html_str, encoding="utf-8-sig")  # BOM: Chromium lê como UTF-8
+        html.write_text(_com_csp(html_str), encoding="utf-8-sig")  # BOM: Chromium lê como UTF-8
         _rodar_edge(_comando_edge(navegador, html, saida, pasta / "perfil"))
         if not saida.is_file():
             raise RuntimeError("Edge não gerou o arquivo PDF")
