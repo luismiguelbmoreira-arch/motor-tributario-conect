@@ -63,6 +63,33 @@ class TestCaminhos:
         assert env[runtime.UI_DIR_ENV] == str(runtime.ui_dir())
 
 
+class TestUiEmpacotada:
+    """motor_tributario.spec leva da UI/ só os tipos da lista (não a pasta inteira)."""
+
+    def test_so_tipos_da_lista_e_licencas(self, tmp_path):
+        ui = tmp_path / "UI"
+        (ui / "vendor" / "inter").mkdir(parents=True)
+        for nome in ("index.html", "app.js", "estilo.css", "vendor/inter/Inter.woff2", "vendor/inter/LICENSE",
+                     "cliente.pdf", "rascunho.txt", "banco.db", ".env", "vendor/README.md"):
+            (ui / nome).write_bytes(b"x")
+        pares = runtime.ui_datas(ui)
+        nomes = sorted(Path(origem).name for origem, _ in pares)
+        assert nomes == ["Inter.woff2", "LICENSE", "app.js", "estilo.css", "index.html"]
+        destinos = {Path(origem).name: destino for origem, destino in pares}
+        assert destinos["Inter.woff2"] == "UI/vendor/inter"  # mantém a subpasta
+        assert destinos["index.html"] == "UI"
+
+    def test_todo_arquivo_da_ui_do_repo_entra_no_exe(self):
+        # Tipo novo em UI/ (ex.: .png, .svg) quebra a tela do exe sem aviso: falha aqui antes.
+        ui = Path(__file__).resolve().parents[2] / "UI"
+        fora = [
+            p.relative_to(ui).as_posix()
+            for p in ui.rglob("*")
+            if p.is_file() and not runtime.ui_arquivo_empacotado(p) and p.name != "README.md"
+        ]
+        assert fora == []
+
+
 class TestStreams:
     def test_streams_existentes_nao_mudam(self, tmp_path):
         assert runtime.ensure_std_streams(tmp_path / "x.log") is None

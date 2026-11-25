@@ -53,8 +53,15 @@ Name: "ptbr"; MessagesFile: "compiler:Languages\BrazilianPortuguese.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-; Defesa extra: nada de segredo ou banco entra no pacote mesmo que apareça no dist.
-Source: "{#DistDir}\*"; DestDir: "{app}"; Excludes: "*.db,*.db-wal,*.db-shm,.env,*.env,master.key,jwt_secret,senha_inicial_admin.txt"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Defesa extra: nada de banco, segredo, log ou PDF entra no pacote mesmo que apareça no dist.
+; *.pem fica de fora desta lista (o certifi precisa do cacert.pem); o build_instalador.ps1
+; recusa qualquer outro .pem.
+Source: "{#DistDir}\*"; DestDir: "{app}"; Excludes: "*.db,*.db-*,*.db.*,*.sqlite,*.sqlite3,*.sqlite-*,*.bak,.env,.env.*,*.env,master.key,*.key,*.pfx,*.p12,jwt_secret*,senha_inicial_admin*,*.log,*.pdf"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[InstallDelete]
+; Atualização: migration que saiu da versão nova não pode ficar no disco (o Alembic a leria).
+; Só esta pasta do próprio app; nada fora de {app}\_internal\alembic\versions.
+Type: filesandordirs; Name: "{app}\_internal\alembic\versions"
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"

@@ -69,6 +69,25 @@ def ui_dir() -> Path:
     return resource_root() / "UI"
 
 
+# O que da pasta UI/ entra no exe (motor_tributario.spec). Arquivo solto de outro tipo
+# (rascunho, export, PDF de cliente) fica de fora. Tipo novo na UI: incluir aqui.
+UI_EXTENSOES_EMPACOTADAS = frozenset({".html", ".css", ".js", ".woff2"})
+
+
+def ui_arquivo_empacotado(path: Path) -> bool:
+    """True para arquivo da UI que vai no exe: tipos da lista ou licença de biblioteca."""
+    return path.suffix.lower() in UI_EXTENSOES_EMPACOTADAS or path.name.upper().startswith("LICENSE")
+
+
+def ui_datas(ui: Path) -> list[tuple[str, str]]:
+    """Pares (origem, destino) do PyInstaller para a UI, mantendo as subpastas."""
+    pares = []
+    for p in sorted(ui.rglob("*")):
+        if p.is_file() and ui_arquivo_empacotado(p):
+            pares.append((str(p), (Path("UI") / p.parent.relative_to(ui)).as_posix()))
+    return pares
+
+
 def user_data_dir(environ: Optional[dict[str, str]] = None) -> Path:
     """Pasta de dados do usuário: `%APPDATA%\\MotorTributario`.
 

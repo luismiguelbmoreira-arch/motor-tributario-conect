@@ -155,8 +155,15 @@ A versão vem de `version=` em `main.py`; `-Versao X.Y.Z` sobrescreve. `ISCC.exe
   Cria atalho no menu Iniciar; atalho na área de trabalho é opcional (desmarcado).
 - O instalador é em português (Brasil) e só para Windows 10/11 x64.
 - `AppId` fixo no `.iss`: nova versão instala por cima da anterior. Não trocar o GUID.
-- Nada de banco, `.env`, `master.key`, `jwt_secret` ou senha inicial entra no pacote. O script de
-  build recusa o dist se achar algum, e o `.iss` também os exclui.
+- Nada de banco, segredo, log ou PDF entra no pacote. O `build_instalador.ps1` recusa o dist se
+  achar algum nome da lista `$Proibidos` (`*.db`, `*.db-*`, `*.sqlite*`, `*.bak`, `.env*`, `*.key`,
+  `*.pem`, `*.pfx`, `jwt_secret*`, `senha_inicial_admin*`, `*.log`, `*.pdf` e outros). A única
+  exceção é `_internal\certifi\cacert.pem` (CAs públicas, usadas no HTTPS da API da Anthropic).
+  O `.iss` exclui a mesma lista, menos `*.pem`.
+- Só entram de `UI/` os tipos `.html`, `.css`, `.js`, `.woff2` e os `LICENSE*` das fontes
+  (`desktop.runtime.ui_datas`). Um teste avisa se aparecer em `UI/` um tipo que ficaria de fora.
+- Na atualização, `[InstallDelete]` apaga só `{app}\_internal\alembic\versions` antes de copiar:
+  uma migration que saiu da versão nova não fica no disco para o Alembic ler.
 - A desinstalação remove só os arquivos que o instalador pôs; outros arquivos que estiverem na
   pasta escolhida ficam.
 - **Desinstalar não apaga os dados** (`%APPDATA%\MotorTributario`: banco, segredos, PDFs cifrados,

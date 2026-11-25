@@ -21,9 +21,20 @@ if (-not $Versao) {
     $Versao = $m.Matches[0].Groups[1].Value
 }
 
-$Proibidos = @("*.db", "*.db-wal", "*.db-shm", ".env", "*.env", "master.key", "jwt_secret", "senha_inicial_admin.txt")
-$Achados = Get-ChildItem -Path $Dist -Recurse -File -Force -Include $Proibidos -ErrorAction SilentlyContinue
-if ($Achados) { throw "dist tem arquivo proibido (banco/segredo): $($Achados.Name -join ', ')" }
+# Banco, cópia de banco, .env, chave, segredo, log e PDF não entram no pacote. Padrões largos
+# de propósito: o que é legítimo e casa com eles vai em $Permitidos (caminho relativo ao dist).
+$Proibidos = @(
+    "*.db", "*.db-*", "*.db.*", "*.sqlite", "*.sqlite3", "*.sqlite-*", "*.bak",
+    ".env", ".env.*", "*.env",
+    "master.key", "*.key", "*.pem", "*.pfx", "*.p12",
+    "jwt_secret*", "senha_inicial_admin*",
+    "*.log", "*.pdf"
+)
+$Permitidos = @("_internal\certifi\cacert.pem")  # CAs públicas do certifi: HTTPS da API da Anthropic
+$DistAbs = (Resolve-Path $Dist).Path.TrimEnd('\') + '\'
+$Achados = @(Get-ChildItem -Path $Dist -Recurse -File -Force -Include $Proibidos -ErrorAction SilentlyContinue |
+    Where-Object { $Permitidos -notcontains $_.FullName.Substring($DistAbs.Length) })
+if ($Achados.Count) { throw "dist tem arquivo proibido (banco/segredo/log/PDF): $($Achados.Name -join ', ')" }
 
 $Candidatos = @(
     $env:INNO_ISCC,
