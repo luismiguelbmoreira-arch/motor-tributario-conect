@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="design_system.css">
   
   <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="vendor/lucide/lucide-1.80.0.min.js"></script>
 </head>
 
 <body class="justify-center items-center">
@@ -120,6 +120,7 @@
     </div>
   </div>
 
+  <script src="config.js"></script>
   <script src="components.js"></script>
   <script>
     // Inicializar ícones Lucide
@@ -160,7 +161,7 @@
 
       try {
         // skipAuthRedirect: login é a única rota que pode receber 401 sem redirect
-        const res = await mcFetch(`${window.location.origin}/auth/login`, {
+        const res = await mcFetch(`/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password }),
@@ -172,7 +173,14 @@
           sessionStorage.setItem('token', data.access_token);
           sessionStorage.setItem('username', data.username || '');
           sessionStorage.setItem('role', data.role || '');
-          window.location.href = 'dashboard.html';
+          // 1º acesso / senha resetada: troca obrigatória antes do painel.
+          if (data.must_change_password) {
+            sessionStorage.setItem('must_change_password', '1');
+            window.location.href = 'trocar_senha.html';
+          } else {
+            sessionStorage.removeItem('must_change_password');
+            window.location.href = 'dashboard.html';
+          }
         } else {
           generalError.classList.remove('step-hidden');
         }
