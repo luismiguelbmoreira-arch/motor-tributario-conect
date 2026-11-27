@@ -173,7 +173,14 @@
           sessionStorage.setItem('token', data.access_token);
           sessionStorage.setItem('username', data.username || '');
           sessionStorage.setItem('role', data.role || '');
-          window.location.href = 'dashboard.html';
+          // 1º acesso / senha resetada: troca obrigatória antes do painel.
+          if (data.must_change_password) {
+            sessionStorage.setItem('must_change_password', '1');
+            window.location.href = 'trocar_senha.html';
+          } else {
+            sessionStorage.removeItem('must_change_password');
+            window.location.href = 'dashboard.html';
+          }
         } else {
           generalError.classList.remove('step-hidden');
         }
