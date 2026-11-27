@@ -14,8 +14,12 @@ Fluxo:
 Modo de verificação sem janela:
   MotorTributario.exe --smoke
   → sobe o servidor, checa /health, /ui/login.html, o banco em %APPDATA% e
-    (no exe) o backend do cofre do Windows; grava o resultado no log
-    e sai com código 0 (ok) ou 1 (falha).
+    (no exe) o backend do cofre do Windows e, na 1ª execução, o login do admin
+    inicial; grava o resultado no log e sai com código 0 (ok) ou 1 (falha).
+
+Segredos por instalação (em %APPDATA%/MotorTributario):
+  jwt_secret               → JWT_SECRET_KEY (criado na 1ª execução)
+  senha_inicial_admin.txt  → senha do `admin` gerada quando o banco não tem usuários
 
 Dev (sem empacotar), a partir de PY/:
   python -m desktop.launcher          # abre janela
@@ -40,6 +44,7 @@ from desktop import db_bootstrap, runtime  # noqa: E402
 WINDOW_TITLE = "Motor Tributário Conect"
 START_PATH = "/ui/login.html"
 HEALTH_PATH = "/health"
+LOGIN_PATH = "/auth/login"
 WEBVIEW2_URL = "https://developer.microsoft.com/microsoft-edge/webview2/"
 
 logger = logging.getLogger("motor_conect.desktop")
@@ -63,21 +68,70 @@ def _show_error(message: str) -> None:
         ctypes.windll.user32.MessageBoxW(None, message, WINDOW_TITLE, 0x10)
 
 
-def _start_backend() -> tuple[object, object, int, dict]:
+def _start_backend() -> tuple[object, object, int, dict, str | None]:
+    """Devolve (server, thread, porta, db_info, senha_admin_inicial).
+
+    A senha só existe na 1ª execução (banco sem usuários) e NUNCA vai para
+    db_info, log ou relatório do smoke.
+    """
     data_dir = runtime.user_data_dir()
-    runtime.prepare_environment(data_dir=data_dir)
+    runtime.prepare_environment(data_dir=data_dir)  # inclui o JWT secret da instalação
     # cwd = pasta de dados: nenhum caminho relativo (ou .env solto) cai na pasta do .exe
     os.chdir(data_dir)
     db_info = db_bootstrap.bootstrap_database(runtime.alembic_dir())
     db_info["arquivo"] = str(runtime.database_path(data_dir))
     logger.info("Banco: %s", db_info)
+    # Depois do bootstrap (tabela users existe) e antes da startup da API
+    senha_admin = runtime.preparar_admin_inicial(data_dir)
+    if senha_admin is not None:
+        logger.info("Admin inicial preparado: %s", runtime.arquivo_senha_inicial(data_dir))
 
     from main import app  # import estático: PyInstaller coleta main.py e dependências
 
     port = runtime.find_free_port()
     server = runtime.build_server(app, port)
     thread = runtime.start_server_thread(server)
-    return server, thread, port, db_info
+    return server, thread, port, db_info, senha_admin
+
+
+def _limpar_senha_do_ambiente() -> None:
+    """A API já criou o admin na startup: a senha sai do os.environ."""
+    os.environ.pop(runtime.ADMIN_PASSWORD_ENV, None)
+
+
+def _login_ok(url: str, senha: str) -> bool:
+    """POST /auth/login com o admin inicial. Só devolve True/False."""
+    import urllib.error
+    import urllib.request
+
+    corpo = json.dumps({"username": runtime.ADMIN_USERNAME, "password": senha}).encode("utf-8")
+    req = urllib.request.Request(
+        url + LOGIN_PATH, data=corpo, headers={"Content-Type": "application/json"}, method="POST"
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.status == 200
+    except (urllib.error.URLError, OSError):
+        return False
+
+
+def _avisar_primeiro_acesso(data_dir: Path) -> None:
+    """Enquanto o arquivo da senha inicial existir, avisa ao abrir o app."""
+    arquivo = runtime.arquivo_senha_inicial(data_dir)
+    if sys.platform != "win32" or not arquivo.is_file():
+        return
+    import ctypes
+
+    try:
+        conteudo = arquivo.read_text(encoding="utf-8")
+    except OSError:
+        return
+    mensagem = (
+        f"{conteudo}\n"
+        f"Arquivo: {arquivo}\n\n"
+        "Este aviso aparece enquanto o arquivo existir."
+    )
+    ctypes.windll.user32.MessageBoxW(None, mensagem, WINDOW_TITLE, 0x40)
 
 
 def _stop_backend(server: object, thread: object) -> None:
@@ -86,11 +140,13 @@ def _stop_backend(server: object, thread: object) -> None:
 
 
 def run_smoke() -> int:
-    server, thread, port, db_info = _start_backend()
+    server, thread, port, db_info, senha_admin = _start_backend()
     url = runtime.base_url(port)
     result: dict = {"smoke": "fail", "port": port, "frozen": runtime.is_frozen(), "db": db_info}
     try:
-        if not runtime.wait_until_healthy(url + HEALTH_PATH, timeout=60):
+        healthy = runtime.wait_until_healthy(url + HEALTH_PATH, timeout=60)
+        _limpar_senha_do_ambiente()
+        if not healthy:
             result["erro"] = "health não respondeu em 60 s"
             return 1
         status_health, corpo_health = runtime.http_get(url + HEALTH_PATH)
@@ -114,9 +170,16 @@ def run_smoke() -> int:
         backend = nome_backend()
         cofre_ok = backend == "WinVaultKeyring"
         result.update(cofre_backend=backend, cofre_ok=cofre_ok)
+        # Admin inicial (só na 1ª execução): login real com a senha gerada.
+        # Em dev/CI o auth já foi importado com outro banco → só reporta.
+        admin_ok = True
+        result["admin_inicial"] = senha_admin is not None
+        if senha_admin is not None:
+            admin_ok = _login_ok(url, senha_admin)
+            result["admin_login_ok"] = admin_ok
         ok = status_health == 200 and status_ui == 200 and len(corpo_ui) > 0 and db_ok
         if runtime.is_frozen():
-            ok = ok and cofre_ok
+            ok = ok and cofre_ok and admin_ok
         result["smoke"] = "ok" if ok else "fail"
         return 0 if ok else 1
     except Exception as exc:  # noqa: BLE001 — smoke reporta qualquer falha
@@ -129,16 +192,20 @@ def run_smoke() -> int:
 
 def run_window() -> int:
     try:
-        server, thread, port, _db = _start_backend()
+        server, thread, port, _db, _senha = _start_backend()
     except Exception as exc:  # noqa: BLE001
+        _limpar_senha_do_ambiente()
         logger.exception("Falha ao iniciar o backend")
         _show_error(f"Falha ao preparar o banco/servidor.\nLog: {_log_path()}\n\n{type(exc).__name__}: {exc}")
         return 1
     url = runtime.base_url(port)
-    if not runtime.wait_until_healthy(url + HEALTH_PATH, timeout=60):
+    healthy = runtime.wait_until_healthy(url + HEALTH_PATH, timeout=60)
+    _limpar_senha_do_ambiente()
+    if not healthy:
         _stop_backend(server, thread)
         _show_error(f"O servidor interno não iniciou. Veja o log em:\n{_log_path()}")
         return 1
+    _avisar_primeiro_acesso(runtime.user_data_dir())
 
     import webview
 
