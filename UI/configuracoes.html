@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Motor Conect — Configurações</title>
   <link rel="stylesheet" href="design_system.css">
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="vendor/lucide/lucide-1.80.0.min.js"></script>
 </head>
 <body>
   <div class="app-container">
@@ -15,6 +15,10 @@
       <header class="mb-8 border-b pb-4" style="border-color: var(--border-subtle);">
         <h2 class="text-h1">Configurações</h2>
         <p class="text-body mt-2">Preferências do seu perfil de usuário. Alterações ficam associadas à sua conta.</p>
+        <a href="trocar_senha.html" id="link-trocar-senha" class="btn btn-ghost mt-4">
+          <i data-lucide="key-round" style="width: 18px; margin-right: 0.5rem;"></i>
+          Trocar senha
+        </a>
       </header>
 
       <div class="glass-card" style="max-width: 600px;">
@@ -47,6 +51,7 @@
       </div>
     </main>
   </div>
+  <script src="config.js"></script>
   <script src="components.js"></script>
   <script>
     (function () {

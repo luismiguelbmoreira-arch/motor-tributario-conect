@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="design_system.css">
   
   <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="vendor/lucide/lucide-1.80.0.min.js"></script>
 
   <style>
     /* Estilos específicos para a tabela administrativa */
@@ -136,11 +136,12 @@
     </div>
   </div>
 
+  <script src="config.js"></script>
   <script src="components.js"></script>
   <script>
     async function loadUsers() {
       try {
-        const res = await mcFetch(`${window.location.origin}/admin/usuarios`);
+        const res = await mcFetch(`/admin/usuarios`);
         const users = await res.json();
         
         document.getElementById('table-loading').classList.add('step-hidden');
