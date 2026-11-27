@@ -25,6 +25,7 @@ from sqlmodel import Session
 
 from api.dependencies import extrair_user_id, get_current_user
 from auth import UserDB, _auth_engine
+from services import chave_anthropic
 
 logger = logging.getLogger("motor_conect.api")
 
@@ -150,3 +151,76 @@ def atualizar_notificacoes(
             tema=tema,
             notificacoes_email=bool(user.notificacoes_email),
         )
+
+
+# ── Chave da Anthropic (só no app desktop) ────────────────────────────────
+# A chave fica no Gerenciador de Credenciais do Windows do usuário do Windows
+# (keyring). Nunca volta na resposta, nunca vai para log: só os 4 últimos.
+# Fora do modo desktop PUT/DELETE respondem 404 (servidor usa variável de ambiente).
+
+
+class ChaveAnthropicStatus(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    configurada: bool
+    origem: Literal["cofre_windows", "ambiente"] | None
+    final: str | None
+    editavel: bool
+
+
+class ChaveAnthropicRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # Sem restrições aqui de propósito: o 422 do Pydantic ecoaria a chave.
+    # Formato validado no handler com mensagem genérica.
+    chave: str
+
+
+def _exigir_modo_desktop() -> None:
+    if not chave_anthropic.modo_desktop():
+        raise HTTPException(status_code=404, detail="Not Found")
+
+
+@router.get(
+    "/settings/anthropic-key",
+    response_model=ChaveAnthropicStatus,
+    summary="Status da chave da Anthropic (nunca devolve a chave)",
+)
+def status_chave_anthropic() -> ChaveAnthropicStatus:
+    # Fora do desktop: 404 (não expõe origem nem final da chave do servidor)
+    _exigir_modo_desktop()
+    return ChaveAnthropicStatus(**chave_anthropic.status_chave())
+
+
+@router.put(
+    "/settings/anthropic-key",
+    response_model=ChaveAnthropicStatus,
+    summary="Salva a chave da Anthropic no cofre do Windows (app desktop)",
+)
+def salvar_chave(req: ChaveAnthropicRequest) -> ChaveAnthropicStatus:
+    _exigir_modo_desktop()
+    try:
+        chave_anthropic.salvar_chave_anthropic(req.chave)
+    except chave_anthropic.ChaveInvalida as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    except chave_anthropic.CofreIndisponivel:
+        raise HTTPException(status_code=503, detail="Cofre de credenciais indisponível.") from None
+    except Exception as exc:  # noqa: BLE001 — erro do backend do cofre; nunca ecoa a chave
+        logger.error("Falha ao salvar chave no cofre: %s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="Não foi possível salvar no cofre do Windows.") from None
+    return ChaveAnthropicStatus(**chave_anthropic.status_chave())
+
+
+@router.delete(
+    "/settings/anthropic-key",
+    response_model=ChaveAnthropicStatus,
+    summary="Remove a chave da Anthropic do cofre do Windows (app desktop)",
+)
+def apagar_chave() -> ChaveAnthropicStatus:
+    _exigir_modo_desktop()
+    try:
+        chave_anthropic.apagar_chave_anthropic()
+    except chave_anthropic.CofreIndisponivel:
+        raise HTTPException(status_code=503, detail="Cofre de credenciais indisponível.") from None
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Falha ao remover chave do cofre: %s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="Não foi possível remover do cofre do Windows.") from None
+    return ChaveAnthropicStatus(**chave_anthropic.status_chave())

@@ -32,7 +32,8 @@ cd PY
 | `PY/desktop/db_bootstrap.py` | cria/migra o SQLite do usuário a cada início (abaixo) |
 | `PY/desktop/motor_tributario.spec` | PyInstaller onedir; inclui só código alcançável + `UI/` + `alembic/` (nada de `.env`, `*.db`, `data/`) |
 | `PY/desktop/build_exe.ps1` | build + smoke |
-| `PY/requirements-desktop.txt` | pywebview + pyinstaller, versões fixas; fora do `requirements.txt` (CI Linux não instala) |
+| `PY/services/chave_anthropic.py` | de onde vem a `ANTHROPIC_API_KEY` (abaixo) |
+| `PY/requirements-desktop.txt` | pywebview + pyinstaller + keyring, versões fixas; fora do `requirements.txt` (CI Linux não instala) |
 
 Log do exe: `%APPDATA%\MotorTributario\logs\launcher.log`.
 
@@ -63,6 +64,25 @@ monta o schema atual do zero (a 1ª migration usa `sqlmodel` sem importar; a tab
 dependeu de `create_all`. **Migrations novas devem partir do schema dos modelos**
 (`alembic revision --autogenerate` contra um banco criado por `create_all`).
 
+## Chave da Anthropic (por usuário do Windows)
+
+O `.exe` não carrega chave nenhuma. Cada usuário cadastra a própria em
+**Configurações → Chave da Anthropic**; ela vai para o Gerenciador de Credenciais do
+Windows (`keyring`, serviço `MotorTributario`, usuário `ANTHROPIC_API_KEY`).
+
+| Onde roda | De onde vem a chave |
+|---|---|
+| `.exe` (`MOTOR_CONECT_DESKTOP=1`) | cofre do Windows → senão variável `ANTHROPIC_API_KEY` |
+| servidor / CI / testes | só a variável `ANTHROPIC_API_KEY` (o cofre nunca é lido) |
+
+- `GET /settings/anthropic-key` → `{configurada, origem, final (4 últimos), editavel}`; nunca a chave.
+- `GET`, `PUT` (`{"chave": "sk-ant-..."}`) e `DELETE` só existem no modo desktop (404 fora dele).
+- Precedência no exe: chave do cofre vence a variável de ambiente (cadastrar na tela substitui a do ambiente).
+- A chave é lida na hora do uso; não vai para `os.environ`, log nem resposta.
+- O cofre é do **usuário do Windows**: quem usa a mesma conta do Windows usa a mesma chave,
+  qualquer que seja o login no app.
+- Apagar à mão: Painel de Controle → Gerenciador de Credenciais → Credenciais do Windows → `MotorTributario`.
+
 ## Requisitos da máquina
 
 - Windows 10/11 com **Microsoft Edge WebView2 Runtime** (já vem no Windows 11).
@@ -71,6 +91,6 @@ dependeu de `create_all`. **Migrations novas devem partir do schema dos modelos*
 ## Limitações conhecidas (próximos PRs)
 
 - UI ainda carrega Inter (Google Fonts), lucide, chart.js e tailwind de CDN → sem internet a UI quebra.
-- `ANTHROPIC_API_KEY`, `JWT_SECRET_KEY` e `MOTOR_CONECT_MASTER_KEY` ainda vêm de `.env`/ambiente.
+- `JWT_SECRET_KEY` e `MOTOR_CONECT_MASTER_KEY` ainda vêm de `.env`/ambiente.
 - weasyprint sem GTK no bundle → `/relatorio/pdf` responde 503 no exe.
 - Sem assinatura de código: o SmartScreen avisa na primeira execução.

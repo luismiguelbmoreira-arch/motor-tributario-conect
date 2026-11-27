@@ -9,7 +9,7 @@
 
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_submodules, copy_metadata
 
 PY_DIR = Path(SPECPATH).resolve().parent  # noqa: F821 — SPECPATH injetado pelo PyInstaller
 REPO_DIR = PY_DIR.parent
@@ -22,12 +22,15 @@ for pkg in ("api", "core", "database", "schemas", "services", "utils", "observab
     hiddenimports += collect_submodules(pkg)
 # Alembic carrega env.py e versions/*.py do disco e importa seus módulos em runtime
 hiddenimports += collect_submodules("alembic")
+# keyring acha o backend por entry points (metadata) e importa em runtime
+hiddenimports += ["keyring.backends.Windows"]
 
 # alembic/ vai em disco (_internal/alembic), sem __pycache__: env.py + versions/*.py
 ALEMBIC_DIR = PY_DIR / "alembic"
 datas = [(str(REPO_DIR / "UI"), "UI")]
 datas += [(str(ALEMBIC_DIR / nome), "alembic") for nome in ("env.py", "script.py.mako")]
 datas += [(str(p), "alembic/versions") for p in sorted((ALEMBIC_DIR / "versions").glob("*.py"))]
+datas += copy_metadata("keyring")
 
 a = Analysis(  # noqa: F821
     [str(PY_DIR / "desktop" / "launcher.py")],
