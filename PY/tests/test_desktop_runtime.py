@@ -243,6 +243,22 @@ class TestAdminInicial:
         texto = runtime.arquivo_senha_inicial(tmp_path).read_text(encoding="utf-8")
         assert senha in texto and "admin" in texto
 
+    def test_senha_sem_caracteres_ambiguos(self, tmp_path):
+        """A senha é lida numa caixa do Windows: I/l/1, O/0 e sinais confundem quem digita."""
+        for i in range(200):
+            d = tmp_path / str(i)
+            d.mkdir()
+            senha = runtime.preparar_admin_inicial(d, {})
+            assert senha and len(senha) >= 16
+            assert not set(senha) & set("Il1O0o-_"), senha
+            assert set(senha) <= set(runtime.ADMIN_SENHA_ALFABETO)
+
+    def test_arquivo_diz_usuario_exato_em_minusculas(self, tmp_path):
+        runtime.preparar_admin_inicial(tmp_path, {})
+        texto = runtime.arquivo_senha_inicial(tmp_path).read_text(encoding="utf-8")
+        assert "Usuário: admin" in texto
+        assert "minúsculas" in texto
+
     def test_senha_diferente_por_instalacao(self, tmp_path):
         a, b = tmp_path / "a", tmp_path / "b"
         a.mkdir()

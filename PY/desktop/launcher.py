@@ -166,6 +166,7 @@ def _avisar_primeiro_acesso(data_dir: Path) -> None:
     mensagem = (
         f"{conteudo}\n"
         f"Arquivo: {arquivo}\n\n"
+        "Dica: abra o arquivo acima no Bloco de Notas e copie e cole a senha.\n"
         "Este aviso aparece enquanto o arquivo existir."
     )
     ctypes.windll.user32.MessageBoxW(None, mensagem, WINDOW_TITLE, 0x40)

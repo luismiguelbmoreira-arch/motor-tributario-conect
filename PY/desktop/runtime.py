@@ -46,6 +46,12 @@ _JWT_HEX_LEN = 64
 ADMIN_PASSWORD_ENV = "DEFAULT_ADMIN_PASSWORD"
 ADMIN_SENHA_FILENAME = "senha_inicial_admin.txt"
 ADMIN_USERNAME = "admin"  # auth.criar_admin_default cria sempre este usuário
+# A senha inicial é lida numa caixa do Windows e digitada à mão: sem I/l/1, O/o/0
+# nem sinais, que se confundem na fonte do sistema. 55 símbolos x 16 ≈ 92 bits.
+ADMIN_SENHA_ALFABETO = "".join(
+    c for c in string.ascii_letters + string.digits if c not in "Il1Oo0"
+)
+_ADMIN_SENHA_LEN = 16
 
 
 def is_frozen() -> bool:
@@ -240,11 +246,13 @@ def preparar_admin_inicial(
     env = os.environ if environ is None else environ
     if not banco_sem_usuarios(database_path(data_dir)):
         return None
-    senha = secrets.token_urlsafe(12)
+    senha = "".join(secrets.choice(ADMIN_SENHA_ALFABETO) for _ in range(_ADMIN_SENHA_LEN))
     texto = (
         "Motor Tributário Conect — primeiro acesso\n\n"
         f"Usuário: {ADMIN_USERNAME}\n"
         f"Senha:   {senha}\n\n"
+        f"Digite o usuário exatamente assim: {ADMIN_USERNAME} (em minúsculas).\n"
+        "A senha diferencia maiúsculas de minúsculas.\n"
         "Anote em lugar seguro e apague este arquivo.\n"
     )
     (data_dir / ADMIN_SENHA_FILENAME).write_text(texto, encoding="utf-8")
