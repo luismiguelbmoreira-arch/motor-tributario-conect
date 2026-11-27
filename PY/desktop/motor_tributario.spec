@@ -7,6 +7,7 @@
 # Empacota SÓ o necessário: código de PY/ alcançável a partir do launcher + UI/.
 # NUNCA inclui .env, *.db, data/ do repositório nem segredos.
 
+import sys
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_submodules, copy_metadata
@@ -27,7 +28,11 @@ hiddenimports += ["keyring.backends.Windows"]
 
 # alembic/ vai em disco (_internal/alembic), sem __pycache__: env.py + versions/*.py
 ALEMBIC_DIR = PY_DIR / "alembic"
-datas = [(str(REPO_DIR / "UI"), "UI")]
+# UI/ por tipo de arquivo (desktop.runtime.ui_datas), não a pasta inteira
+sys.path.insert(0, str(PY_DIR))
+from desktop.runtime import ui_datas  # noqa: E402
+
+datas = ui_datas(REPO_DIR / "UI")
 datas += [(str(ALEMBIC_DIR / nome), "alembic") for nome in ("env.py", "script.py.mako")]
 datas += [(str(p), "alembic/versions") for p in sorted((ALEMBIC_DIR / "versions").glob("*.py"))]
 datas += copy_metadata("keyring")
