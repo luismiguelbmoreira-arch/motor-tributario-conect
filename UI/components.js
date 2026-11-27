@@ -248,6 +248,9 @@
       else externalSignal.addEventListener('abort', function () { controller.abort(); });
     }
 
+    // Base da API vem de config.js (MC_CONFIG.API_BASE). Sem config.js, caminho segue relativo à página.
+    if (typeof window.mcApiUrl === 'function') url = window.mcApiUrl(url);
+
     let response;
     try {
       response = await fetch(url, options);
