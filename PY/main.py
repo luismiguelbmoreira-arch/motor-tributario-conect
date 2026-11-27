@@ -14,7 +14,7 @@ ENDPOINTS:
   POST /admin/usuarios/{id}/desativar   → desativar usuário (admin)
   POST /analise/manual                  → cálculo direto sem PDF (autenticado)
   POST /analise/pdf                     → upload PDFs e-CAC → extração → diagnóstico (autenticado)
-  POST /relatorio/pdf                   → gera PDF do diagnóstico via weasyprint (autenticado)
+  POST /relatorio/pdf                   → gera PDF do diagnóstico via weasyprint ou Edge headless (autenticado)
 
 USO:
   cd PY && uvicorn api_motor:app --reload --port 8000
@@ -81,6 +81,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from pydantic import ValidationError as PydanticValidationError  # noqa: E402
 from slowapi import _rate_limit_exceeded_handler  # noqa: E402
 from slowapi.errors import RateLimitExceeded  # noqa: E402
+from starlette.concurrency import run_in_threadpool  # noqa: E402
 
 # Adiciona PY/ ao path para imports relativos
 sys.path.insert(0, str(Path(__file__).parent))
@@ -955,7 +956,7 @@ def obter_analise_sessao(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# POST /relatorio/pdf — Geração de PDF via weasyprint (FASE 5)
+# POST /relatorio/pdf — Geração de PDF via weasyprint ou Edge headless (FASE 5)
 # ─────────────────────────────────────────────────────────────────────────────
 
 @app.post(
@@ -965,7 +966,7 @@ def obter_analise_sessao(
     responses={
         200: {"content": {"application/pdf": {}}, "description": "PDF gerado com sucesso"},
         422: {"description": "Diagnóstico inválido"},
-        503: {"description": "weasyprint não disponível"},
+        503: {"description": "sem motor de PDF (weasyprint/GTK ou Microsoft Edge)"},
     },
 )
 async def gerar_relatorio_pdf(
@@ -994,8 +995,8 @@ async def gerar_relatorio_pdf(
         raise HTTPException(
             status_code=503,
             detail=(
-                "Geração de PDF indisponível — weasyprint/GTK não instalado. "
-                "No Windows: instale GTK3 Runtime em https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer"
+                "Geração de PDF indisponível — sem weasyprint/GTK e sem Microsoft Edge. "
+                "No Windows: instale o Microsoft Edge ou o GTK3 Runtime."
             ),
         )
 
@@ -1009,12 +1010,13 @@ async def gerar_relatorio_pdf(
         pii = None
 
     try:
-        pdf_bytes = _gerar_pdf(diagnostico, pii=pii)
+        # Geração é síncrona (até 60 s no Edge): numa thread, para não travar o servidor.
+        pdf_bytes = await run_in_threadpool(_gerar_pdf, diagnostico, pii=pii)
     except RuntimeError as exc:
         if "não instalado" in str(exc):
             raise HTTPException(
                 status_code=503,
-                detail="Geração de PDF indisponível — weasyprint não instalado no servidor.",
+                detail="Geração de PDF indisponível — sem weasyprint/GTK e sem Microsoft Edge no servidor.",
             )
         logger.error("Erro ao gerar PDF: %s", exc)
         raise HTTPException(status_code=500, detail="Falha na geração do PDF.")

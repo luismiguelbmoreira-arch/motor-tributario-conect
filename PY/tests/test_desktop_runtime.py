@@ -244,6 +244,12 @@ def desktop_isolado(monkeypatch, tmp_path):
         for nome in ("DATABASE_URL", runtime.STORAGE_DIR_ENV, runtime.DESKTOP_FLAG_ENV, runtime.UI_DIR_ENV):
             os.environ.pop(nome, None)
         monkeypatch.chdir(tmp_path)
+        # PDF do smoke: Edge falso (o teste real do Edge fica em test_relatorio_pdf_motor.py)
+        from services import relatorio_pdf
+
+        monkeypatch.setattr(relatorio_pdf, "_tentar_importar_weasyprint", lambda: False)
+        monkeypatch.setattr(relatorio_pdf, "_achar_navegador_pdf", lambda: "msedge.exe")
+        monkeypatch.setattr(relatorio_pdf, "_pdf_via_navegador", lambda html, nav: b"%PDF-falso")
         yield tmp_path
 
 
@@ -263,6 +269,30 @@ class TestLauncherSmoke:
         senha = runtime.arquivo_senha_inicial(dados).read_text(encoding="utf-8").split("Senha:")[1].split()[0]
         assert senha not in saida
         assert runtime.ADMIN_PASSWORD_ENV not in os.environ  # limpa depois da startup
+        assert '"pdf_motor_ok": true' in saida
+
+    def test_smoke_reporta_pdf_sem_motor(self, desktop_isolado, capsys, monkeypatch):
+        from services import relatorio_pdf
+
+        monkeypatch.setattr(relatorio_pdf, "_achar_navegador_pdf", lambda: None)
+        assert launcher.run_smoke() == 0  # fora do exe só reporta
+        saida = capsys.readouterr().out
+        assert '"pdf_motor_ok": false' in saida
+        assert "não instalado" in saida
+
+    def test_pdf_ok_com_token_chama_endpoint(self, monkeypatch, desktop_isolado):
+        from services import relatorio_pdf  # noqa: F401 — fixture já trocou o Edge
+
+        chamadas = []
+
+        def post(url, dados, token=None, timeout=10):
+            chamadas.append((url, dados, token))
+            return 200, b"%PDF-falso"
+
+        monkeypatch.setattr(launcher, "_post_json", post)
+        info = launcher._pdf_ok("http://127.0.0.1:1", "tok")
+        assert info == {"pdf_motor_ok": True, "pdf_endpoint_status": 200, "pdf_endpoint_ok": True}
+        assert chamadas == [("http://127.0.0.1:1/relatorio/pdf", {"diagnostico": {}}, "tok")]
 
     def test_segundo_smoke_reaproveita_secret_e_nao_gera_senha(self, desktop_isolado, capsys, monkeypatch):
         dados = desktop_isolado / "MotorTributario"

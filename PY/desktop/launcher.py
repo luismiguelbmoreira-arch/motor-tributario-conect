@@ -14,8 +14,9 @@ Fluxo:
 Modo de verificação sem janela:
   MotorTributario.exe --smoke
   → sobe o servidor, checa /health, /ui/login.html, o banco em %APPDATA% e
-    (no exe) o backend do cofre do Windows e, na 1ª execução, o login do admin
-    inicial; grava o resultado no log e sai com código 0 (ok) ou 1 (falha).
+    (no exe) o backend do cofre do Windows, o PDF do relatório (weasyprint ou
+    Edge headless) e, na 1ª execução, o login do admin inicial e o endpoint
+    /relatorio/pdf; grava o resultado no log e sai com código 0 (ok) ou 1 (falha).
 
 Segredos por instalação (em %APPDATA%/MotorTributario):
   jwt_secret               → JWT_SECRET_KEY (criado na 1ª execução)
@@ -34,6 +35,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 if __package__ in (None, ""):
     # Executado como script (PyInstaller): garante PY/ no sys.path
@@ -45,6 +47,7 @@ WINDOW_TITLE = "Motor Tributário Conect"
 START_PATH = "/ui/login.html"
 HEALTH_PATH = "/health"
 LOGIN_PATH = "/auth/login"
+RELATORIO_PDF_PATH = "/relatorio/pdf"
 WEBVIEW2_URL = "https://developer.microsoft.com/microsoft-edge/webview2/"
 
 logger = logging.getLogger("motor_conect.desktop")
@@ -99,20 +102,54 @@ def _limpar_senha_do_ambiente() -> None:
     os.environ.pop(runtime.ADMIN_PASSWORD_ENV, None)
 
 
-def _login_ok(url: str, senha: str) -> bool:
-    """POST /auth/login com o admin inicial. Só devolve True/False."""
+def _post_json(url: str, dados: dict, token: Optional[str] = None, timeout: int = 10):
+    """POST JSON com urllib. Devolve (status, corpo) ou (None, b"") em erro de rede."""
     import urllib.error
     import urllib.request
 
-    corpo = json.dumps({"username": runtime.ADMIN_USERNAME, "password": senha}).encode("utf-8")
-    req = urllib.request.Request(
-        url + LOGIN_PATH, data=corpo, headers={"Content-Type": "application/json"}, method="POST"
-    )
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(url, data=json.dumps(dados).encode("utf-8"), headers=headers, method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            return resp.status == 200
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status, resp.read()
+    except urllib.error.HTTPError as exc:
+        return exc.code, b""
     except (urllib.error.URLError, OSError):
-        return False
+        return None, b""
+
+
+def _login_token(url: str, senha: str) -> Optional[str]:
+    """POST /auth/login com o admin inicial. Devolve o JWT (nunca vai para log) ou None."""
+    status, corpo = _post_json(url + LOGIN_PATH, {"username": runtime.ADMIN_USERNAME, "password": senha})
+    if status != 200:
+        return None
+    try:
+        return json.loads(corpo.decode("utf-8")).get("access_token")
+    except ValueError:
+        return None
+
+
+def _pdf_ok(url: str, token: Optional[str]) -> dict:
+    """Prova que o PDF do relatório sai neste computador, com diagnóstico vazio (sem dado real).
+
+    Sempre testa o motor direto; com token (1ª execução) também o endpoint real.
+    O PDF não é gravado em disco.
+    """
+    from services.relatorio_pdf import gerar_pdf
+
+    info: dict = {}
+    try:
+        info["pdf_motor_ok"] = gerar_pdf({}).startswith(b"%PDF")
+    except RuntimeError as exc:
+        info["pdf_motor_ok"] = False
+        info["pdf_erro"] = str(exc)[:200]
+    if token:
+        status, corpo = _post_json(url + RELATORIO_PDF_PATH, {"diagnostico": {}}, token=token, timeout=90)
+        info["pdf_endpoint_status"] = status
+        info["pdf_endpoint_ok"] = status == 200 and corpo.startswith(b"%PDF")
+    return info
 
 
 def _avisar_primeiro_acesso(data_dir: Path) -> None:
@@ -173,13 +210,19 @@ def run_smoke() -> int:
         # Admin inicial (só na 1ª execução): login real com a senha gerada.
         # Em dev/CI o auth já foi importado com outro banco → só reporta.
         admin_ok = True
+        token = None
         result["admin_inicial"] = senha_admin is not None
         if senha_admin is not None:
-            admin_ok = _login_ok(url, senha_admin)
+            token = _login_token(url, senha_admin)
+            admin_ok = token is not None
             result["admin_login_ok"] = admin_ok
+        # PDF do relatório: no exe tem que sair (antes respondia 503 sem GTK).
+        pdf = _pdf_ok(url, token)
+        result.update(pdf)
+        pdf_ok = pdf["pdf_motor_ok"] and pdf.get("pdf_endpoint_ok", True)
         ok = status_health == 200 and status_ui == 200 and len(corpo_ui) > 0 and db_ok
         if runtime.is_frozen():
-            ok = ok and cofre_ok and admin_ok
+            ok = ok and cofre_ok and admin_ok and pdf_ok
         result["smoke"] = "ok" if ok else "fail"
         return 0 if ok else 1
     except Exception as exc:  # noqa: BLE001 — smoke reporta qualquer falha
