@@ -44,7 +44,7 @@
           <label class="input-label" for="username">Usuário</label>
           <div class="auto-utils-d85c4e">
             <i data-lucide="user" class="auto-utils-1d2286"></i>
-            <input type="text" id="username" class="input-field auto-utils-4355ff" placeholder="Administrador" required>
+            <input type="text" id="username" class="input-field auto-utils-4355ff" placeholder="admin" autocapitalize="none" autocomplete="username" spellcheck="false" required>
           </div>
         </div>
 
@@ -151,7 +151,8 @@
       e.preventDefault();
       generalError.classList.add('step-hidden');
       
-      const username = document.getElementById('username').value;
+      // trim: espaço/quebra de linha de copiar e colar não pode virar "Credenciais inválidas"
+      const username = document.getElementById('username').value.trim();
       const password = passwordField.value;
 
       if (!username || !password) return;
