@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conect — Trocar senha</title>
+
+  <!-- CSS Centralizado (Design System) -->
+  <link rel="stylesheet" href="design_system.css">
+
+  <!-- Lucide Icons -->
+  <script src="vendor/lucide/lucide-1.80.0.min.js"></script>
+</head>
+
+<body class="justify-center items-center">
+
+  <!-- Background Decorativo (mesmo do login) -->
+  <div class="auto-utils-033a97">
+    <div class="auto-utils-165bff"></div>
+    <div class="auto-utils-1715cc"></div>
+  </div>
+
+  <div class="animate-fade-slide-up auto-utils-8034b6">
+    <!-- Logo -->
+    <div class="flex-col items-center gap-4 mb-6 text-center">
+      <div class="auto-utils-81e712">
+        <i data-lucide="shield-check" class="auto-utils-a7c5b3"></i>
+      </div>
+      <div>
+        <h2 class="text-h2">Conect Motor</h2>
+        <p class="text-muted auto-utils-04ce76">Sistema de Auditoria Fiscal 2026–2033</p>
+      </div>
+    </div>
+
+    <div class="glass-card">
+      <div class="mb-6">
+        <h3 class="text-h2 auto-utils-14fa87">Trocar senha</h3>
+        <p class="text-body" id="trocaSubtitulo">Escolha uma nova senha com no mínimo 8 caracteres.</p>
+      </div>
+
+      <form id="trocaForm" novalidate>
+        <div class="input-group">
+          <label class="input-label" for="senhaAtual">Senha atual</label>
+          <div class="auto-utils-d85c4e">
+            <i data-lucide="lock" class="auto-utils-1d2286"></i>
+            <input type="password" id="senhaAtual" class="input-field auto-utils-4355ff" placeholder="••••••••" autocomplete="current-password" required>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label class="input-label" for="novaSenha">Nova senha</label>
+          <div class="auto-utils-d85c4e">
+            <i data-lucide="key-round" class="auto-utils-1d2286"></i>
+            <input type="password" id="novaSenha" class="input-field auto-utils-4355ff" placeholder="Mínimo 8 caracteres" autocomplete="new-password" minlength="8" required>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label class="input-label" for="confirmaSenha">Confirmar nova senha</label>
+          <div class="auto-utils-d85c4e">
+            <i data-lucide="key-round" class="auto-utils-1d2286"></i>
+            <input type="password" id="confirmaSenha" class="input-field auto-utils-4355ff" placeholder="Repita a nova senha" autocomplete="new-password" minlength="8" required>
+          </div>
+        </div>
+
+        <button type="submit" id="trocaBtn" class="btn btn-primary w-full mt-4">
+          <span id="trocaBtnText">Salvar nova senha</span>
+        </button>
+
+        <a href="configuracoes.html" id="trocaVoltar" class="btn btn-ghost w-full mt-4">Voltar</a>
+
+        <div id="trocaErro" class="step-hidden mt-4 p-4 text-danger text-center auto-utils-37c052"></div>
+      </form>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="components.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      lucide.createIcons();
+
+      // Troca obrigatória (1º acesso / senha resetada): login.html grava a
+      // flag quando /auth/login devolve must_change_password=true. Enquanto
+      // ela existir, components.js prende o usuário nesta página.
+      const obrigatoria = sessionStorage.getItem('must_change_password') === '1';
+
+      const form = document.getElementById('trocaForm');
+      const btn = document.getElementById('trocaBtn');
+      const btnText = document.getElementById('trocaBtnText');
+      const erro = document.getElementById('trocaErro');
+      const voltar = document.getElementById('trocaVoltar');
+
+      if (obrigatoria) {
+        document.getElementById('trocaSubtitulo').textContent =
+          'Primeiro acesso: troque a senha antes de continuar. Mínimo de 8 caracteres.';
+        voltar.textContent = 'Sair';
+        voltar.setAttribute('href', 'login.html');
+        voltar.addEventListener('click', function (e) {
+          e.preventDefault();
+          window.mcLogout();
+        });
+      }
+
+      function mostrarErro(msg) {
+        erro.textContent = msg;
+        erro.classList.remove('step-hidden');
+      }
+
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        erro.classList.add('step-hidden');
+
+        const senhaAtual = document.getElementById('senhaAtual').value;
+        const novaSenha = document.getElementById('novaSenha').value;
+        const confirma = document.getElementById('confirmaSenha').value;
+
+        if (!senhaAtual) { mostrarErro('Informe a senha atual.'); return; }
+        if (novaSenha.length < 8) { mostrarErro('A nova senha deve ter no mínimo 8 caracteres.'); return; }
+        if (novaSenha !== confirma) { mostrarErro('A confirmação não confere com a nova senha.'); return; }
+        if (novaSenha === senhaAtual) { mostrarErro('A nova senha deve ser diferente da atual.'); return; }
+
+        btn.disabled = true;
+        btnText.textContent = 'Salvando...';
+
+        try {
+          const res = await window.mcFetch('/auth/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senha_atual: senhaAtual, nova_senha: novaSenha }),
+          });
+
+          if (res.ok) {
+            sessionStorage.removeItem('must_change_password');
+            window.mcToast('Senha alterada.', 'success');
+            window.location.href = obrigatoria ? 'dashboard.html' : 'configuracoes.html';
+            return;
+          }
+
+          // 400 traz detail em texto (senha atual errada). 422 traz uma lista
+          // de erros de validação — mensagem genérica.
+          let msg = 'Não foi possível trocar a senha. Tente novamente.';
+          if (res.status === 400) {
+            try {
+              const data = await res.json();
+              if (data && typeof data.detail === 'string') msg = data.detail;
+            } catch (_) { /* corpo inválido — mantém genérica */ }
+          } else if (res.status === 422) {
+            msg = 'Senha inválida. Use no mínimo 8 caracteres.';
+          }
+          mostrarErro(msg);
+        } catch (err) {
+          mostrarErro(err && err.message ? err.message : 'Erro de conexão com o servidor.');
+        } finally {
+          btn.disabled = false;
+          btnText.textContent = 'Salvar nova senha';
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

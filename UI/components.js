@@ -182,6 +182,20 @@
     }
   }
 
+  // ─── Troca de senha obrigatória ───────────────────────────────────
+  // login.html grava must_change_password='1' quando o backend pede troca
+  // (1º acesso / senha resetada). Até trocar, só login e trocar_senha abrem.
+  // Guard só de UI: a API não bloqueia as outras rotas.
+  const PAGINAS_LIVRES_TROCA_SENHA = ['login.html', 'trocar_senha.html'];
+  function trocaSenhaGuard() {
+    if (PAGINAS_LIVRES_TROCA_SENHA.includes(currentPage())) return false;
+    if (sessionStorage.getItem('must_change_password') === '1') {
+      window.location.href = 'trocar_senha.html';
+      return true;
+    }
+    return false;
+  }
+
   // ─── Toast utility (disponível globalmente) ───────────────────────
   window.mcToast = function (msg, type) {
     type = type || 'success';
@@ -247,6 +261,9 @@
       if (externalSignal.aborted) controller.abort();
       else externalSignal.addEventListener('abort', function () { controller.abort(); });
     }
+
+    // Base da API vem de config.js (MC_CONFIG.API_BASE). Sem config.js, caminho segue relativo à página.
+    if (typeof window.mcApiUrl === 'function') url = window.mcApiUrl(url);
 
     let response;
     try {
@@ -452,6 +469,7 @@
 
   function boot() {
     authGuard();
+    if (trocaSenhaGuard()) return;
     injectSidebar();
     setupLogout();
     setupJwtRefreshLoop();

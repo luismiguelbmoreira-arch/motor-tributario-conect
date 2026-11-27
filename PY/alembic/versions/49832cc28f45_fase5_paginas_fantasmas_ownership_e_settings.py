@@ -51,17 +51,23 @@ def upgrade() -> None:
 
     SQLite ALTER TABLE limitado → batch_alter_table emula via drop+recreate.
     """
+    # `users` nasce do create_all do app (auth.py), não desta cadeia. Em banco
+    # vazio ela ainda não existe: a FK e as colunas de users ficam para a
+    # revisão a1c3e5f7b9d2, que cria a tabela.
+    tem_users = sa.inspect(op.get_bind()).has_table('users')
+
     # 1. diagnosticos — ownership
     with op.batch_alter_table('diagnosticos', schema=None) as batch_op:
         batch_op.add_column(
             sa.Column('uploaded_by_user_id', sa.Integer(), nullable=True),
         )
-        batch_op.create_foreign_key(
-            'fk_diagnosticos_uploaded_by_user_id',
-            'users',
-            ['uploaded_by_user_id'],
-            ['id'],
-        )
+        if tem_users:
+            batch_op.create_foreign_key(
+                'fk_diagnosticos_uploaded_by_user_id',
+                'users',
+                ['uploaded_by_user_id'],
+                ['id'],
+            )
         batch_op.create_index(
             batch_op.f('ix_diagnosticos_uploaded_by_user_id'),
             ['uploaded_by_user_id'],
@@ -69,6 +75,8 @@ def upgrade() -> None:
         )
 
     # 2+3. users — preferências
+    if not tem_users:
+        return
     with op.batch_alter_table('users', schema=None) as batch_op:
         batch_op.add_column(
             sa.Column(
@@ -90,9 +98,10 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Reverte as 3 colunas adicionadas."""
-    with op.batch_alter_table('users', schema=None) as batch_op:
-        batch_op.drop_column('notificacoes_email')
-        batch_op.drop_column('tema')
+    if sa.inspect(op.get_bind()).has_table('users'):
+        with op.batch_alter_table('users', schema=None) as batch_op:
+            batch_op.drop_column('notificacoes_email')
+            batch_op.drop_column('tema')
 
     with op.batch_alter_table('diagnosticos', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_diagnosticos_uploaded_by_user_id'))
