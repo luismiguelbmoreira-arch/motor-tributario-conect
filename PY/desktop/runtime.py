@@ -8,7 +8,8 @@ em qualquer SO (inclusive no CI Linux). O launcher (`desktop/launcher.py`)
 
 Responsabilidades:
   - achar porta TCP livre em 127.0.0.1
-  - localizar recursos (UI/) dentro e fora do bundle PyInstaller
+  - localizar recursos (UI/, alembic/) dentro e fora do bundle PyInstaller
+  - apontar banco e PDFs cifrados para %APPDATA%\\MotorTributario
   - garantir stdout/stderr válidos num .exe sem console
   - montar o servidor uvicorn com loop/http explícitos (sem imports dinâmicos)
   - esperar o /health responder antes de abrir a janela
@@ -29,6 +30,11 @@ from typing import Any, Callable, Optional, TextIO
 HOST = "127.0.0.1"
 APP_DIR_NAME = "MotorTributario"
 UI_DIR_ENV = "MOTOR_CONECT_UI_DIR"
+# main.py: com esta flag, .env não sobrescreve o que o launcher definiu
+DESKTOP_FLAG_ENV = "MOTOR_CONECT_DESKTOP"
+# services/storage_cifrado.py lê esta variável (PDFs cifrados da auditoria)
+STORAGE_DIR_ENV = "MOTOR_CONECT_STORAGE_DIR"
+DB_FILENAME = "motor_tributario.db"
 
 
 def is_frozen() -> bool:
@@ -93,14 +99,45 @@ def ensure_std_streams(log_path: Path) -> Optional[TextIO]:
     return stream
 
 
-def prepare_environment(environ: Optional[dict[str, str]] = None) -> None:
+def alembic_dir() -> Path:
+    """Pasta `alembic/` (env.py + versions/). Frozen: `_internal/alembic`; dev: `PY/alembic`."""
+    if is_frozen():
+        return resource_root() / "alembic"
+    return resource_root() / "PY" / "alembic"
+
+
+def database_path(data_dir: Path) -> Path:
+    return data_dir / DB_FILENAME
+
+
+def sqlite_url(path: Path) -> str:
+    """`sqlite:///C:/Users/.../motor_tributario.db` (barras normais, caminho absoluto)."""
+    return "sqlite:///" + path.resolve().as_posix()
+
+
+def desktop_environment(data_dir: Path) -> dict[str, str]:
+    """Variáveis que o .exe FORÇA (não setdefault): banco e PDFs cifrados do usuário
+    ficam em `data_dir`, nunca dentro do bundle nem no diretório atual."""
+    return {
+        DESKTOP_FLAG_ENV: "1",
+        "DATABASE_URL": sqlite_url(database_path(data_dir)),
+        STORAGE_DIR_ENV: str(data_dir / "auditoria"),
+    }
+
+
+def prepare_environment(
+    environ: Optional[dict[str, str]] = None, data_dir: Optional[Path] = None
+) -> None:
     """Define variáveis lidas por `main.py` ANTES de importá-lo.
 
-    Só preenche o que não estiver definido (setdefault): o usuário avançado
-    continua podendo sobrescrever tudo por variável de ambiente.
+    `MOTOR_CONECT_UI_DIR` só é preenchido se faltar (setdefault).
+    Com `data_dir`, aplica `desktop_environment(data_dir)` por cima de tudo.
     """
     env = os.environ if environ is None else environ
     env.setdefault(UI_DIR_ENV, str(ui_dir()))
+    if data_dir is not None:
+        data_dir.mkdir(parents=True, exist_ok=True)
+        env.update(desktop_environment(data_dir))
 
 
 def build_server(app: Any, port: int, host: str = HOST) -> Any:

@@ -4,7 +4,8 @@ desktop/launcher.py — Ponto de entrada do .exe Windows.
 
 Fluxo:
   1. garante stdout/stderr (exe sem console) e prepara variáveis de ambiente
-  2. importa a FastAPI de `main.py`
+     (banco e PDFs cifrados em %APPDATA%/MotorTributario)
+  2. cria/migra o banco (desktop/db_bootstrap.py) e importa a FastAPI de `main.py`
   3. sobe uvicorn numa thread em 127.0.0.1:<porta livre>
   4. espera GET /health == 200
   5. abre janela nativa (pywebview + WebView2) em /ui/login.html
@@ -12,7 +13,8 @@ Fluxo:
 
 Modo de verificação sem janela:
   MotorTributario.exe --smoke
-  → sobe o servidor, checa /health e /ui/login.html, grava o resultado no log
+  → sobe o servidor, checa /health, /ui/login.html e o banco em %APPDATA%,
+    grava o resultado no log
     e sai com código 0 (ok) ou 1 (falha).
 
 Dev (sem empacotar), a partir de PY/:
@@ -25,6 +27,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -32,7 +35,7 @@ if __package__ in (None, ""):
     # Executado como script (PyInstaller): garante PY/ no sys.path
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from desktop import runtime  # noqa: E402
+from desktop import db_bootstrap, runtime  # noqa: E402
 
 WINDOW_TITLE = "Motor Tributário Conect"
 START_PATH = "/ui/login.html"
@@ -60,14 +63,21 @@ def _show_error(message: str) -> None:
         ctypes.windll.user32.MessageBoxW(None, message, WINDOW_TITLE, 0x10)
 
 
-def _start_backend() -> tuple[object, object, int]:
-    runtime.prepare_environment()
+def _start_backend() -> tuple[object, object, int, dict]:
+    data_dir = runtime.user_data_dir()
+    runtime.prepare_environment(data_dir=data_dir)
+    # cwd = pasta de dados: nenhum caminho relativo (ou .env solto) cai na pasta do .exe
+    os.chdir(data_dir)
+    db_info = db_bootstrap.bootstrap_database(runtime.alembic_dir())
+    db_info["arquivo"] = str(runtime.database_path(data_dir))
+    logger.info("Banco: %s", db_info)
+
     from main import app  # import estático: PyInstaller coleta main.py e dependências
 
     port = runtime.find_free_port()
     server = runtime.build_server(app, port)
     thread = runtime.start_server_thread(server)
-    return server, thread, port
+    return server, thread, port, db_info
 
 
 def _stop_backend(server: object, thread: object) -> None:
@@ -76,9 +86,9 @@ def _stop_backend(server: object, thread: object) -> None:
 
 
 def run_smoke() -> int:
-    server, thread, port = _start_backend()
+    server, thread, port, db_info = _start_backend()
     url = runtime.base_url(port)
-    result: dict = {"smoke": "fail", "port": port, "frozen": runtime.is_frozen()}
+    result: dict = {"smoke": "fail", "port": port, "frozen": runtime.is_frozen(), "db": db_info}
     try:
         if not runtime.wait_until_healthy(url + HEALTH_PATH, timeout=60):
             result["erro"] = "health não respondeu em 60 s"
@@ -91,7 +101,13 @@ def run_smoke() -> int:
             ui_status=status_ui,
             ui_bytes=len(corpo_ui),
         )
-        ok = status_health == 200 and status_ui == 200 and len(corpo_ui) > 0
+        db_ok = (
+            Path(db_info["arquivo"]).is_file()
+            and db_info["head"] is not None
+            and db_info["revisao"] == db_info["head"]
+        )
+        result["db_ok"] = db_ok
+        ok = status_health == 200 and status_ui == 200 and len(corpo_ui) > 0 and db_ok
         result["smoke"] = "ok" if ok else "fail"
         return 0 if ok else 1
     except Exception as exc:  # noqa: BLE001 — smoke reporta qualquer falha
@@ -103,7 +119,12 @@ def run_smoke() -> int:
 
 
 def run_window() -> int:
-    server, thread, port = _start_backend()
+    try:
+        server, thread, port, _db = _start_backend()
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Falha ao iniciar o backend")
+        _show_error(f"Falha ao preparar o banco/servidor.\nLog: {_log_path()}\n\n{type(exc).__name__}: {exc}")
+        return 1
     url = runtime.base_url(port)
     if not runtime.wait_until_healthy(url + HEALTH_PATH, timeout=60):
         _stop_backend(server, thread)

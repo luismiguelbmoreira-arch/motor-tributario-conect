@@ -20,12 +20,20 @@ hiddenimports += collect_submodules("passlib.handlers")
 # Pacotes do próprio projeto: garante routers/serviços importados de forma indireta
 for pkg in ("api", "core", "database", "schemas", "services", "utils", "observability", "parsers"):
     hiddenimports += collect_submodules(pkg)
+# Alembic carrega env.py e versions/*.py do disco e importa seus módulos em runtime
+hiddenimports += collect_submodules("alembic")
+
+# alembic/ vai em disco (_internal/alembic), sem __pycache__: env.py + versions/*.py
+ALEMBIC_DIR = PY_DIR / "alembic"
+datas = [(str(REPO_DIR / "UI"), "UI")]
+datas += [(str(ALEMBIC_DIR / nome), "alembic") for nome in ("env.py", "script.py.mako")]
+datas += [(str(p), "alembic/versions") for p in sorted((ALEMBIC_DIR / "versions").glob("*.py"))]
 
 a = Analysis(  # noqa: F821
     [str(PY_DIR / "desktop" / "launcher.py")],
     pathex=[str(PY_DIR)],
     binaries=[],
-    datas=[(str(REPO_DIR / "UI"), "UI")],
+    datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     runtime_hooks=[],
